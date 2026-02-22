@@ -13,8 +13,10 @@ public func registerAllTools(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    artifacts: ArtifactStore
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
+    await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
 }

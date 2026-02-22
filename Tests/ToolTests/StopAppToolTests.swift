@@ -1,5 +1,5 @@
 //
-//  EraseSimulatorToolTests.swift
+//  StopAppToolTests.swift
 //  ios-mcp
 //
 //  Created by Jared Manfredi
@@ -10,10 +10,10 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("erase_simulator")
-struct EraseSimulatorToolTests {
+@Suite("stop_app")
+struct StopAppToolTests {
 
-    @Test("Erases simulator")
+    @Test("Stops app on simulator")
     func happyPath() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
@@ -26,25 +26,31 @@ struct EraseSimulatorToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let response = try await registry.callTool(
-            name: "erase_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            name: "stop_app",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "bundle_id": .string("com.example.app"),
+            ]
         )
 
         if case .success(let result) = response {
-            #expect(result.content.contains("erased successfully"))
+            #expect(result.content.contains("Stopped com.example.app"))
+            #expect(result.content.contains("AAAA-1111"))
         } else {
             Issue.record("Expected success response")
         }
 
         let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("erase"))
+        #expect(capturedArgs.contains("terminate"))
         #expect(capturedArgs.contains("AAAA-1111"))
+        #expect(capturedArgs.contains("com.example.app"))
     }
 
-    @Test("Falls back to session UDID")
+    @Test("Falls back to session defaults")
     func sessionFallback() async throws {
         let session = SessionStore()
         await session.set(.simulatorUDID, value: "SESSION-UDID")
+        await session.set(.bundleID, value: "com.session.app")
 
         let registry = ToolRegistry()
         let capture = ArgCapture()
@@ -55,21 +61,28 @@ struct EraseSimulatorToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
-        _ = try await registry.callTool(name: "erase_simulator", arguments: [:])
+        let response = try await registry.callTool(name: "stop_app", arguments: [:])
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("SESSION-UDID"))
+        if case .success = response {
+            let capturedArgs = await capture.lastArgs
+            #expect(capturedArgs.contains("SESSION-UDID"))
+            #expect(capturedArgs.contains("com.session.app"))
+        } else {
+            Issue.record("Expected success response")
+        }
     }
 
     @Test("Errors when no UDID available")
     func missingUDID() async throws {
         let session = SessionStore()
+        await session.set(.bundleID, value: "com.example.app")
+
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
-        let response = try await registry.callTool(name: "erase_simulator", arguments: [:])
+        let response = try await registry.callTool(name: "stop_app", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -79,44 +92,47 @@ struct EraseSimulatorToolTests {
         }
     }
 
-    @Test("Returns error when simctl erase fails")
-    func commandFailure() async throws {
+    @Test("Errors when no bundle_id available")
+    func missingBundleID() async throws {
         let session = SessionStore()
+        await session.set(.simulatorUDID, value: "AAAA-1111")
+
         let registry = ToolRegistry()
-        let executor = MockCommandExecutor.failingWith(stderr: "Unable to erase contents and settings: device is booted")
+        let executor = MockCommandExecutor.succeedingWith("")
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let response = try await registry.callTool(
-            name: "erase_simulator",
+            name: "stop_app",
             arguments: ["udid": .string("AAAA-1111")]
         )
 
         if case .error(let error) = response {
-            #expect(error.code == .commandFailed)
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("No bundle_id"))
         } else {
             Issue.record("Expected error response")
         }
     }
 
-    @Test("Returns resource busy when lock held")
-    func resourceBusy() async throws {
+    @Test("Returns error when simctl terminate fails")
+    func commandFailure() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let concurrency = ConcurrencyPolicy()
-        let executor = MockCommandExecutor.succeedingWith("")
+        let executor = MockCommandExecutor.failingWith(stderr: "An error was encountered processing the command")
 
-        _ = await concurrency.acquire(key: "simulator:AAAA-1111", owner: "other_operation")
-
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let response = try await registry.callTool(
-            name: "erase_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            name: "stop_app",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "bundle_id": .string("com.example.app"),
+            ]
         )
 
         if case .error(let error) = response {
-            #expect(error.code == .resourceBusy)
+            #expect(error.code == .commandFailed)
         } else {
             Issue.record("Expected error response")
         }

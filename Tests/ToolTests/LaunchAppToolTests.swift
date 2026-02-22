@@ -1,5 +1,5 @@
 //
-//  ShutdownSimulatorToolTests.swift
+//  LaunchAppToolTests.swift
 //  ios-mcp
 //
 //  Created by Jared Manfredi
@@ -10,41 +10,47 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("shutdown_simulator")
-struct ShutdownSimulatorToolTests {
+@Suite("launch_app")
+struct LaunchAppToolTests {
 
-    @Test("Shuts down simulator")
+    @Test("Launches app on simulator")
     func happyPath() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
             await capture.capture(args)
-            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+            return CommandResult(stdout: "com.example.app: 12345", stderr: "", exitCode: 0)
         }
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let response = try await registry.callTool(
-            name: "shutdown_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            name: "launch_app",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "bundle_id": .string("com.example.app"),
+            ]
         )
 
         if case .success(let result) = response {
-            #expect(result.content.contains("shut down successfully"))
+            #expect(result.content.contains("Launched com.example.app"))
+            #expect(result.content.contains("AAAA-1111"))
         } else {
             Issue.record("Expected success response")
         }
 
         let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("shutdown"))
+        #expect(capturedArgs.contains("launch"))
         #expect(capturedArgs.contains("AAAA-1111"))
+        #expect(capturedArgs.contains("com.example.app"))
     }
 
-    @Test("Falls back to session UDID")
+    @Test("Falls back to session defaults for UDID and bundle_id")
     func sessionFallback() async throws {
         let session = SessionStore()
         await session.set(.simulatorUDID, value: "SESSION-UDID")
+        await session.set(.bundleID, value: "com.session.app")
 
         let registry = ToolRegistry()
         let capture = ArgCapture()
@@ -55,21 +61,28 @@ struct ShutdownSimulatorToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
-        _ = try await registry.callTool(name: "shutdown_simulator", arguments: [:])
+        let response = try await registry.callTool(name: "launch_app", arguments: [:])
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("SESSION-UDID"))
+        if case .success = response {
+            let capturedArgs = await capture.lastArgs
+            #expect(capturedArgs.contains("SESSION-UDID"))
+            #expect(capturedArgs.contains("com.session.app"))
+        } else {
+            Issue.record("Expected success response")
+        }
     }
 
     @Test("Errors when no UDID available")
     func missingUDID() async throws {
         let session = SessionStore()
+        await session.set(.bundleID, value: "com.example.app")
+
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
-        let response = try await registry.callTool(name: "shutdown_simulator", arguments: [:])
+        let response = try await registry.callTool(name: "launch_app", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -79,17 +92,43 @@ struct ShutdownSimulatorToolTests {
         }
     }
 
-    @Test("Returns error when simctl shutdown fails")
-    func commandFailure() async throws {
+    @Test("Errors when no bundle_id available")
+    func missingBundleID() async throws {
         let session = SessionStore()
+        await session.set(.simulatorUDID, value: "AAAA-1111")
+
         let registry = ToolRegistry()
-        let executor = MockCommandExecutor.failingWith(stderr: "Unable to shutdown device in current state: Shutdown")
+        let executor = MockCommandExecutor.succeedingWith("")
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let response = try await registry.callTool(
-            name: "shutdown_simulator",
+            name: "launch_app",
             arguments: ["udid": .string("AAAA-1111")]
+        )
+
+        if case .error(let error) = response {
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("No bundle_id"))
+        } else {
+            Issue.record("Expected error response")
+        }
+    }
+
+    @Test("Returns error when simctl launch fails")
+    func commandFailure() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.failingWith(stderr: "An error was encountered processing the command")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+
+        let response = try await registry.callTool(
+            name: "launch_app",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "bundle_id": .string("com.example.app"),
+            ]
         )
 
         if case .error(let error) = response {
@@ -99,45 +138,29 @@ struct ShutdownSimulatorToolTests {
         }
     }
 
-    @Test("Returns resource busy when lock held")
-    func resourceBusy() async throws {
+    @Test("Passes launch arguments to simctl")
+    func launchArgs() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let concurrency = ConcurrencyPolicy()
-        let executor = MockCommandExecutor.succeedingWith("")
-
-        _ = await concurrency.acquire(key: "simulator:AAAA-1111", owner: "other_operation")
-
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
-
-        let response = try await registry.callTool(
-            name: "shutdown_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
-        )
-
-        if case .error(let error) = response {
-            #expect(error.code == .resourceBusy)
-        } else {
-            Issue.record("Expected error response")
+        let capture = ArgCapture()
+        let executor = MockCommandExecutor { _, args in
+            await capture.capture(args)
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
-    }
-
-    @Test("Does not clear session UDID")
-    func preservesSessionUDID() async throws {
-        let session = SessionStore()
-        await session.set(.simulatorUDID, value: "AAAA-1111")
-
-        let registry = ToolRegistry()
-        let executor = MockCommandExecutor.succeedingWith("")
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         _ = try await registry.callTool(
-            name: "shutdown_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            name: "launch_app",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "bundle_id": .string("com.example.app"),
+                "args": .string("-debug YES"),
+            ]
         )
 
-        let udid = await session.get(.simulatorUDID)
-        #expect(udid == "AAAA-1111")
+        let capturedArgs = await capture.lastArgs
+        #expect(capturedArgs.contains("-debug"))
+        #expect(capturedArgs.contains("YES"))
     }
 }

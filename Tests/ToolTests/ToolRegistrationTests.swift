@@ -5,6 +5,7 @@
 //  Created by Jared Manfredi
 //
 
+import Foundation
 import Testing
 @testable import Core
 @testable import Tools
@@ -17,10 +18,10 @@ struct ToolRegistrationTests {
         let session = SessionStore()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
 
         let tools = await registry.listTools()
-        #expect(tools.count == 8)
+        #expect(tools.count == 14)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -31,5 +32,11 @@ struct ToolRegistrationTests {
         #expect(names.contains("shutdown_simulator"))
         #expect(names.contains("erase_simulator"))
         #expect(names.contains("session_set_defaults"))
+        #expect(names.contains("build_sim"))
+        #expect(names.contains("build_run_sim"))
+        #expect(names.contains("launch_app"))
+        #expect(names.contains("stop_app"))
+        #expect(names.contains("test_sim"))
+        #expect(names.contains("clean_derived_data"))
     }
 }

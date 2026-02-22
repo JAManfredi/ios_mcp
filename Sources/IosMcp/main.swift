@@ -36,8 +36,11 @@ private func startServer() async throws {
     let session = SessionStore()
     let executor = CommandExecutor()
     let concurrency = ConcurrencyPolicy()
+    let artifacts = ArtifactStore(
+        baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ios-mcp-artifacts")
+    )
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
 
     let server = Server(
         name: "ios-mcp",
