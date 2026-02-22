@@ -8,9 +8,19 @@
 import Foundation
 import Logging
 
+/// Protocol for executing CLI commands, enabling mock-based testing.
+public protocol CommandExecuting: Sendable {
+    func execute(
+        executable: String,
+        arguments: [String],
+        timeout: TimeInterval?,
+        environment: [String: String]?
+    ) async throws -> CommandResult
+}
+
 /// Async wrapper around `Process` for executing CLI commands with arg arrays.
 /// Never uses shell execution — always passes arguments directly.
-public struct CommandExecutor: Sendable {
+public struct CommandExecutor: CommandExecuting, Sendable {
     private let logger = Logger(label: "ios-mcp.command-executor")
 
     public init() {}
@@ -88,6 +98,16 @@ public struct CommandResult: Sendable {
     public let stdout: String
     public let stderr: String
     public let exitCode: Int32
+
+    public init(
+        stdout: String,
+        stderr: String,
+        exitCode: Int32
+    ) {
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exitCode = exitCode
+    }
 
     public var succeeded: Bool { exitCode == 0 }
 }

@@ -33,8 +33,10 @@ private func startServer() async throws {
     LoggingConfiguration.bootstrap(level: .info)
     let logger = Logger(label: "ios-mcp")
 
+    let session = SessionStore()
+    let executor = CommandExecutor()
     let registry = ToolRegistry()
-    await registerAllTools(with: registry)
+    await registerAllTools(with: registry, session: session, executor: executor)
 
     let server = Server(
         name: "ios-mcp",

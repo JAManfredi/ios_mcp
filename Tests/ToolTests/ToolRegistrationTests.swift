@@ -11,12 +11,20 @@ import Testing
 
 @Suite("Tool Registration")
 struct ToolRegistrationTests {
-    @Test("Register all tools does not crash")
+    @Test("Registers all project discovery tools")
     func registerAll() async {
         let registry = ToolRegistry()
-        await registerAllTools(with: registry)
-        // No tools registered yet — just verifying the function runs.
+        let session = SessionStore()
+        let executor = MockCommandExecutor.succeedingWith("")
+
+        await registerAllTools(with: registry, session: session, executor: executor)
+
         let tools = await registry.listTools()
-        #expect(tools.isEmpty)
+        #expect(tools.count == 3)
+
+        let names = Set(tools.map(\.name))
+        #expect(names.contains("discover_projects"))
+        #expect(names.contains("list_schemes"))
+        #expect(names.contains("show_build_settings"))
     }
 }
