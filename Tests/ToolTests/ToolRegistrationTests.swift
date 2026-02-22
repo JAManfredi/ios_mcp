@@ -18,10 +18,10 @@ struct ToolRegistrationTests {
         let session = SessionStore()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 24)
+        #expect(tools.count == 32)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -48,5 +48,13 @@ struct ToolRegistrationTests {
         #expect(names.contains("type_text"))
         #expect(names.contains("key_press"))
         #expect(names.contains("long_press"))
+        #expect(names.contains("debug_attach"))
+        #expect(names.contains("debug_detach"))
+        #expect(names.contains("debug_breakpoint_add"))
+        #expect(names.contains("debug_breakpoint_remove"))
+        #expect(names.contains("debug_continue"))
+        #expect(names.contains("debug_stack"))
+        #expect(names.contains("debug_variables"))
+        #expect(names.contains("debug_lldb_command"))
     }
 }

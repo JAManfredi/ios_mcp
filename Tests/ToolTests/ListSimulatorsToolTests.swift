@@ -93,7 +93,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(name: "list_simulators", arguments: [:])
 
@@ -113,7 +113,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(
             name: "list_simulators",
@@ -135,7 +135,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(
             name: "list_simulators",
@@ -157,7 +157,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(
             name: "list_simulators",
@@ -178,7 +178,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(name: "list_simulators", arguments: [:])
 
@@ -214,7 +214,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith(allShutdown)
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         _ = try await registry.callTool(name: "list_simulators", arguments: [:])
 
@@ -228,7 +228,7 @@ struct ListSimulatorsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.failingWith(stderr: "simctl error")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let response = try await registry.callTool(name: "list_simulators", arguments: [:])
 

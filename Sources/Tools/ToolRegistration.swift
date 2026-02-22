@@ -15,11 +15,13 @@ public func registerAllTools(
     executor: any CommandExecuting,
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
-    logCapture: any LogCapturing
+    logCapture: any LogCapturing,
+    debugSession: any DebugSessionManaging
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
     await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
     await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
     await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts)
+    await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency)
 }
