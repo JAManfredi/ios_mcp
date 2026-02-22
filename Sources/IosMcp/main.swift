@@ -61,7 +61,17 @@ private func startServer() async throws {
         )
         switch response {
         case .success(let result):
-            return .init(content: [.text(result.content)])
+            var content: [Tool.Content] = [.text(result.content)]
+            for artifact in result.artifacts where artifact.mimeType.hasPrefix("image/") {
+                if let data = try? Data(contentsOf: URL(fileURLWithPath: artifact.path)) {
+                    content.append(.image(
+                        data: data.base64EncodedString(),
+                        mimeType: artifact.mimeType,
+                        metadata: nil
+                    ))
+                }
+            }
+            return .init(content: content)
         case .error(let error):
             return .init(content: [.text(error.message)], isError: true)
         }

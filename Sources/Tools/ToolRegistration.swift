@@ -21,4 +21,5 @@ public func registerAllTools(
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
     await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
     await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
+    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts)
 }

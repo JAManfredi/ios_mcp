@@ -21,7 +21,7 @@ struct ToolRegistrationTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 16)
+        #expect(tools.count == 24)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -40,5 +40,13 @@ struct ToolRegistrationTests {
         #expect(names.contains("clean_derived_data"))
         #expect(names.contains("start_log_capture"))
         #expect(names.contains("stop_log_capture"))
+        #expect(names.contains("screenshot"))
+        #expect(names.contains("deep_link"))
+        #expect(names.contains("snapshot_ui"))
+        #expect(names.contains("tap"))
+        #expect(names.contains("swipe"))
+        #expect(names.contains("type_text"))
+        #expect(names.contains("key_press"))
+        #expect(names.contains("long_press"))
     }
 }
