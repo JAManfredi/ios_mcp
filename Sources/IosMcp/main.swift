@@ -39,8 +39,9 @@ private func startServer() async throws {
     let artifacts = ArtifactStore(
         baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ios-mcp-artifacts")
     )
+    let logCapture = LogCaptureManager()
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture)
 
     let server = Server(
         name: "ios-mcp",

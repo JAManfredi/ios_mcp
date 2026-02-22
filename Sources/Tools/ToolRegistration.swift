@@ -14,9 +14,11 @@ public func registerAllTools(
     session: SessionStore,
     executor: any CommandExecuting,
     concurrency: ConcurrencyPolicy,
-    artifacts: ArtifactStore
+    artifacts: ArtifactStore,
+    logCapture: any LogCapturing
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
     await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
+    await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
 }

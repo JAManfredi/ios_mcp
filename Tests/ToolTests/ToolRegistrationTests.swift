@@ -18,10 +18,10 @@ struct ToolRegistrationTests {
         let session = SessionStore()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 14)
+        #expect(tools.count == 16)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -38,5 +38,7 @@ struct ToolRegistrationTests {
         #expect(names.contains("stop_app"))
         #expect(names.contains("test_sim"))
         #expect(names.contains("clean_derived_data"))
+        #expect(names.contains("start_log_capture"))
+        #expect(names.contains("stop_log_capture"))
     }
 }

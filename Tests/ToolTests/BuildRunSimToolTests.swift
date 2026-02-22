@@ -54,7 +54,7 @@ struct BuildRunSimToolTests {
             return CommandResult(stdout: self.xcresultJSON, stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
 
@@ -95,7 +95,7 @@ struct BuildRunSimToolTests {
             return CommandResult(stdout: self.xcresultJSON, stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
 
@@ -128,7 +128,7 @@ struct BuildRunSimToolTests {
             return CommandResult(stdout: self.xcresultJSON, stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
 
@@ -161,7 +161,7 @@ struct BuildRunSimToolTests {
             return CommandResult(stdout: self.xcresultJSON, stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         _ = try await registry.callTool(name: "build_run_sim", arguments: [:])
 
@@ -194,7 +194,7 @@ struct BuildRunSimToolTests {
             return CommandResult(stdout: self.xcresultJSON, stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         _ = try await registry.callTool(
             name: "build_run_sim",

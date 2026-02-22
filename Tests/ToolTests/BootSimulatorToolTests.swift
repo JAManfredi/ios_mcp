@@ -23,7 +23,7 @@ struct BootSimulatorToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "boot_simulator",
@@ -57,7 +57,7 @@ struct BootSimulatorToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "boot_simulator", arguments: [:])
 
@@ -75,7 +75,7 @@ struct BootSimulatorToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "boot_simulator", arguments: [:])
 
@@ -93,7 +93,7 @@ struct BootSimulatorToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.failingWith(stderr: "Unable to boot device in current state: Booted")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "boot_simulator",
@@ -116,7 +116,7 @@ struct BootSimulatorToolTests {
 
         _ = await concurrency.acquire(key: "simulator:AAAA-1111", owner: "other_operation")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "boot_simulator",
@@ -159,7 +159,7 @@ struct BootSimulatorToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "boot_simulator",

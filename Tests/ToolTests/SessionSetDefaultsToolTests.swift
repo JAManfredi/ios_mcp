@@ -19,7 +19,7 @@ struct SessionSetDefaultsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "session_set_defaults",
@@ -42,7 +42,7 @@ struct SessionSetDefaultsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "session_set_defaults",
@@ -75,7 +75,7 @@ struct SessionSetDefaultsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(name: "session_set_defaults", arguments: [:])
 
@@ -93,7 +93,7 @@ struct SessionSetDefaultsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())))
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture())
 
         let response = try await registry.callTool(
             name: "session_set_defaults",

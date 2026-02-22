@@ -53,3 +53,48 @@ actor ArgCapture {
         lastArgs = args
     }
 }
+
+/// Test helper that provides canned LogCapturing responses without real processes.
+actor MockLogCapture: LogCapturing {
+    private var sessions: [String: LogCaptureResult] = [:]
+    private var nextID = "mock-session-1"
+
+    init() {}
+
+    init(
+        nextID: String = "mock-session-1",
+        cannedResult: LogCaptureResult? = nil
+    ) {
+        self.nextID = nextID
+        if let cannedResult {
+            sessions[nextID] = cannedResult
+        }
+    }
+
+    func startCapture(
+        udid: String,
+        predicate: String?,
+        bufferSize: Int
+    ) async throws -> String {
+        let id = nextID
+        if sessions[id] == nil {
+            sessions[id] = LogCaptureResult(entries: [], droppedEntryCount: 0, totalEntriesReceived: 0)
+        }
+        return id
+    }
+
+    func stopCapture(sessionID: String) async throws -> LogCaptureResult {
+        guard let result = sessions[sessionID] else {
+            throw ToolError(
+                code: .invalidInput,
+                message: "Unknown log capture session: \(sessionID)"
+            )
+        }
+        sessions[sessionID] = nil
+        return result
+    }
+
+    func hasActiveCapture(sessionID: String) async -> Bool {
+        sessions[sessionID] != nil
+    }
+}
