@@ -21,7 +21,7 @@ struct ToolRegistrationTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 32)
+        #expect(tools.count == 36)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -56,5 +56,9 @@ struct ToolRegistrationTests {
         #expect(names.contains("debug_stack"))
         #expect(names.contains("debug_variables"))
         #expect(names.contains("debug_lldb_command"))
+        #expect(names.contains("read_user_defaults"))
+        #expect(names.contains("write_user_default"))
+        #expect(names.contains("lint"))
+        #expect(names.contains("accessibility_audit"))
     }
 }

@@ -24,4 +24,6 @@ public func registerAllTools(
     await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
     await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts)
     await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency)
+    await registerInspectionTools(with: registry, session: session, executor: executor)
+    await registerQualityTools(with: registry, session: session, executor: executor)
 }
