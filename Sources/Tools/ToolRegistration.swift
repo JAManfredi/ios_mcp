@@ -12,7 +12,9 @@ import Core
 public func registerAllTools(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    concurrency: ConcurrencyPolicy
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
+    await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
 }

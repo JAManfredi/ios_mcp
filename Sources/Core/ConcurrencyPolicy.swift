@@ -39,6 +39,20 @@ public actor ConcurrencyPolicy {
     public func isLocked(key: String) -> Bool {
         locks[key] != nil
     }
+
+    /// Acquire a lock, run the operation, and release. Returns the lock error if busy.
+    public func withLock(
+        key: String,
+        owner: String,
+        operation: @Sendable () async -> ToolResponse
+    ) async -> ToolResponse {
+        if let lockError = acquire(key: key, owner: owner) {
+            return .error(lockError)
+        }
+        let response = await operation()
+        release(key: key)
+        return response
+    }
 }
 
 // MARK: - LockInfo

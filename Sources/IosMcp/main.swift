@@ -35,8 +35,9 @@ private func startServer() async throws {
 
     let session = SessionStore()
     let executor = CommandExecutor()
+    let concurrency = ConcurrencyPolicy()
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency)
 
     let server = Server(
         name: "ios-mcp",

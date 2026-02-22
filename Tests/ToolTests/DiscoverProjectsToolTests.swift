@@ -136,7 +136,7 @@ struct DiscoverProjectsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor)
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy())
 
         let response = try await registry.callTool(
             name: "discover_projects",
@@ -165,7 +165,7 @@ struct DiscoverProjectsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor)
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy())
 
         let response = try await registry.callTool(
             name: "discover_projects",
@@ -195,7 +195,7 @@ struct DiscoverProjectsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor)
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy())
 
         let response = try await registry.callTool(
             name: "discover_projects",
