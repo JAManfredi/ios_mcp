@@ -95,7 +95,11 @@ private func startServer() async throws {
             }
             return .init(content: content)
         case .error(let error):
-            return .init(content: [.text(error.message)], isError: true)
+            var content: [Tool.Content] = [.text(error.message)]
+            if let details = error.details {
+                content.append(.text(details))
+            }
+            return .init(content: content, isError: true)
         }
     }
 

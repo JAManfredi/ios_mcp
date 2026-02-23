@@ -13,7 +13,49 @@ import Testing
 @Suite("erase_simulator")
 struct EraseSimulatorToolTests {
 
-    @Test("Erases simulator")
+    @Test("Rejected without confirm")
+    func rejectedWithoutConfirm() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "erase_simulator",
+            arguments: ["udid": .string("AAAA-1111")]
+        )
+
+        if case .error(let error) = response {
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("confirm: true"))
+        } else {
+            Issue.record("Expected error response for missing confirm")
+        }
+    }
+
+    @Test("Rejected when confirm is false")
+    func rejectedWithConfirmFalse() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "erase_simulator",
+            arguments: ["udid": .string("AAAA-1111"), "confirm": .bool(false)]
+        )
+
+        if case .error(let error) = response {
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("confirm: true"))
+        } else {
+            Issue.record("Expected error response for confirm: false")
+        }
+    }
+
+    @Test("Erases simulator with confirm: true")
     func happyPath() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
@@ -27,7 +69,7 @@ struct EraseSimulatorToolTests {
 
         let response = try await registry.callTool(
             name: "erase_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            arguments: ["udid": .string("AAAA-1111"), "confirm": .bool(true)]
         )
 
         if case .success(let result) = response {
@@ -55,7 +97,10 @@ struct EraseSimulatorToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
 
-        _ = try await registry.callTool(name: "erase_simulator", arguments: [:])
+        _ = try await registry.callTool(
+            name: "erase_simulator",
+            arguments: ["confirm": .bool(true)]
+        )
 
         let capturedArgs = await capture.lastArgs
         #expect(capturedArgs.contains("SESSION-UDID"))
@@ -69,7 +114,10 @@ struct EraseSimulatorToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
 
-        let response = try await registry.callTool(name: "erase_simulator", arguments: [:])
+        let response = try await registry.callTool(
+            name: "erase_simulator",
+            arguments: ["confirm": .bool(true)]
+        )
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -89,7 +137,7 @@ struct EraseSimulatorToolTests {
 
         let response = try await registry.callTool(
             name: "erase_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            arguments: ["udid": .string("AAAA-1111"), "confirm": .bool(true)]
         )
 
         if case .error(let error) = response {
@@ -112,7 +160,7 @@ struct EraseSimulatorToolTests {
 
         let response = try await registry.callTool(
             name: "erase_simulator",
-            arguments: ["udid": .string("AAAA-1111")]
+            arguments: ["udid": .string("AAAA-1111"), "confirm": .bool(true)]
         )
 
         if case .error(let error) = response {

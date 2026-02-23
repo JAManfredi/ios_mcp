@@ -30,7 +30,8 @@ func registerScreenshotTool(
                 ),
             ]
         ),
-        category: .uiAutomation
+        category: .uiAutomation,
+        isReadOnly: true
     )
 
     await registry.register(manifest: manifest) { args in

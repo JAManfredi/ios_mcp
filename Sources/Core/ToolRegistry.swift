@@ -51,10 +51,15 @@ public actor ToolRegistry {
 extension ToolManifest {
     /// Convert to MCP SDK `Tool` representation.
     public func mcpTool() -> Tool {
-        Tool(
+        let annotations = Tool.Annotations(
+            readOnlyHint: isReadOnly ? true : nil,
+            destructiveHint: isDestructive ? true : nil
+        )
+        return Tool(
             name: name,
             description: description,
-            inputSchema: mcpInputSchema()
+            inputSchema: mcpInputSchema(),
+            annotations: annotations
         )
     }
 

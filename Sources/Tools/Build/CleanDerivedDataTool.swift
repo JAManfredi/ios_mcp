@@ -22,6 +22,10 @@ func registerCleanDerivedDataTool(
                     type: "string",
                     description: "Path to DerivedData directory. Falls back to session default, then ~/Library/Developer/Xcode/DerivedData."
                 ),
+                "confirm": .init(
+                    type: "boolean",
+                    description: "Must be true to execute. Omit to preview what will happen."
+                ),
             ]
         ),
         category: .build,
@@ -29,6 +33,20 @@ func registerCleanDerivedDataTool(
     )
 
     await registry.register(manifest: manifest) { args in
+        let confirmed: Bool
+        if case .bool(let c) = args["confirm"] {
+            confirmed = c
+        } else {
+            confirmed = false
+        }
+
+        guard confirmed else {
+            return .error(ToolError(
+                code: .invalidInput,
+                message: "clean_derived_data is destructive: it deletes the entire DerivedData directory. Pass confirm: true to proceed."
+            ))
+        }
+
         let path: String
         if case .string(let p) = args["derived_data_path"] {
             path = p

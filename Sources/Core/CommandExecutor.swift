@@ -91,17 +91,31 @@ public struct CommandExecutor: CommandExecuting, Sendable {
                     return
                 }
 
+                // Place the child in its own process group so we can kill the entire tree
+                let pid = process.processIdentifier
+                setpgid(pid, 0)
+
                 if let timeout {
                     let deadline = DispatchTime.now() + timeout
                     DispatchQueue.global().asyncAfter(deadline: deadline) {
                         if process.isRunning {
-                            process.terminate()
+                            Self.terminateProcessTree(process)
                         }
                     }
                 }
             }
         } onCancel: {
-            if process.isRunning { process.terminate() }
+            if process.isRunning { Self.terminateProcessTree(process) }
+        }
+    }
+    /// Terminate a process and its entire process group.
+    /// Sends SIGTERM to the group first, then SIGKILL after a grace period.
+    private static func terminateProcessTree(_ process: Process) {
+        let pid = process.processIdentifier
+        guard pid > 0 else { return }
+        kill(-pid, SIGTERM)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+            kill(-pid, SIGKILL)
         }
     }
 }

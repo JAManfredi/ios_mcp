@@ -7,6 +7,10 @@ input:
       type: string
       required: false
       description: "Simulator UDID. Falls back to session default."
+    confirm:
+      type: boolean
+      required: false
+      description: "Must be true to execute. Omit to preview what will happen."
   required: []
 output:
   success: "Success message confirming erase."

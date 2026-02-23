@@ -24,6 +24,10 @@ func registerEraseSimulatorTool(
                     type: "string",
                     description: "Simulator UDID. Falls back to session default."
                 ),
+                "confirm": .init(
+                    type: "boolean",
+                    description: "Must be true to execute. Omit to preview what will happen."
+                ),
             ]
         ),
         category: .simulator,
@@ -31,6 +35,20 @@ func registerEraseSimulatorTool(
     )
 
     await registry.register(manifest: manifest) { args in
+        let confirmed: Bool
+        if case .bool(let c) = args["confirm"] {
+            confirmed = c
+        } else {
+            confirmed = false
+        }
+
+        guard confirmed else {
+            return .error(ToolError(
+                code: .invalidInput,
+                message: "erase_simulator is destructive: it erases all content and settings from the simulator. Pass confirm: true to proceed."
+            ))
+        }
+
         let udid: String?
         if case .string(let u) = args["udid"] {
             udid = u

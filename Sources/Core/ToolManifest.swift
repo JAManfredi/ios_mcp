@@ -14,19 +14,22 @@ public struct ToolManifest: Sendable {
     public let inputSchema: JSONSchema
     public let category: ToolCategory
     public let isDestructive: Bool
+    public let isReadOnly: Bool
 
     public init(
         name: String,
         description: String,
         inputSchema: JSONSchema,
         category: ToolCategory,
-        isDestructive: Bool = false
+        isDestructive: Bool = false,
+        isReadOnly: Bool = false
     ) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
         self.category = category
         self.isDestructive = isDestructive
+        self.isReadOnly = isReadOnly
     }
 }
 

@@ -33,7 +33,8 @@ func registerListSimulatorsTool(
                 ),
             ]
         ),
-        category: .simulator
+        category: .simulator,
+        isReadOnly: true
     )
 
     await registry.register(manifest: manifest) { args in

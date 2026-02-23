@@ -66,4 +66,39 @@ struct CommandExecutorTests {
         #expect(elapsed < .seconds(2))
         #expect(result.exitCode != 0)
     }
+
+    @Test("Timeout kills child process tree")
+    func timeoutKillsProcessTree() async throws {
+        let executor = CommandExecutor()
+
+        // Spawn a shell that forks a background child, then sleeps.
+        // The child writes its PID to a temp file so we can check if it was killed.
+        let pidFile = NSTemporaryDirectory() + "ios-mcp-test-child-\(UUID().uuidString).pid"
+        defer { try? FileManager.default.removeItem(atPath: pidFile) }
+
+        // Script: fork a background sleep, record its PID, then sleep the parent
+        let script = """
+        /bin/bash -c 'sleep 300 & echo $! > \(pidFile); sleep 300'
+        """
+
+        let result = try await executor.execute(
+            executable: "/bin/bash",
+            arguments: ["-c", script],
+            timeout: 1,
+            environment: nil
+        )
+
+        // Parent was killed by timeout
+        #expect(result.exitCode != 0)
+
+        // Give SIGKILL grace period time to fire
+        try await Task.sleep(for: .seconds(4))
+
+        // Read the child PID and verify it's no longer running
+        if let pidString = try? String(contentsOfFile: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           let childPID = Int32(pidString) {
+            let isAlive = kill(childPID, 0) == 0
+            #expect(!isAlive, "Child process \(childPID) should have been killed with the process group")
+        }
+    }
 }

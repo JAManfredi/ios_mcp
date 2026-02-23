@@ -28,7 +28,8 @@ func registerDebugVariablesTool(
             ],
             required: ["session_id"]
         ),
-        category: .debugging
+        category: .debugging,
+        isReadOnly: true
     )
 
     await registry.register(manifest: manifest) { args in

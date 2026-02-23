@@ -35,7 +35,8 @@ func registerReadUserDefaultsTool(
             ],
             required: ["domain"]
         ),
-        category: .inspection
+        category: .inspection,
+        isReadOnly: true
     )
 
     await registry.register(manifest: manifest) { args in

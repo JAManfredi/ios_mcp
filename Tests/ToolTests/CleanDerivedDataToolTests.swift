@@ -20,7 +20,57 @@ struct CleanDerivedDataToolTests {
         return url
     }
 
-    @Test("Deletes existing DerivedData directory")
+    @Test("Rejected without confirm")
+    func rejectedWithoutConfirm() async throws {
+        let tmp = try createTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "clean_derived_data",
+            arguments: ["derived_data_path": .string(tmp.path)]
+        )
+
+        if case .error(let error) = response {
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("confirm: true"))
+            // Directory should still exist — operation was blocked
+            #expect(FileManager.default.fileExists(atPath: tmp.path))
+        } else {
+            Issue.record("Expected error response for missing confirm")
+        }
+    }
+
+    @Test("Rejected when confirm is false")
+    func rejectedWithConfirmFalse() async throws {
+        let tmp = try createTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "clean_derived_data",
+            arguments: ["derived_data_path": .string(tmp.path), "confirm": .bool(false)]
+        )
+
+        if case .error(let error) = response {
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains("confirm: true"))
+        } else {
+            Issue.record("Expected error response for confirm: false")
+        }
+    }
+
+    @Test("Deletes existing DerivedData directory with confirm: true")
     func happyPath() async throws {
         let tmp = try createTempDir()
 
@@ -32,7 +82,7 @@ struct CleanDerivedDataToolTests {
 
         let response = try await registry.callTool(
             name: "clean_derived_data",
-            arguments: ["derived_data_path": .string(tmp.path)]
+            arguments: ["derived_data_path": .string(tmp.path), "confirm": .bool(true)]
         )
 
         if case .success(let result) = response {
@@ -55,7 +105,10 @@ struct CleanDerivedDataToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
 
-        let response = try await registry.callTool(name: "clean_derived_data", arguments: [:])
+        let response = try await registry.callTool(
+            name: "clean_derived_data",
+            arguments: ["confirm": .bool(true)]
+        )
 
         if case .success(let result) = response {
             #expect(result.content.contains("Deleted DerivedData"))
@@ -77,7 +130,7 @@ struct CleanDerivedDataToolTests {
 
         let response = try await registry.callTool(
             name: "clean_derived_data",
-            arguments: ["derived_data_path": .string(fakePath)]
+            arguments: ["derived_data_path": .string(fakePath), "confirm": .bool(true)]
         )
 
         if case .error(let error) = response {
@@ -102,7 +155,7 @@ struct CleanDerivedDataToolTests {
 
         let response = try await registry.callTool(
             name: "clean_derived_data",
-            arguments: ["derived_data_path": .string(tmp.path)]
+            arguments: ["derived_data_path": .string(tmp.path), "confirm": .bool(true)]
         )
 
         if case .success(let result) = response {

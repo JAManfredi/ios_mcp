@@ -58,7 +58,8 @@ func registerShowBuildSettingsTool(
                 ),
             ]
         ),
-        category: .projectDiscovery
+        category: .projectDiscovery,
+        isReadOnly: true
     )
 
     await registry.register(manifest: manifest) { args in
