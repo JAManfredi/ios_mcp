@@ -136,6 +136,9 @@ actor LogCaptureSession {
     private var readTask: Task<Void, Never>?
     private let simctlArgs: [String]
 
+    /// 10 MB payload limit per §4.4 of the tech doc.
+    static let maxPayloadBytes = 10_485_760
+
     init(
         id: String,
         udid: String,
@@ -144,7 +147,19 @@ actor LogCaptureSession {
     ) {
         self.id = id
         self.udid = udid
-        self.buffer = RingBuffer(capacity: bufferSize)
+        self.buffer = RingBuffer(
+            capacity: bufferSize,
+            maxBytes: Self.maxPayloadBytes,
+            sizeEstimator: { entry in
+                entry.timestamp.utf8.count
+                    + entry.processName.utf8.count
+                    + entry.subsystem.utf8.count
+                    + entry.category.utf8.count
+                    + entry.level.utf8.count
+                    + entry.message.utf8.count
+                    + 64 // JSON overhead (keys, quotes, braces)
+            }
+        )
         self.simctlArgs = simctlArgs
     }
 

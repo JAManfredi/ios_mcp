@@ -187,6 +187,73 @@ public struct NextStepResolver: Sendable {
         mapping[toolName] ?? []
     }
 
+    /// Returns next steps with prefilled context from session defaults.
+    /// Each step's context includes relevant session values for the suggested tool.
+    public static func resolve(
+        for toolName: String,
+        session: SessionStore
+    ) async -> [NextStep] {
+        let steps = mapping[toolName] ?? []
+        guard !steps.isEmpty else { return [] }
+
+        let defaults = await session.allDefaults()
+        guard !defaults.isEmpty else { return steps }
+
+        return steps.map { step in
+            let ctx = contextKeys(for: step.tool, from: defaults)
+            return NextStep(tool: step.tool, description: step.description, context: ctx)
+        }
+    }
+
+    /// Maps relevant session defaults to context keys based on what a tool needs.
+    private static func contextKeys(
+        for toolName: String,
+        from defaults: [SessionStore.Key: String]
+    ) -> [String: String] {
+        var ctx: [String: String] = [:]
+
+        let needsSimulator: Set<String> = [
+            "boot_simulator", "shutdown_simulator", "erase_simulator",
+            "build_sim", "build_run_sim", "test_sim", "launch_app", "stop_app",
+            "screenshot", "snapshot_ui", "deep_link", "tap", "swipe", "type_text",
+            "key_press", "long_press", "start_log_capture", "debug_attach",
+            "accessibility_audit", "open_simulator",
+        ]
+
+        let needsWorkspace: Set<String> = [
+            "list_schemes", "show_build_settings", "build_sim", "build_run_sim",
+            "test_sim", "clean_derived_data", "lint",
+        ]
+
+        let needsScheme: Set<String> = [
+            "build_sim", "build_run_sim", "test_sim",
+        ]
+
+        let needsBundleID: Set<String> = [
+            "launch_app", "stop_app", "read_user_defaults", "write_user_default",
+            "debug_attach",
+        ]
+
+        if needsSimulator.contains(toolName), let udid = defaults[.simulatorUDID] {
+            ctx["simulator_udid"] = udid
+        }
+        if needsWorkspace.contains(toolName) {
+            if let ws = defaults[.workspace] {
+                ctx["workspace"] = ws
+            } else if let proj = defaults[.project] {
+                ctx["project"] = proj
+            }
+        }
+        if needsScheme.contains(toolName), let scheme = defaults[.scheme] {
+            ctx["scheme"] = scheme
+        }
+        if needsBundleID.contains(toolName), let bid = defaults[.bundleID] {
+            ctx["bundle_id"] = bid
+        }
+
+        return ctx
+    }
+
     /// All tool names that have next-step mappings.
     public static var registeredToolNames: Set<String> {
         Set(mapping.keys)

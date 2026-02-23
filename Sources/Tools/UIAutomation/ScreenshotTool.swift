@@ -24,6 +24,10 @@ func registerScreenshotTool(
                     type: "string",
                     description: "Simulator UDID. Falls back to session default."
                 ),
+                "inline": .init(
+                    type: "boolean",
+                    description: "When false, returns only the artifact path without inlining base64 image data. Defaults to true."
+                ),
             ]
         ),
         category: .uiAutomation
@@ -33,6 +37,11 @@ func registerScreenshotTool(
         var udid: String?
         if case .string(let u) = args["udid"] {
             udid = u
+        }
+
+        var inlineImage = true
+        if case .bool(let b) = args["inline"] {
+            inlineImage = b
         }
 
         if udid == nil {
@@ -87,7 +96,8 @@ func registerScreenshotTool(
 
             return .success(ToolResult(
                 content: "Screenshot captured for simulator \(resolvedUDID).\nStored at: \(ref.path)",
-                artifacts: [ref]
+                artifacts: [ref],
+                inlineArtifacts: inlineImage
             ))
         } catch let error as ToolError {
             return .error(error)

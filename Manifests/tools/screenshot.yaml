@@ -7,6 +7,10 @@ input:
       type: string
       required: false
       description: "Simulator UDID. Falls back to session default."
+    inline:
+      type: boolean
+      required: false
+      description: "When false, returns only the artifact path without inlining base64 image data. Defaults to true."
   required: []
 output:
   success: "PNG image returned as MCP image content block. Artifact stored in ArtifactStore."

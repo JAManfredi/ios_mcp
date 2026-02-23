@@ -43,7 +43,8 @@ private func startServer() async throws {
     let debugSession = LLDBSessionManager()
     try? await artifacts.cleanupStaleDirectories()
 
-    let validator = DefaultsValidator(executor: executor)
+    let pathPolicy = PathPolicy()
+    let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
 
     let registry = ToolRegistry()
     await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator)
@@ -67,18 +68,29 @@ private func startServer() async throws {
         switch response {
         case .success(let result):
             var content: [Tool.Content] = [.text(result.content)]
-            for artifact in result.artifacts where artifact.mimeType.hasPrefix("image/") {
-                if let data = try? Data(contentsOf: URL(fileURLWithPath: artifact.path)) {
-                    content.append(.image(
-                        data: data.base64EncodedString(),
-                        mimeType: artifact.mimeType,
-                        metadata: nil
-                    ))
+            if result.inlineArtifacts {
+                for artifact in result.artifacts where artifact.mimeType.hasPrefix("image/") {
+                    if let data = try? Data(contentsOf: URL(fileURLWithPath: artifact.path)) {
+                        content.append(.image(
+                            data: data.base64EncodedString(),
+                            mimeType: artifact.mimeType,
+                            metadata: nil
+                        ))
+                    }
                 }
             }
-            let steps = NextStepResolver.resolve(for: params.name)
+            let steps = await NextStepResolver.resolve(for: params.name, session: session)
             if !steps.isEmpty {
-                let lines = steps.enumerated().map { "\($0.offset + 1). \($0.element.tool) — \($0.element.description)" }
+                let lines = steps.enumerated().map { idx, step in
+                    var line = "\(idx + 1). \(step.tool) — \(step.description)"
+                    if !step.context.isEmpty {
+                        let pairs = step.context.sorted(by: { $0.key < $1.key })
+                            .map { "\($0.key)=\($0.value)" }
+                            .joined(separator: ", ")
+                        line += " (\(pairs))"
+                    }
+                    return line
+                }
                 content.append(.text("\nSuggested next steps:\n" + lines.joined(separator: "\n")))
             }
             return .init(content: content)
@@ -185,7 +197,8 @@ struct Doctor: AsyncParsableCommand {
                 )
                 if result.succeeded {
                     let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-                    print("[ok] axe: \(version)")
+                    let checksumStatus = verifyAxeChecksum(binaryPath: path)
+                    print("[ok] axe: \(version)\(checksumStatus)")
                 } else {
                     print("[--] axe: found at \(path) but --version failed")
                     optionalFailed = true
@@ -229,5 +242,60 @@ struct Doctor: AsyncParsableCommand {
         } else {
             print("\nVerdict: SUPPORTED — all checks passed.")
         }
+    }
+}
+
+// MARK: - Axe Checksum Verification
+
+/// Verifies the axe binary checksum against a sibling `.sha256` file.
+/// Returns a status string to append to the doctor output line.
+private func verifyAxeChecksum(binaryPath: String) -> String {
+    let binaryURL = URL(fileURLWithPath: binaryPath)
+
+    // Only verify for vendored binaries (under Vendor/axe/)
+    guard binaryPath.contains("Vendor/axe/") else { return "" }
+
+    let checksumURL = binaryURL.deletingLastPathComponent().appendingPathComponent("axe.sha256")
+    guard let checksumContents = try? String(contentsOf: checksumURL, encoding: .utf8) else {
+        return " [--] checksum file not found"
+    }
+
+    // Parse "binary_sha256=<hex>" line
+    var expectedHash: String?
+    for line in checksumContents.components(separatedBy: .newlines) {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("binary_sha256=") {
+            expectedHash = String(trimmed.dropFirst("binary_sha256=".count))
+            break
+        }
+    }
+
+    guard let expected = expectedHash, !expected.isEmpty else {
+        return " [--] checksum file missing binary_sha256 entry"
+    }
+
+    // Compute actual SHA-256 via shasum
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/shasum")
+    process.arguments = ["-a", "256", binaryPath]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = Pipe()
+
+    do {
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return " [--] checksum computation failed" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        // shasum output format: "<hash>  <path>"
+        let actualHash = output.components(separatedBy: " ").first ?? ""
+        if actualHash.lowercased() == expected.lowercased() {
+            return " [ok] checksum verified"
+        } else {
+            return " [--] checksum mismatch"
+        }
+    } catch {
+        return " [--] checksum verification failed"
     }
 }

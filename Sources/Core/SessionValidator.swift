@@ -12,13 +12,16 @@ import Foundation
 public struct DefaultsValidator: Sendable {
     private let executor: any CommandExecuting
     private let fileExists: @Sendable (String) -> Bool
+    private let pathPolicy: PathPolicy?
 
     public init(
         executor: any CommandExecuting,
-        fileExists: @escaping @Sendable (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+        fileExists: @escaping @Sendable (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
+        pathPolicy: PathPolicy? = nil
     ) {
         self.executor = executor
         self.fileExists = fileExists
+        self.pathPolicy = pathPolicy
     }
 
     /// Validates that a simulator UDID exists in `simctl list devices`.
@@ -57,12 +60,16 @@ public struct DefaultsValidator: Sendable {
         }
     }
 
-    /// Validates that a filesystem path exists.
-    /// Returns nil if the path exists, ToolError if missing.
+    /// Validates that a filesystem path exists and is within allowed roots.
+    /// Returns nil if valid, ToolError if outside policy or missing.
     public func validatePathExists(
         _ path: String,
         label: String
     ) -> ToolError? {
+        if let policyError = pathPolicy?.validate(path, label: label) {
+            return policyError
+        }
+
         if fileExists(path) { return nil }
 
         return ToolError(

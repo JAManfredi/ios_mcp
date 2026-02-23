@@ -35,6 +35,49 @@ struct NextStepResolverTests {
         #expect(steps.isEmpty)
     }
 
+    @Test("Session-aware resolve populates simulator UDID context")
+    func sessionAwareResolvesSimulatorContext() async {
+        let session = SessionStore()
+        await session.set(.simulatorUDID, value: "UDID-1234")
+
+        let steps = await NextStepResolver.resolve(for: "boot_simulator", session: session)
+        #expect(steps.count == 3)
+        #expect(steps[0].context["simulator_udid"] == "UDID-1234")
+        #expect(steps[0].tool == "build_sim")
+    }
+
+    @Test("Session-aware resolve populates workspace and scheme context")
+    func sessionAwareResolvesWorkspaceContext() async {
+        let session = SessionStore()
+        await session.set(.workspace, value: "/path/to/App.xcworkspace")
+        await session.set(.scheme, value: "App")
+        await session.set(.simulatorUDID, value: "SIM-1")
+
+        let steps = await NextStepResolver.resolve(for: "list_schemes", session: session)
+        #expect(steps.count == 2)
+        // session_set_defaults doesn't need workspace context
+        // build_sim needs workspace + scheme + simulator
+        let buildStep = steps.first { $0.tool == "build_sim" }!
+        #expect(buildStep.context["workspace"] == "/path/to/App.xcworkspace")
+        #expect(buildStep.context["scheme"] == "App")
+        #expect(buildStep.context["simulator_udid"] == "SIM-1")
+    }
+
+    @Test("Session-aware resolve returns empty context when no defaults set")
+    func sessionAwareEmptySessionReturnsNoContext() async {
+        let session = SessionStore()
+        let steps = await NextStepResolver.resolve(for: "build_sim", session: session)
+        #expect(steps.count == 3)
+        #expect(steps[0].context.isEmpty)
+    }
+
+    @Test("Session-aware resolve unknown tool returns empty")
+    func sessionAwareUnknownToolReturnsEmpty() async {
+        let session = SessionStore()
+        let steps = await NextStepResolver.resolve(for: "nonexistent", session: session)
+        #expect(steps.isEmpty)
+    }
+
     @Test("All 37 registered tools have next steps")
     func allRegisteredToolsHaveNextSteps() {
         let allToolNames: Set<String> = [

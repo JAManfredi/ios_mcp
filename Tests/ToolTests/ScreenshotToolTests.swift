@@ -113,6 +113,62 @@ struct ScreenshotToolTests {
         }
     }
 
+    @Test("inline=false returns path without inlineArtifacts")
+    func metadataOnlyMode() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let artifacts = ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-artifacts-\(UUID().uuidString)"))
+        let pngData = makeMinimalPNG()
+        let executor = MockCommandExecutor { _, args in
+            if let path = args.last, path.hasSuffix(".png") {
+                try pngData.write(to: URL(fileURLWithPath: path))
+            }
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: artifacts, logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "screenshot",
+            arguments: ["udid": .string("AAAA-1111"), "inline": .bool(false)]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("Screenshot captured"))
+            #expect(result.artifacts.count == 1)
+            #expect(!result.inlineArtifacts, "inlineArtifacts should be false when inline=false")
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
+    @Test("inline=true (default) returns inlineArtifacts true")
+    func inlineDefaultTrue() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let artifacts = ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-artifacts-\(UUID().uuidString)"))
+        let pngData = makeMinimalPNG()
+        let executor = MockCommandExecutor { _, args in
+            if let path = args.last, path.hasSuffix(".png") {
+                try pngData.write(to: URL(fileURLWithPath: path))
+            }
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: artifacts, logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "screenshot",
+            arguments: ["udid": .string("AAAA-1111")]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.inlineArtifacts, "inlineArtifacts should be true by default")
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
     @Test("Passes correct arguments to simctl")
     func argShape() async throws {
         let session = SessionStore()

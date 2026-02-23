@@ -18,13 +18,16 @@ public enum ToolResponse: Sendable {
 public struct NextStep: Sendable {
     public let tool: String
     public let description: String
+    public let context: [String: String]
 
     public init(
         tool: String,
-        description: String
+        description: String,
+        context: [String: String] = [:]
     ) {
         self.tool = tool
         self.description = description
+        self.context = context
     }
 }
 
@@ -34,15 +37,18 @@ public struct ToolResult: Sendable {
     public let content: String
     public let artifacts: [ArtifactReference]
     public let nextSteps: [NextStep]
+    public let inlineArtifacts: Bool
 
     public init(
         content: String,
         artifacts: [ArtifactReference] = [],
-        nextSteps: [NextStep] = []
+        nextSteps: [NextStep] = [],
+        inlineArtifacts: Bool = true
     ) {
         self.content = content
         self.artifacts = artifacts
         self.nextSteps = nextSteps
+        self.inlineArtifacts = inlineArtifacts
     }
 }
 
