@@ -57,7 +57,7 @@ public actor LLDBSessionManager: DebugSessionManaging {
         if let pid {
             attachCommand = "process attach --pid \(pid)"
         } else if let bundleID {
-            attachCommand = "process attach --name \(bundleID) --waitfor"
+            attachCommand = "process attach --name \(bundleID)"
         } else {
             throw ToolError(
                 code: .invalidInput,
@@ -128,6 +128,47 @@ public actor LLDBSessionManager: DebugSessionManaging {
     }
 }
 
+// MARK: - Output Buffer
+
+/// Thread-safe output buffer using a lock instead of actor isolation.
+/// This avoids deadlocking when the actor's synchronous `waitForPrompt`
+/// spin loop needs to read output written by a detached read task.
+final class LLDBOutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: String = ""
+
+    func append(_ text: String) {
+        lock.lock()
+        storage += text
+        lock.unlock()
+    }
+
+    func consumeIfPrompt(_ prompt: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard storage.contains(prompt) else { return nil }
+        let result = storage
+            .replacingOccurrences(of: prompt, with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        storage = ""
+        return result
+    }
+
+    func drain() -> String {
+        lock.lock()
+        let result = storage
+        storage = ""
+        lock.unlock()
+        return result
+    }
+
+    func clear() {
+        lock.lock()
+        storage = ""
+        lock.unlock()
+    }
+}
+
 // MARK: - Session
 
 /// Owns a single LLDB Process with bidirectional stdin/stdout pipes.
@@ -136,7 +177,7 @@ actor LLDBSession {
     private var process: Process?
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
-    private var accumulatedOutput: String = ""
+    private let outputBuffer = LLDBOutputBuffer()
     private var readTask: Task<Void, Never>?
 
     private static let prompt = "(lldb) "
@@ -164,12 +205,13 @@ actor LLDBSession {
         self.stdoutPipe = stdout
 
         let fileHandle = stdout.fileHandleForReading
-        readTask = Task.detached { [weak self] in
+        let buffer = outputBuffer
+        readTask = Task.detached {
             while !Task.isCancelled {
                 let data = fileHandle.availableData
                 guard !data.isEmpty else { break }
                 if let text = String(data: data, encoding: .utf8) {
-                    await self?.appendOutput(text)
+                    buffer.append(text)
                 }
             }
         }
@@ -186,8 +228,7 @@ actor LLDBSession {
             )
         }
 
-        // Clear accumulated output before sending
-        accumulatedOutput = ""
+        outputBuffer.clear()
 
         let commandData = Data((command + "\n").utf8)
         stdinPipe.fileHandleForWriting.write(commandData)
@@ -208,26 +249,17 @@ actor LLDBSession {
 
     // MARK: - Private
 
-    fileprivate func appendOutput(_ text: String) {
-        accumulatedOutput += text
-    }
-
     private func waitForPrompt(timeout: TimeInterval) throws -> String {
         let deadline = Date().addingTimeInterval(timeout)
 
         while Date() < deadline {
-            if accumulatedOutput.contains(Self.prompt) {
-                let result = accumulatedOutput
-                    .replacingOccurrences(of: Self.prompt, with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                accumulatedOutput = ""
+            if let result = outputBuffer.consumeIfPrompt(Self.prompt) {
                 return result
             }
             Thread.sleep(forTimeInterval: 0.05)
         }
 
-        let partial = accumulatedOutput
-        accumulatedOutput = ""
+        let partial = outputBuffer.drain()
         throw ToolError(
             code: .timeout,
             message: "LLDB command timed out after \(Int(timeout))s",
