@@ -41,6 +41,8 @@ private func startServer() async throws {
     )
     let logCapture = LogCaptureManager()
     let debugSession = LLDBSessionManager()
+    try? await artifacts.cleanupStaleDirectories()
+
     let registry = ToolRegistry()
     await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession)
 
@@ -95,42 +97,121 @@ struct Doctor: AsyncParsableCommand {
 
     func run() async throws {
         let executor = CommandExecutor()
+        var requiredFailed = false
+        var optionalFailed = false
 
         print("ios-mcp doctor")
         print("==============\n")
 
-        // Xcode
+        // Xcode (required)
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcode-select",
-                arguments: ["-p"]
+                arguments: ["-p"],
+                timeout: 10
             )
             if result.succeeded {
                 print("[ok] Xcode: \(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines))")
             } else {
                 print("[!!] Xcode: not found — install via xcode-select --install")
+                requiredFailed = true
             }
         } catch {
             print("[!!] Xcode: check failed — \(error)")
+            requiredFailed = true
         }
 
-        // Simulators
+        // Simulators (required)
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["simctl", "list", "devices", "-j"]
+                arguments: ["simctl", "list", "devices", "-j"],
+                timeout: 15
             )
             if result.succeeded {
                 print("[ok] Simulator: simctl available")
             } else {
                 print("[!!] Simulator: simctl not available")
+                requiredFailed = true
             }
         } catch {
             print("[!!] Simulator: check failed — \(error)")
+            requiredFailed = true
         }
 
-        // swift-log version
+        // LLDB (required)
+        do {
+            let result = try await executor.execute(
+                executable: "/usr/bin/xcrun",
+                arguments: ["lldb", "--version"],
+                timeout: 10
+            )
+            if result.succeeded {
+                let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("[ok] LLDB: \(version)")
+            } else {
+                print("[!!] LLDB: not available")
+                requiredFailed = true
+            }
+        } catch {
+            print("[!!] LLDB: check failed — \(error)")
+            requiredFailed = true
+        }
+
+        // axe (optional)
+        switch resolveAxePath() {
+        case .success(let path):
+            do {
+                let result = try await executor.execute(
+                    executable: path,
+                    arguments: ["--version"],
+                    timeout: 10
+                )
+                if result.succeeded {
+                    let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                    print("[ok] axe: \(version)")
+                } else {
+                    print("[--] axe: found at \(path) but --version failed")
+                    optionalFailed = true
+                }
+            } catch {
+                print("[--] axe: check failed — \(error)")
+                optionalFailed = true
+            }
+        case .failure:
+            print("[--] axe: not found — UI automation tools will be unavailable")
+            optionalFailed = true
+        }
+
+        // SwiftLint (optional)
+        do {
+            let result = try await executor.execute(
+                executable: "/usr/bin/which",
+                arguments: ["swiftlint"],
+                timeout: 5
+            )
+            if result.succeeded {
+                let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                print("[ok] SwiftLint: \(path)")
+            } else {
+                print("[--] SwiftLint: not found — lint tool will be unavailable")
+                optionalFailed = true
+            }
+        } catch {
+            print("[--] SwiftLint: check failed — \(error)")
+            optionalFailed = true
+        }
+
+        // Version
         print("[ok] ios-mcp version: 0.1.0")
-        print("\nAll checks passed.")
+
+        // Verdict
+        if requiredFailed {
+            print("\nVerdict: UNSUPPORTED — required dependencies are missing.")
+        } else if optionalFailed {
+            print("\nVerdict: WARNING — optional dependencies are missing. Some tools will be unavailable.")
+        } else {
+            print("\nVerdict: SUPPORTED — all checks passed.")
+        }
     }
 }

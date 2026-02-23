@@ -14,10 +14,11 @@ import Foundation
 /// 1. Walk up from the main executable to find `Vendor/axe/<arch>/axe`
 /// 2. Fall back to `which axe` via Process
 /// 3. Return `.dependencyMissing` if neither succeeds
-func resolveAxePath() -> Result<String, ToolError> {
+public func resolveAxePath() -> Result<String, ToolError> {
     // 1. Check Vendor directory relative to executable
     if let execURL = Bundle.main.executableURL {
         let candidates = sequence(first: execURL.deletingLastPathComponent()) { url in
+            guard url.path != "/" else { return nil }
             let parent = url.deletingLastPathComponent()
             return parent.path != url.path ? parent : nil
         }
