@@ -13,13 +13,13 @@ import Testing
 @Suite("type_text")
 struct TypeTextToolTests {
 
-    @Test("Types text on simulator")
+    @Test("Types text on simulator with tap-first targeting")
     func happyPath() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let capture = ArgCapture()
+        let allCalls = AllCallCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            await allCalls.capture(args)
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -41,12 +41,20 @@ struct TypeTextToolTests {
             Issue.record("Expected success response")
         }
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("type"))
-        #expect(capturedArgs.contains("--text"))
-        #expect(capturedArgs.contains("hello world"))
-        #expect(capturedArgs.contains("--identifier"))
-        #expect(capturedArgs.contains("searchField"))
+        let calls = await allCalls.allArgs
+        #expect(calls.count == 2, "Should tap first, then type")
+
+        // First call: tap to focus
+        let tapCall = calls[0]
+        #expect(tapCall.contains("tap"))
+        #expect(tapCall.contains("--id"))
+        #expect(tapCall.contains("searchField"))
+
+        // Second call: type text (positional arg)
+        let typeCall = calls[1]
+        #expect(typeCall.contains("type"))
+        #expect(typeCall.contains("hello world"))
+        #expect(!typeCall.contains("--text"))
     }
 
     @Test("Falls back to session UDID")
@@ -141,11 +149,11 @@ struct TypeTextToolTests {
         if case .success = response {
             let capturedArgs = await capture.lastArgs
             #expect(capturedArgs.contains("type"))
-            #expect(capturedArgs.contains("--text"))
             #expect(capturedArgs.contains("no target"))
-            #expect(!capturedArgs.contains("--identifier"))
+            #expect(!capturedArgs.contains("--text"))
+            #expect(!capturedArgs.contains("--id"))
             #expect(!capturedArgs.contains("--label"))
-            #expect(!capturedArgs.contains("--x"))
+            #expect(!capturedArgs.contains("-x"))
         } else {
             Issue.record("Expected success response")
         }

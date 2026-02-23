@@ -43,8 +43,8 @@ struct KeyPressToolTests {
 
         let capturedArgs = await capture.lastArgs
         #expect(capturedArgs.contains("key"))
-        #expect(capturedArgs.contains("--key"))
-        #expect(capturedArgs.contains("return"))
+        #expect(capturedArgs.contains("40"))
+        #expect(!capturedArgs.contains("--key"))
     }
 
     @Test("Falls back to session UDID")

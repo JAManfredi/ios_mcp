@@ -87,17 +87,36 @@ func registerTypeTextTool(
             return .error(error)
         }
 
-        var axeArgs = ["type", "--udid", resolvedUDID, "--text", text]
-
-        // Targeting is optional for type_text — if omitted, types into focused field
+        // If targeting is provided, tap the element first to focus it
         if case .success(let targetArgs) = resolveAxeTarget(from: args) {
-            axeArgs += targetArgs
+            do {
+                let tapResult = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["tap", "--udid", resolvedUDID] + targetArgs,
+                    timeout: 120,
+                    environment: nil
+                )
+                guard tapResult.succeeded else {
+                    return .error(ToolError(
+                        code: .commandFailed,
+                        message: "Failed to tap target element before typing",
+                        details: tapResult.stderr
+                    ))
+                }
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(
+                    code: .internalError,
+                    message: "Failed to tap target element: \(error.localizedDescription)"
+                ))
+            }
         }
 
         do {
             let result = try await executor.execute(
                 executable: resolvedAxe,
-                arguments: axeArgs,
+                arguments: ["type", text, "--udid", resolvedUDID],
                 timeout: 120,
                 environment: nil
             )

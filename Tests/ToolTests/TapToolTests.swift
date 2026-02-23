@@ -42,7 +42,7 @@ struct TapToolTests {
 
         let capturedArgs = await capture.lastArgs
         #expect(capturedArgs.contains("tap"))
-        #expect(capturedArgs.contains("--identifier"))
+        #expect(capturedArgs.contains("--id"))
         #expect(capturedArgs.contains("loginButton"))
     }
 

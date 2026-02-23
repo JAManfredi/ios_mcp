@@ -54,6 +54,15 @@ actor ArgCapture {
     }
 }
 
+/// Actor-based container for capturing all call arguments across multiple invocations.
+actor AllCallCapture {
+    private(set) var allArgs: [[String]] = []
+
+    func capture(_ args: [String]) {
+        allArgs.append(args)
+    }
+}
+
 // MARK: - Test Validator
 
 /// JSON containing common test UDIDs for validator passthrough.

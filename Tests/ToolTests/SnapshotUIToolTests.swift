@@ -79,7 +79,7 @@ struct SnapshotUIToolTests {
         }
     }
 
-    @Test("Returns error when axe dump fails")
+    @Test("Returns error when axe describe-ui fails")
     func commandFailure() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()

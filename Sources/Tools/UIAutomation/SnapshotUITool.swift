@@ -62,7 +62,7 @@ func registerSnapshotUITool(
         do {
             let result = try await executor.execute(
                 executable: resolvedAxe,
-                arguments: ["dump", "--udid", resolvedUDID],
+                arguments: ["describe-ui", "--udid", resolvedUDID],
                 timeout: 120,
                 environment: nil
             )
@@ -70,7 +70,7 @@ func registerSnapshotUITool(
             guard result.succeeded else {
                 return .error(ToolError(
                     code: .commandFailed,
-                    message: "axe dump failed",
+                    message: "axe describe-ui failed",
                     details: result.stderr
                 ))
             }

@@ -79,19 +79,26 @@ func registerLongPressTool(
             return .error(error)
         }
 
-        let targetArgs: [String]
-        switch resolveAxeTarget(from: args) {
-        case .success(let t): targetArgs = t
+        let coords: (x: Double, y: Double)
+        switch await resolveTargetCoordinates(
+            from: args,
+            axePath: resolvedAxe,
+            udid: resolvedUDID,
+            executor: executor
+        ) {
+        case .success(let c): coords = c
         case .failure(let error): return .error(error)
         }
 
-        var axeArgs = ["longpress", "--udid", resolvedUDID]
+        let duration = extractLongPressDuration(from: args["duration"]) ?? 1.0
 
-        if let duration = extractLongPressDuration(from: args["duration"]) {
-            axeArgs += ["--duration", String(format: "%.1f", duration)]
-        }
-
-        axeArgs += targetArgs
+        let axeArgs = [
+            "touch",
+            "-x", "\(Int(coords.x))", "-y", "\(Int(coords.y))",
+            "--down", "--up",
+            "--delay", String(format: "%.1f", duration),
+            "--udid", resolvedUDID,
+        ]
 
         do {
             let result = try await executor.execute(
@@ -104,7 +111,7 @@ func registerLongPressTool(
             guard result.succeeded else {
                 return .error(ToolError(
                     code: .commandFailed,
-                    message: "axe longpress failed",
+                    message: "axe touch (long press) failed",
                     details: result.stderr
                 ))
             }

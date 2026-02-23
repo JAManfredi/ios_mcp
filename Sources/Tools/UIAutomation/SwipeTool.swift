@@ -101,21 +101,59 @@ func registerSwipeTool(
             return .error(error)
         }
 
-        let targetArgs: [String]
-        switch resolveAxeTarget(from: args) {
-        case .success(let t): targetArgs = t
-        case .failure(let error): return .error(error)
-        }
-
-        var axeArgs = ["swipe", "--udid", resolvedUDID, "--direction", direction]
-
-        if let distance = extractSwipeDistance(from: args["distance"]) {
-            axeArgs += ["--distance", "\(distance)"]
-        }
-
-        axeArgs += targetArgs
+        let hasTarget = args["accessibility_id"] != nil
+            || args["accessibility_label"] != nil
+            || (args["x"] != nil && args["y"] != nil)
 
         do {
+            if !hasTarget {
+                // No target — use axe gesture presets for screen-level swipes
+                let preset = "scroll-\(direction)"
+                let result = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["gesture", preset, "--udid", resolvedUDID],
+                    timeout: 120,
+                    environment: nil
+                )
+
+                guard result.succeeded else {
+                    return .error(ToolError(
+                        code: .commandFailed,
+                        message: "axe gesture failed",
+                        details: result.stderr
+                    ))
+                }
+
+                return .success(ToolResult(content: "Swiped \(direction) on simulator \(resolvedUDID)."))
+            }
+
+            // Have a target — resolve coordinates, compute swipe start/end
+            let coords: (x: Double, y: Double)
+            switch await resolveTargetCoordinates(
+                from: args,
+                axePath: resolvedAxe,
+                udid: resolvedUDID,
+                executor: executor
+            ) {
+            case .success(let c): coords = c
+            case .failure(let error): return .error(error)
+            }
+
+            let distance = Double(extractSwipeDistance(from: args["distance"]) ?? 200)
+            let endpoints = computeSwipeEndpoints(
+                center: coords,
+                direction: direction,
+                distance: distance
+            )
+
+            let axeArgs = [
+                "swipe", "--udid", resolvedUDID,
+                "--start-x", "\(Int(endpoints.startX))",
+                "--start-y", "\(Int(endpoints.startY))",
+                "--end-x", "\(Int(endpoints.endX))",
+                "--end-y", "\(Int(endpoints.endY))",
+            ]
+
             let result = try await executor.execute(
                 executable: resolvedAxe,
                 arguments: axeArgs,
@@ -149,5 +187,20 @@ private func extractSwipeDistance(from value: Value?) -> Int? {
     case .int(let i): return i
     case .double(let d): return Int(d)
     default: return nil
+    }
+}
+
+private func computeSwipeEndpoints(
+    center: (x: Double, y: Double),
+    direction: String,
+    distance: Double
+) -> (startX: Double, startY: Double, endX: Double, endY: Double) {
+    let half = distance / 2.0
+    switch direction {
+    case "up":    return (center.x, center.y + half, center.x, center.y - half)
+    case "down":  return (center.x, center.y - half, center.x, center.y + half)
+    case "left":  return (center.x + half, center.y, center.x - half, center.y)
+    case "right": return (center.x - half, center.y, center.x + half, center.y)
+    default:      return (center.x, center.y, center.x, center.y)
     }
 }

@@ -61,44 +61,23 @@ func registerAccessibilityAuditTool(
             return .error(error)
         }
 
-        // 3. Try audit subcommand first, fall back to dump if not supported
         do {
             let result = try await executor.execute(
                 executable: resolvedAxe,
-                arguments: ["audit", "--udid", resolvedUDID],
+                arguments: ["describe-ui", "--udid", resolvedUDID],
                 timeout: 120,
                 environment: nil
             )
 
-            if result.succeeded {
-                return .success(ToolResult(content: result.stdout))
+            guard result.succeeded else {
+                return .error(ToolError(
+                    code: .commandFailed,
+                    message: "axe describe-ui failed",
+                    details: result.stderr
+                ))
             }
 
-            // If audit subcommand is not supported, fall back to dump
-            if result.stderr.contains("unknown command") || result.stderr.contains("not recognized") {
-                let dumpResult = try await executor.execute(
-                    executable: resolvedAxe,
-                    arguments: ["dump", "--udid", resolvedUDID],
-                    timeout: 120,
-                    environment: nil
-                )
-
-                guard dumpResult.succeeded else {
-                    return .error(ToolError(
-                        code: .commandFailed,
-                        message: "axe dump failed",
-                        details: dumpResult.stderr
-                    ))
-                }
-
-                return .success(ToolResult(content: dumpResult.stdout))
-            }
-
-            return .error(ToolError(
-                code: .commandFailed,
-                message: "axe audit failed",
-                details: result.stderr
-            ))
+            return .success(ToolResult(content: result.stdout))
         } catch let error as ToolError {
             return .error(error)
         } catch {
