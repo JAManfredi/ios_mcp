@@ -1,6 +1,7 @@
 # End-to-End Test Checklist
 
 Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 simulator (iPhone 17 Pro).
+Axe tools tested against DraftKings Sportsbook (`/Users/j.manfredi/workspace/gaming-worktrees/develop`, scheme `Sportsbook-Debug`) on iPhone 17 Pro (iOS 26.2, UDID `46D5547C-F66E-4DB0-AA26-0F75EFFACA57`).
 
 ## Project Discovery (3 tools)
 - [x] `discover_projects` — finds Jarvis.xcodeproj, auto-sets session project
@@ -26,15 +27,15 @@ Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 
 - [x] `start_log_capture` — starts capture, returns session_id
 - [x] `stop_log_capture` — stops capture, returns entries (0 for idle app)
 
-## UI Automation (8 tools) — axe blocked on x86_64
+## UI Automation (8 tools) — axe v1.4.0 on arm64
 - [x] `screenshot` — captures simulator screen
-- [ ] `snapshot_ui` — accessibility tree (requires axe)
+- [x] `snapshot_ui` — returns full accessibility tree via `axe describe-ui` (413KB on DK Sportsbook)
 - [x] `deep_link` — opens URL in simulator
-- [ ] `tap` — taps element (requires axe)
-- [ ] `swipe` — swipes on element (requires axe)
-- [ ] `type_text` — types into field (requires axe)
-- [ ] `key_press` — sends key event (requires axe)
-- [ ] `long_press` — long presses element (requires axe)
+- [x] `tap` — by accessibility_id (`--id`), accessibility_label (`--label`), and coordinates (`-x/-y`). Tab bar items not in axe tree; use coordinates as fallback.
+- [x] `swipe` — up/down/left/right via `axe swipe` with dynamic screen center from `describe-ui` root frame. Targeted swipe resolves element center via accessibility tree.
+- [x] `type_text` — typed "Lakers" into search field via `axe type` (positional arg). Works with standard UITextField; custom keypads need `tap` on button elements instead.
+- [x] `key_press` — return (submitted search), escape, tab all work via HID keycode mapping.
+- [x] `long_press` — long-pressed "More Bets" by label via `axe touch --down --up --delay`. Resolves coordinates from `describe-ui`.
 
 ## Debugging (8 tools)
 - [x] `debug_attach` — attaches LLDB to running app. Fixed actor deadlock + removed --waitfor.
@@ -52,7 +53,7 @@ Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 
 
 ## Quality (2 tools)
 - [x] `lint` — returns full JSON violations. Fixed --path → positional arg + exit code 2 threshold.
-- [ ] `accessibility_audit` — accessibility check (requires axe)
+- [x] `accessibility_audit` — returns accessibility tree via `axe describe-ui` for manual inspection.
 
 ## Extras (1 tool)
 - [x] `open_simulator` — opens Simulator.app
@@ -69,3 +70,6 @@ Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 
 3. `lint` — exit code 2 (error-severity violations) incorrectly treated as fatal, changed threshold to >= 3
 4. `debug_attach` — actor deadlock: `waitForPrompt` spin loop held actor while readTask needed actor isolation. Fixed with NSLock-based `LLDBOutputBuffer`.
 5. `debug_attach` — `--waitfor` flag waits for next process launch, not current. Removed flag.
+6. All axe tools — CLI API mismatch with axe v1.4.0. Updated `dump` → `describe-ui`, `--identifier` → `--id`, `--x/--y` → `-x/-y`, `gesture` presets → explicit `swipe` with coordinates, `--text` flag → positional arg, `--key` → HID keycode, `longpress` → `touch --down --up --delay`.
+7. `swipe` — `axe gesture` defaults to iPhone 15 dimensions (390x844). Replaced with `axe swipe` using dynamically resolved screen center from `describe-ui` root Application frame.
+8. `CommandExecutor` — pipe buffer deadlock: reading stdout/stderr in `terminationHandler` (post-exit) deadlocked when output exceeded 64KB pipe buffer. Fixed by reading pipes in detached tasks before process runs.
