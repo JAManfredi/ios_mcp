@@ -10,7 +10,16 @@ import Testing
 @testable import Core
 @testable import Tools
 
-private let mockDescribeUIJSON = """
+private let mockScreenJSON = """
+[{
+  "AXUniqueId": null,
+  "AXLabel": "TestApp",
+  "frame": {"x": 0, "y": 0, "width": 400, "height": 800},
+  "children": []
+}]
+"""
+
+private let mockElementJSON = """
 [{
   "AXUniqueId": "scrollView",
   "AXLabel": "Scroll",
@@ -22,13 +31,16 @@ private let mockDescribeUIJSON = """
 @Suite("swipe")
 struct SwipeToolTests {
 
-    @Test("Swipes with gesture preset when no target provided")
-    func gesturePreset() async throws {
+    @Test("Resolves screen center for untargeted swipe")
+    func untargetedSwipe() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let capture = ArgCapture()
+        let allCalls = AllCallCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            await allCalls.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockScreenJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -48,9 +60,11 @@ struct SwipeToolTests {
             Issue.record("Expected success response")
         }
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("gesture"))
-        #expect(capturedArgs.contains("scroll-up"))
+        let calls = await allCalls.allArgs
+        #expect(calls.count == 2)
+        #expect(calls[0].contains("describe-ui"))
+        #expect(calls[1].contains("swipe"))
+        #expect(calls[1].contains("--start-x"))
     }
 
     @Test("Swipes with coordinates when accessibility target provided")
@@ -61,7 +75,7 @@ struct SwipeToolTests {
         let executor = MockCommandExecutor { _, args in
             await allCalls.capture(args)
             if args.contains("describe-ui") {
-                return CommandResult(stdout: mockDescribeUIJSON, stderr: "", exitCode: 0)
+                return CommandResult(stdout: mockElementJSON, stderr: "", exitCode: 0)
             }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
@@ -100,6 +114,9 @@ struct SwipeToolTests {
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
             await capture.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockScreenJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
