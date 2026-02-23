@@ -10,22 +10,23 @@ An [MCP](https://modelcontextprotocol.io/) server that gives Claude Code full co
 | Xcode | 16+ | Yes |
 | iOS Simulator runtime | Any installed | Yes |
 | Swift | 6.1+ | Yes |
-| [axe](https://github.com/nicklama/axe) | 0.4.0+ | No — UI automation tools only |
+| [axe](https://github.com/cameroncooke/AXe) | 0.4.0+ | No — UI automation tools only |
 | SwiftLint | Any | No — lint tool only |
 
 ## Installation
 
-Build from source:
+Clone and install optional dependencies:
 
 ```bash
-git clone <repo-url>
-cd ios-mcp
-swift build -c release
+git clone https://github.com/JAManfredi/ios_mcp.git
+cd ios_mcp
+brew bundle
 ```
 
-Install the binary:
+Build and install:
 
 ```bash
+swift build -c release
 cp .build/release/ios-mcp /usr/local/bin/
 ```
 
