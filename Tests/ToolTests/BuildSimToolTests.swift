@@ -206,6 +206,51 @@ struct BuildSimToolTests {
         }
     }
 
+    @Test("Includes stderr in error message when build fails with no diagnostics")
+    func stderrInErrorMessage() async throws {
+        let session = SessionStore()
+        await session.set(.workspace, value: "/path/to/App.xcworkspace")
+        await session.set(.scheme, value: "MyApp")
+        await session.set(.simulatorUDID, value: "AAAA-1111")
+
+        let emptyDiagnostics = """
+        {
+          "actions": [
+            {
+              "buildResult": {
+                "issues": {
+                  "errorSummaries": [],
+                  "warningSummaries": []
+                }
+              }
+            }
+          ]
+        }
+        """
+
+        let stderrOutput = "xcodebuild: error: The project requires iOS 26.0 or later."
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor { exec, args in
+            if exec.contains("xcodebuild") && args.contains("build") {
+                return CommandResult(stdout: "", stderr: stderrOutput, exitCode: 65)
+            }
+            return CommandResult(stdout: emptyDiagnostics, stderr: "", exitCode: 0)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+
+        if case .error(let error) = response {
+            #expect(error.code == .commandFailed)
+            #expect(error.message.contains("Build output:"))
+            #expect(error.message.contains("iOS 26.0"))
+        } else {
+            Issue.record("Expected error response")
+        }
+    }
+
     @Test("Reports success with zero counts when xcresulttool fails")
     func xcresulttoolFailureFallback() async throws {
         let session = SessionStore()
