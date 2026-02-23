@@ -118,6 +118,45 @@ struct SoakTests {
         )
     }
 
+    // MARK: - Build Cancellation Stress
+
+    @Test("Build cancellation does not leak xcodebuild processes (3 iterations)")
+    func buildCancellationStress() async throws {
+        let xcodebuildCountBefore = try await countProcesses(matching: "xcodebuild")
+
+        for iteration in 1...3 {
+            // Start a build in a child task, then cancel it after a short delay
+            let buildTask = Task {
+                // Use a known-bad project so xcodebuild runs but we don't need real sources.
+                // The important thing is that the process starts and we cancel it.
+                let _ = try? await executor.execute(
+                    executable: "/usr/bin/xcodebuild",
+                    arguments: ["-scheme", "NonExistentScheme", "-destination", "generic/platform=iOS Simulator", "build"],
+                    timeout: 30,
+                    environment: nil
+                )
+            }
+
+            // Allow the process to start
+            try await Task.sleep(for: .seconds(2))
+            buildTask.cancel()
+
+            // Allow cancellation to propagate and SIGTERM/SIGKILL to complete
+            try await Task.sleep(for: .seconds(4))
+
+            // Verify the task completed (was cancelled)
+            let _ = await buildTask.result
+            _ = iteration // silence unused warning
+        }
+
+        // Final check: no leaked xcodebuild processes
+        let xcodebuildCountAfter = try await countProcesses(matching: "xcodebuild")
+        #expect(
+            xcodebuildCountAfter <= xcodebuildCountBefore,
+            "Leaked xcodebuild processes: before=\(xcodebuildCountBefore), after=\(xcodebuildCountAfter)"
+        )
+    }
+
     // MARK: - Helpers
 
     private func findShutdownSimulator() async throws -> String {

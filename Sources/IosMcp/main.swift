@@ -46,14 +46,24 @@ private func startServer() async throws {
     let pathPolicy = PathPolicy()
     let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
 
-    let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator)
-
     let server = Server(
         name: "ios-mcp",
         version: "0.1.0",
         capabilities: .init(tools: .init())
     )
+
+    let progressReporter = ProgressReporter { token, progress, total, message in
+        let params = ProgressNotification.Parameters(
+            progressToken: token,
+            progress: progress,
+            total: total,
+            message: message
+        )
+        try? await server.notify(ProgressNotification.message(params))
+    }
+
+    let registry = ToolRegistry()
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, progressReporter: progressReporter)
 
     await server.withMethodHandler(ListTools.self) { _ in
         let manifests = await registry.listTools()
@@ -61,10 +71,20 @@ private func startServer() async throws {
     }
 
     await server.withMethodHandler(CallTool.self) { params in
-        let response = try await registry.callTool(
-            name: params.name,
-            arguments: params.arguments ?? [:]
-        )
+        await progressReporter.setToken(params._meta?.progressToken)
+
+        let response: ToolResponse
+        do {
+            response = try await registry.callTool(
+                name: params.name,
+                arguments: params.arguments ?? [:]
+            )
+        } catch {
+            await progressReporter.setToken(nil)
+            throw error
+        }
+        await progressReporter.setToken(nil)
+
         switch response {
         case .success(let result):
             var content: [Tool.Content] = []

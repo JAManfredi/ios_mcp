@@ -15,7 +15,8 @@ func registerTestSimTool(
     executor: any CommandExecuting,
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
         name: "test_sim",
@@ -111,12 +112,19 @@ func registerTestSimTool(
                 )
 
                 let testStart = ContinuousClock.now
-                let result = try await executor.execute(
+                let phaseParser = XcodebuildPhaseParser()
+                let result = try await executor.executeStreaming(
                     executable: "/usr/bin/xcodebuild",
                     arguments: testArgs,
                     timeout: timeout,
                     environment: nil
-                )
+                ) { line in
+                    if let phase = await phaseParser.parse(line: line), let reporter = progressReporter {
+                        let elapsed = ContinuousClock.now - testStart
+                        let msg = String(format: "%@ — %.0fs", phase, durationSeconds(elapsed))
+                        await reporter.report(message: msg)
+                    }
+                }
 
                 let diagnostics = await fetchBuildDiagnostics(
                     resultBundlePath: resultPath,
