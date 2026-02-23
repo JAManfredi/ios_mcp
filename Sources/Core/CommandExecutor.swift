@@ -255,12 +255,16 @@ public struct CommandExecutor: CommandExecuting, Sendable {
     }
 
     /// Terminate a process and its entire process group.
-    /// Sends SIGTERM to the group first, then SIGKILL after a grace period.
+    /// Sends SIGTERM to the process and its group, then SIGKILL after a grace period.
+    /// Signals both the process directly and the group to handle the race where
+    /// `onCancel` fires before `setpgid` has placed the child in its own group.
     private static func terminateProcessTree(_ process: Process) {
         let pid = process.processIdentifier
         guard pid > 0 else { return }
+        kill(pid, SIGTERM)
         kill(-pid, SIGTERM)
         DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+            kill(pid, SIGKILL)
             kill(-pid, SIGKILL)
         }
     }
