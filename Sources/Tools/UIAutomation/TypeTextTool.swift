@@ -18,7 +18,7 @@ func registerTypeTextTool(
 ) async {
     let manifest = ToolManifest(
         name: "type_text",
-        description: "Type text into the iOS simulator. Types into the currently focused field by default, or targets a specific element via accessibility identifier, label, or coordinates. Falls back to session default simulator_udid.",
+        description: "Type text into the iOS simulator. Sends keyboard events to the currently focused text field by default, or targets a specific element via accessibility identifier, label, or coordinates. For custom keypads or non-standard input views, use tap on individual buttons instead. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(

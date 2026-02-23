@@ -31,7 +31,7 @@ func registerKeyPressTool(
 ) async {
     let manifest = ToolManifest(
         name: "key_press",
-        description: "Send a key press to the iOS simulator (e.g. return, escape, delete). The key is sent to the currently focused responder. Falls back to session default simulator_udid.",
+        description: "Send a key press to the iOS simulator. Supported keys: return, enter, escape, backspace, delete, tab, space, up, down, left, right. Also accepts raw HID keycodes. The key is sent to the currently focused responder. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(
@@ -40,7 +40,7 @@ func registerKeyPressTool(
                 ),
                 "key": .init(
                     type: "string",
-                    description: "The key to press (required). Examples: return, escape, delete, tab."
+                    description: "The key to press (required). Supported keys: return, enter, escape, backspace, delete, tab, space, up, down, left, right. Also accepts numeric HID keycodes."
                 ),
             ],
             required: ["key"]

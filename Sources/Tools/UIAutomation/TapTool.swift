@@ -18,7 +18,7 @@ func registerTapTool(
 ) async {
     let manifest = ToolManifest(
         name: "tap",
-        description: "Tap a UI element in the iOS simulator by accessibility identifier, label, or coordinates. Falls back to session default simulator_udid.",
+        description: "Tap a UI element in the iOS simulator by accessibility identifier, label, or coordinates. Not all elements appear in the accessibility tree (e.g. UITabBar items). Use snapshot_ui to inspect available elements, or fall back to coordinates. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(

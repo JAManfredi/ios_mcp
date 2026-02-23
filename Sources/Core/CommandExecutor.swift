@@ -173,6 +173,10 @@ public struct CommandExecutor: CommandExecuting, Sendable {
         // Accumulate stdout for the final result while streaming lines to the callback
         let stdoutAccumulator = StdoutAccumulator()
 
+        // Read stderr concurrently to prevent deadlock when output exceeds
+        // the 64KB pipe buffer. Must start before the process runs.
+        let stderrRead = Task.detached { stderrPipe.fileHandleForReading.readDataToEndOfFile() }
+
         return try await withTaskCancellationHandler {
             // Start reading stdout in a detached task so lines stream in real time
             let readTask = Task.detached {
@@ -205,10 +209,9 @@ public struct CommandExecutor: CommandExecuting, Sendable {
             return try await withCheckedThrowingContinuation { continuation in
                 process.terminationHandler = { _ in
                     Task {
-                        // Wait for the read task to drain all output
+                        // Wait for both read tasks to drain all output
                         await readTask.value
-
-                        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                        let stderrData = await stderrRead.value
                         let rawStdout = await stdoutAccumulator.data
                         let stdoutStr = String(data: rawStdout, encoding: .utf8) ?? ""
                         let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
@@ -226,6 +229,7 @@ public struct CommandExecutor: CommandExecuting, Sendable {
                 do {
                     try process.run()
                 } catch {
+                    stderrRead.cancel()
                     continuation.resume(throwing: ToolError(
                         code: .commandFailed,
                         message: "Failed to launch \(executable): \(error.localizedDescription)"
