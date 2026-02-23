@@ -143,6 +143,51 @@ private func extractCenter(from node: [String: Any]) -> (x: Double, y: Double)? 
     return (x: x + width / 2.0, y: y + height / 2.0)
 }
 
+/// Resolve screen center by reading the root Application frame from `describe-ui`.
+func resolveScreenCenter(
+    axePath: String,
+    udid: String,
+    executor: any CommandExecuting
+) async -> Result<(x: Double, y: Double), ToolError> {
+    do {
+        let result = try await executor.execute(
+            executable: axePath,
+            arguments: ["describe-ui", "--udid", udid],
+            timeout: 120,
+            environment: nil
+        )
+
+        guard result.succeeded else {
+            return .failure(ToolError(
+                code: .commandFailed,
+                message: "Failed to resolve screen dimensions: axe describe-ui failed",
+                details: result.stderr
+            ))
+        }
+
+        guard let data = result.stdout.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let root = json.first,
+              let frame = root["frame"] as? [String: Any],
+              let width = frame["width"] as? Double,
+              let height = frame["height"] as? Double else {
+            return .failure(ToolError(
+                code: .commandFailed,
+                message: "Failed to parse screen dimensions from axe describe-ui"
+            ))
+        }
+
+        return .success((x: width / 2.0, y: height / 2.0))
+    } catch let error as ToolError {
+        return .failure(error)
+    } catch {
+        return .failure(ToolError(
+            code: .internalError,
+            message: "Failed to resolve screen center: \(error.localizedDescription)"
+        ))
+    }
+}
+
 /// Extract a numeric value from a MCP Value, handling both `.int` and `.double`.
 func extractNumber(from value: Value?) -> Double? {
     guard let value else { return nil }

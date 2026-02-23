@@ -101,42 +101,32 @@ func registerSwipeTool(
             return .error(error)
         }
 
-        let hasTarget = args["accessibility_id"] != nil
-            || args["accessibility_label"] != nil
-            || (args["x"] != nil && args["y"] != nil)
-
         do {
-            if !hasTarget {
-                // No target — use axe gesture presets for screen-level swipes
-                let preset = "scroll-\(direction)"
-                let result = try await executor.execute(
-                    executable: resolvedAxe,
-                    arguments: ["gesture", preset, "--udid", resolvedUDID],
-                    timeout: 120,
-                    environment: nil
-                )
-
-                guard result.succeeded else {
-                    return .error(ToolError(
-                        code: .commandFailed,
-                        message: "axe gesture failed",
-                        details: result.stderr
-                    ))
-                }
-
-                return .success(ToolResult(content: "Swiped \(direction) on simulator \(resolvedUDID)."))
-            }
-
-            // Have a target — resolve coordinates, compute swipe start/end
+            // Resolve swipe center: explicit target, or screen center from describe-ui
             let coords: (x: Double, y: Double)
-            switch await resolveTargetCoordinates(
-                from: args,
-                axePath: resolvedAxe,
-                udid: resolvedUDID,
-                executor: executor
-            ) {
-            case .success(let c): coords = c
-            case .failure(let error): return .error(error)
+            let hasTarget = args["accessibility_id"] != nil
+                || args["accessibility_label"] != nil
+                || (args["x"] != nil && args["y"] != nil)
+
+            if hasTarget {
+                switch await resolveTargetCoordinates(
+                    from: args,
+                    axePath: resolvedAxe,
+                    udid: resolvedUDID,
+                    executor: executor
+                ) {
+                case .success(let c): coords = c
+                case .failure(let error): return .error(error)
+                }
+            } else {
+                switch await resolveScreenCenter(
+                    axePath: resolvedAxe,
+                    udid: resolvedUDID,
+                    executor: executor
+                ) {
+                case .success(let c): coords = c
+                case .failure(let error): return .error(error)
+                }
             }
 
             let distance = Double(extractSwipeDistance(from: args["distance"]) ?? 200)
