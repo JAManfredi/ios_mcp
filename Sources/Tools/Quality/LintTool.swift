@@ -115,8 +115,9 @@ func registerLintTool(
                 environment: nil
             )
 
-            // Exit code 0 = clean, 1 = violations found (still success), 2+ = fatal error
-            if result.exitCode >= 2 {
+            // SwiftLint exit codes: 0 = clean, 1 = warnings only, 2 = has errors, 3+ = fatal
+            // All are "success" from the tool's perspective — return the violations.
+            if result.exitCode >= 3 {
                 return .error(ToolError(
                     code: .commandFailed,
                     message: "swiftlint lint failed",
