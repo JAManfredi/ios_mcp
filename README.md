@@ -38,18 +38,13 @@ ios-mcp doctor
 
 ## Claude Code Configuration
 
-Add to your MCP settings (`~/.claude/settings.json` or project-level `.claude/settings.json`):
+Register as an MCP server:
 
-```json
-{
-  "mcpServers": {
-    "ios-mcp": {
-      "command": "/usr/local/bin/ios-mcp",
-      "args": []
-    }
-  }
-}
+```bash
+claude mcp add -s user ios-mcp /usr/local/bin/ios-mcp
 ```
+
+This adds ios-mcp as a user-scoped MCP server available in all projects. Restart Claude Code to connect.
 
 ## What's Included
 
