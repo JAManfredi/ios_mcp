@@ -23,7 +23,7 @@ struct LongPressToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "long_press",
@@ -58,7 +58,7 @@ struct LongPressToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "long_press",
@@ -79,7 +79,7 @@ struct LongPressToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "long_press",
@@ -100,7 +100,7 @@ struct LongPressToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "long_press",
@@ -125,7 +125,7 @@ struct LongPressToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "long_press",

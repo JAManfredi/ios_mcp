@@ -11,8 +11,9 @@ import Core
 func registerQualityTools(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
-    await registerLintTool(with: registry, session: session, executor: executor)
-    await registerAccessibilityAuditTool(with: registry, session: session, executor: executor)
+    await registerLintTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, validator: validator)
 }

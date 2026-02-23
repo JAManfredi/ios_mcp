@@ -12,8 +12,9 @@ func registerLoggingTools(
     with registry: ToolRegistry,
     session: SessionStore,
     logCapture: any LogCapturing,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
-    await registerStartLogCaptureTool(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
+    await registerStartLogCaptureTool(with: registry, session: session, logCapture: logCapture, concurrency: concurrency, validator: validator)
     await registerStopLogCaptureTool(with: registry, logCapture: logCapture)
 }

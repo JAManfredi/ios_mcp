@@ -16,15 +16,16 @@ public func registerAllTools(
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
     logCapture: any LogCapturing,
-    debugSession: any DebugSessionManaging
+    debugSession: any DebugSessionManaging,
+    validator: DefaultsValidator
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
-    await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency)
-    await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
-    await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency)
-    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts)
-    await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency)
-    await registerInspectionTools(with: registry, session: session, executor: executor)
-    await registerQualityTools(with: registry, session: session, executor: executor)
-    await registerExtrasTools(with: registry, session: session, executor: executor)
+    await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
+    await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator)
+    await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency, validator: validator)
+    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
+    await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency, validator: validator)
+    await registerInspectionTools(with: registry, session: session, executor: executor, validator: validator)
+    await registerQualityTools(with: registry, session: session, executor: executor, validator: validator)
+    await registerExtrasTools(with: registry, session: session, executor: executor, validator: validator)
 }

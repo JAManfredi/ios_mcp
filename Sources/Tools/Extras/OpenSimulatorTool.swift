@@ -11,7 +11,8 @@ import Foundation
 func registerOpenSimulatorTool(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "open_simulator",
@@ -34,6 +35,13 @@ func registerOpenSimulatorTool(
             udid = u
         } else {
             udid = await session.get(.simulatorUDID)
+        }
+
+        // Validate UDID if provided
+        if let udid {
+            if let error = await validator.validateSimulatorUDID(udid) {
+                return .error(error)
+            }
         }
 
         // Boot the simulator if a UDID is available

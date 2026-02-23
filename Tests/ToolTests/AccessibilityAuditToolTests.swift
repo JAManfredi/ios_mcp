@@ -22,7 +22,7 @@ struct AccessibilityAuditToolTests {
             CommandResult(stdout: auditOutput, stderr: "", exitCode: 0)
         }
 
-        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "accessibility_audit",
@@ -49,7 +49,7 @@ struct AccessibilityAuditToolTests {
             return CommandResult(stdout: "Audit complete: 0 issues", stderr: "", exitCode: 0)
         }
 
-        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "accessibility_audit",
@@ -70,7 +70,7 @@ struct AccessibilityAuditToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerAccessibilityAuditTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "accessibility_audit",

@@ -12,9 +12,10 @@ func registerDebuggingTools(
     with registry: ToolRegistry,
     session: SessionStore,
     debugSession: any DebugSessionManaging,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
-    await registerDebugAttachTool(with: registry, session: session, debugSession: debugSession, concurrency: concurrency)
+    await registerDebugAttachTool(with: registry, session: session, debugSession: debugSession, concurrency: concurrency, validator: validator)
     await registerDebugDetachTool(with: registry, debugSession: debugSession, concurrency: concurrency)
     await registerDebugBreakpointAddTool(with: registry, debugSession: debugSession)
     await registerDebugBreakpointRemoveTool(with: registry, debugSession: debugSession)

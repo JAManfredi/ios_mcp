@@ -22,7 +22,7 @@ struct SnapshotUIToolTests {
         """
         let executor = MockCommandExecutor.succeedingWith(treeOutput)
 
-        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "snapshot_ui",
@@ -49,7 +49,7 @@ struct SnapshotUIToolTests {
             return CommandResult(stdout: "{}", stderr: "", exitCode: 0)
         }
 
-        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(name: "snapshot_ui", arguments: [:])
 
@@ -67,7 +67,7 @@ struct SnapshotUIToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(name: "snapshot_ui", arguments: [:])
 
@@ -85,7 +85,7 @@ struct SnapshotUIToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.failingWith(stderr: "axe: device not found")
 
-        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "snapshot_ui",

@@ -10,7 +10,8 @@ import Foundation
 
 func registerSessionSetDefaultsTool(
     with registry: ToolRegistry,
-    session: SessionStore
+    session: SessionStore,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "session_set_defaults",
@@ -60,6 +61,27 @@ func registerSessionSetDefaultsTool(
             ("configuration", .configuration),
             ("derived_data_path", .derivedDataPath),
         ]
+
+        // Validate UDID before setting
+        if case .string(let udidValue) = args["simulator_udid"] {
+            if let error = await validator.validateSimulatorUDID(udidValue) {
+                return .error(error)
+            }
+        }
+
+        // Validate workspace path before setting
+        if case .string(let wsValue) = args["workspace"] {
+            if let error = validator.validatePathExists(wsValue, label: "Workspace") {
+                return .error(error)
+            }
+        }
+
+        // Validate project path before setting
+        if case .string(let projValue) = args["project"] {
+            if let error = validator.validatePathExists(projValue, label: "Project") {
+                return .error(error)
+            }
+        }
 
         var setKeys: [String] = []
 

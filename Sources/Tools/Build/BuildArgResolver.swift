@@ -23,9 +23,11 @@ struct ResolvedBuildArgs: Sendable {
 
 /// Extracts and resolves workspace/project/scheme/configuration/udid from tool
 /// arguments with session fallback. Shared by build_sim, build_run_sim, and test_sim.
+/// Validates resolved paths and UDID against actual system state.
 func resolveBuildArgs(
     from args: [String: Value],
-    session: SessionStore
+    session: SessionStore,
+    validator: DefaultsValidator
 ) async -> Result<ResolvedBuildArgs, ToolError> {
     let workspace: String?
     if case .string(let ws) = args["workspace"] {
@@ -95,6 +97,17 @@ func resolveBuildArgs(
             code: .invalidInput,
             message: "No simulator UDID specified, and no session default is set. Run list_simulators first."
         ))
+    }
+
+    // Validate resolved values against actual system state
+    if let workspace, let error = validator.validatePathExists(workspace, label: "Workspace") {
+        return .failure(error)
+    }
+    if let project, workspace == nil, let error = validator.validatePathExists(project, label: "Project") {
+        return .failure(error)
+    }
+    if let error = await validator.validateSimulatorUDID(udid) {
+        return .failure(error)
     }
 
     let lockKey = "build:\(workspace ?? project ?? scheme)"

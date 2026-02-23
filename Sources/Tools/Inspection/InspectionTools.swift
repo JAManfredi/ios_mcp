@@ -11,8 +11,9 @@ import Core
 func registerInspectionTools(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
-    await registerReadUserDefaultsTool(with: registry, session: session, executor: executor)
-    await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+    await registerReadUserDefaultsTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: validator)
 }

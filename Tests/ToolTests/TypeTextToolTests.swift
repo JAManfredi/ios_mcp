@@ -23,7 +23,7 @@ struct TypeTextToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "type_text",
@@ -61,7 +61,7 @@ struct TypeTextToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "type_text",
@@ -82,7 +82,7 @@ struct TypeTextToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "type_text",
@@ -103,7 +103,7 @@ struct TypeTextToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "type_text",
@@ -128,7 +128,7 @@ struct TypeTextToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTypeTextTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "type_text",

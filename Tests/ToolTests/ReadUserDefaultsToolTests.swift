@@ -23,7 +23,7 @@ struct ReadUserDefaultsToolTests {
             return CommandResult(stdout: "dark", stderr: "", exitCode: 0)
         }
 
-        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor)
+        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "read_user_defaults",
@@ -61,7 +61,7 @@ struct ReadUserDefaultsToolTests {
             return CommandResult(stdout: plistOutput, stderr: "", exitCode: 0)
         }
 
-        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor)
+        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "read_user_defaults",
@@ -95,7 +95,7 @@ struct ReadUserDefaultsToolTests {
             return CommandResult(stdout: "value", stderr: "", exitCode: 0)
         }
 
-        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor)
+        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "read_user_defaults",
@@ -119,7 +119,7 @@ struct ReadUserDefaultsToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor)
+        await registerReadUserDefaultsTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "read_user_defaults",

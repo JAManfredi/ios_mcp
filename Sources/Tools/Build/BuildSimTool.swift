@@ -14,7 +14,8 @@ func registerBuildSimTool(
     session: SessionStore,
     executor: any CommandExecuting,
     concurrency: ConcurrencyPolicy,
-    artifacts: ArtifactStore
+    artifacts: ArtifactStore,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "build_sim",
@@ -56,7 +57,7 @@ func registerBuildSimTool(
 
     await registry.register(manifest: manifest) { args in
         let resolved: ResolvedBuildArgs
-        switch await resolveBuildArgs(from: args, session: session) {
+        switch await resolveBuildArgs(from: args, session: session, validator: validator) {
         case .success(let r): resolved = r
         case .failure(let error): return .error(error)
         }

@@ -23,7 +23,7 @@ struct KeyPressToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "key_press",
@@ -59,7 +59,7 @@ struct KeyPressToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "key_press",
@@ -80,7 +80,7 @@ struct KeyPressToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "key_press",
@@ -101,7 +101,7 @@ struct KeyPressToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerKeyPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "key_press",

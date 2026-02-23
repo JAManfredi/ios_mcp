@@ -12,7 +12,8 @@ import MCP
 func registerReadUserDefaultsTool(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "read_user_defaults",
@@ -59,6 +60,10 @@ func registerReadUserDefaultsTool(
                 code: .invalidInput,
                 message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
             ))
+        }
+
+        if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+            return .error(error)
         }
 
         // 3. Build command arguments

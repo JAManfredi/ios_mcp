@@ -22,7 +22,7 @@ struct StartLogCaptureToolTests {
         let executor = MockCommandExecutor.succeedingWith("")
         let mockCapture = MockLogCapture(nextID: "test-session-abc")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: mockCapture, debugSession: MockDebugSession())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: mockCapture, debugSession: MockDebugSession(), validator: testValidator())
 
         let response = try await registry.callTool(
             name: "start_log_capture",
@@ -47,7 +47,7 @@ struct StartLogCaptureToolTests {
         let executor = MockCommandExecutor.succeedingWith("")
         let mockCapture = MockLogCapture(nextID: "sess-123")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: mockCapture, debugSession: MockDebugSession())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: mockCapture, debugSession: MockDebugSession(), validator: testValidator())
 
         let response = try await registry.callTool(name: "start_log_capture", arguments: [:])
 
@@ -64,7 +64,7 @@ struct StartLogCaptureToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
 
         let response = try await registry.callTool(name: "start_log_capture", arguments: [:])
 
@@ -84,7 +84,7 @@ struct StartLogCaptureToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
 
         let response = try await registry.callTool(
             name: "start_log_capture",

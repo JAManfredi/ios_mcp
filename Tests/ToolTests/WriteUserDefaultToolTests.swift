@@ -23,7 +23,7 @@ struct WriteUserDefaultToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "write_user_default",
@@ -59,7 +59,7 @@ struct WriteUserDefaultToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "write_user_default",
@@ -87,7 +87,7 @@ struct WriteUserDefaultToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "write_user_default",
@@ -112,7 +112,7 @@ struct WriteUserDefaultToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "write_user_default",
@@ -137,7 +137,7 @@ struct WriteUserDefaultToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor)
+        await registerWriteUserDefaultTool(with: registry, session: session, executor: executor, validator: testValidator())
 
         let response = try await registry.callTool(
             name: "write_user_default",

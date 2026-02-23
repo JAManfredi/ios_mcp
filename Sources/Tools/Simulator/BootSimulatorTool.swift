@@ -12,7 +12,8 @@ func registerBootSimulatorTool(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "boot_simulator",
@@ -75,6 +76,10 @@ func registerBootSimulatorTool(
                     code: .invalidInput,
                     message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
                 ))
+            }
+
+            if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+                return .error(error)
             }
 
             return await concurrency.withLock(

@@ -11,7 +11,8 @@ import Core
 func registerExtrasTools(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
-    await registerOpenSimulatorTool(with: registry, session: session, executor: executor)
+    await registerOpenSimulatorTool(with: registry, session: session, executor: executor, validator: validator)
 }

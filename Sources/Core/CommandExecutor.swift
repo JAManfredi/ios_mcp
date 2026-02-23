@@ -20,6 +20,8 @@ public protocol CommandExecuting: Sendable {
 
 /// Async wrapper around `Process` for executing CLI commands with arg arrays.
 /// Never uses shell execution — always passes arguments directly.
+/// Applies `Redactor.redact()` to stdout/stderr before returning.
+/// Supports Swift Concurrency cancellation — cancelling the Task terminates the child process.
 public struct CommandExecutor: CommandExecuting, Sendable {
     private let logger = Logger(label: "ios-mcp.command-executor")
 
@@ -39,6 +41,11 @@ public struct CommandExecutor: CommandExecuting, Sendable {
         timeout: TimeInterval? = 60,
         environment: [String: String]? = nil
     ) async throws -> CommandResult {
+        // Pre-run cancellation check
+        if Task.isCancelled {
+            throw CancellationError()
+        }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -56,38 +63,45 @@ public struct CommandExecutor: CommandExecuting, Sendable {
 
         logger.debug("Executing: \(executable) \(arguments.joined(separator: " "))")
 
-        return try await withCheckedThrowingContinuation { continuation in
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: ToolError(
-                    code: .commandFailed,
-                    message: "Failed to launch \(executable): \(error.localizedDescription)"
-                ))
-                return
-            }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                process.terminationHandler = { _ in
+                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
 
-            if let timeout {
-                let deadline = DispatchTime.now() + timeout
-                DispatchQueue.global().asyncAfter(deadline: deadline) {
-                    if process.isRunning {
-                        process.terminate()
+                    let rawStdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                    let rawStderr = String(data: stderrData, encoding: .utf8) ?? ""
+
+                    let result = CommandResult(
+                        stdout: Redactor.redact(rawStdout),
+                        stderr: Redactor.redact(rawStderr),
+                        exitCode: process.terminationStatus
+                    )
+
+                    continuation.resume(returning: result)
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: ToolError(
+                        code: .commandFailed,
+                        message: "Failed to launch \(executable): \(error.localizedDescription)"
+                    ))
+                    return
+                }
+
+                if let timeout {
+                    let deadline = DispatchTime.now() + timeout
+                    DispatchQueue.global().asyncAfter(deadline: deadline) {
+                        if process.isRunning {
+                            process.terminate()
+                        }
                     }
                 }
             }
-
-            process.waitUntilExit()
-
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-            let result = CommandResult(
-                stdout: String(data: stdoutData, encoding: .utf8) ?? "",
-                stderr: String(data: stderrData, encoding: .utf8) ?? "",
-                exitCode: process.terminationStatus
-            )
-
-            continuation.resume(returning: result)
+        } onCancel: {
+            if process.isRunning { process.terminate() }
         }
     }
 }

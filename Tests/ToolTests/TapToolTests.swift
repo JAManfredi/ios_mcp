@@ -23,7 +23,7 @@ struct TapToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "tap",
@@ -58,7 +58,7 @@ struct TapToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "tap",
@@ -79,7 +79,7 @@ struct TapToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "tap",
@@ -100,7 +100,7 @@ struct TapToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "tap",
@@ -121,7 +121,7 @@ struct TapToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.failingWith(stderr: "element not found")
 
-        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerTapTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "tap",

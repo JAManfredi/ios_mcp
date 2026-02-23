@@ -11,7 +11,8 @@ import Foundation
 func registerDeepLinkTool(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "deep_link",
@@ -55,6 +56,10 @@ func registerDeepLinkTool(
                 code: .invalidInput,
                 message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
             ))
+        }
+
+        if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+            return .error(error)
         }
 
         do {

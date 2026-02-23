@@ -13,7 +13,8 @@ func registerStartLogCaptureTool(
     with registry: ToolRegistry,
     session: SessionStore,
     logCapture: any LogCapturing,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "start_log_capture",
@@ -67,6 +68,10 @@ func registerStartLogCaptureTool(
                     code: .invalidInput,
                     message: "No simulator UDID specified, and no session default is set. Run list_simulators first."
                 ))
+            }
+
+            if let error = await validator.validateSimulatorUDID(udid) {
+                return .error(error)
             }
 
             // Build NSPredicate-style filter string

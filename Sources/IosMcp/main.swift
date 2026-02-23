@@ -43,8 +43,10 @@ private func startServer() async throws {
     let debugSession = LLDBSessionManager()
     try? await artifacts.cleanupStaleDirectories()
 
+    let validator = DefaultsValidator(executor: executor)
+
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator)
 
     let server = Server(
         name: "ios-mcp",
@@ -77,6 +79,15 @@ private func startServer() async throws {
             return .init(content: content)
         case .error(let error):
             return .init(content: [.text(error.message)], isError: true)
+        }
+    }
+
+    // Periodic artifact cleanup every 30 minutes
+    Task.detached {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1800))
+            await artifacts.evictExpired()
+            try? await artifacts.cleanupStaleDirectories()
         }
     }
 

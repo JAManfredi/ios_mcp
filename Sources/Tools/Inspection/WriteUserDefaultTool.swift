@@ -12,7 +12,8 @@ import MCP
 func registerWriteUserDefaultTool(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "write_user_default",
@@ -94,6 +95,10 @@ func registerWriteUserDefaultTool(
                 code: .invalidInput,
                 message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
             ))
+        }
+
+        if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+            return .error(error)
         }
 
         // 4. Build command and execute

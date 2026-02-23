@@ -54,6 +54,34 @@ actor ArgCapture {
     }
 }
 
+// MARK: - Test Validator
+
+/// JSON containing common test UDIDs for validator passthrough.
+let validatorSimctlJSON = """
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      { "udid": "AAAA-1111", "name": "iPhone 16", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "SESSION-UDID", "name": "iPhone 15", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "TEST-UDID", "name": "iPhone 14", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "RESOLVED-UUID", "name": "iPhone 16", "state": "Shutdown", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "VALID-UDID-1111", "name": "iPhone 16 Pro", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "SIM-1111", "name": "iPhone 16 Pro Max", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "SIM-2222", "name": "iPhone SE", "state": "Shutdown", "isAvailable": true, "deviceTypeIdentifier": "t" },
+      { "udid": "UUID-123", "name": "iPad Pro", "state": "Booted", "isAvailable": true, "deviceTypeIdentifier": "t" }
+    ]
+  }
+}
+"""
+
+/// Creates a DefaultsValidator backed by a mock executor that always returns valid simctl JSON.
+func testValidator() -> DefaultsValidator {
+    DefaultsValidator(
+        executor: MockCommandExecutor.succeedingWith(validatorSimctlJSON),
+        fileExists: { _ in true }
+    )
+}
+
 /// Test helper that provides canned LogCapturing responses without real processes.
 actor MockLogCapture: LogCapturing {
     private var sessions: [String: LogCaptureResult] = [:]

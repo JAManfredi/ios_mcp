@@ -23,7 +23,7 @@ struct SwipeToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",
@@ -61,7 +61,7 @@ struct SwipeToolTests {
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",
@@ -85,7 +85,7 @@ struct SwipeToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",
@@ -109,7 +109,7 @@ struct SwipeToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",
@@ -133,7 +133,7 @@ struct SwipeToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",
@@ -157,7 +157,7 @@ struct SwipeToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe")
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "swipe",

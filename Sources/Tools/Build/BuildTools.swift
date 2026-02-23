@@ -13,12 +13,13 @@ func registerBuildTools(
     session: SessionStore,
     executor: any CommandExecuting,
     concurrency: ConcurrencyPolicy,
-    artifacts: ArtifactStore
+    artifacts: ArtifactStore,
+    validator: DefaultsValidator
 ) async {
-    await registerBuildSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
-    await registerBuildRunSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
-    await registerLaunchAppTool(with: registry, session: session, executor: executor)
-    await registerStopAppTool(with: registry, session: session, executor: executor)
-    await registerTestSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts)
+    await registerBuildSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator)
+    await registerBuildRunSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator)
+    await registerLaunchAppTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerStopAppTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerTestSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator)
     await registerCleanDerivedDataTool(with: registry, session: session)
 }

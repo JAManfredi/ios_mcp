@@ -45,7 +45,8 @@ func registerLintTool(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    swiftLintPath: String? = nil
+    swiftLintPath: String? = nil,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "lint",
@@ -93,6 +94,10 @@ func registerLintTool(
                 code: .invalidInput,
                 message: "No path provided and no session workspace or project is set."
             ))
+        }
+
+        if let error = validator.validatePathExists(resolvedPath, label: "Lint path") {
+            return .error(error)
         }
 
         // 3. Resolve reporter

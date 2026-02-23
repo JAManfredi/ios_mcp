@@ -22,7 +22,7 @@ struct LintToolTests {
             CommandResult(stdout: lintJSON, stderr: "", exitCode: 0)
         }
 
-        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint")
+        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "lint",
@@ -47,7 +47,7 @@ struct LintToolTests {
             return CommandResult(stdout: lintOutput, stderr: "", exitCode: 1)
         }
 
-        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint")
+        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "lint",
@@ -80,7 +80,7 @@ struct LintToolTests {
             return CommandResult(stdout: "[]", stderr: "", exitCode: 0)
         }
 
-        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint")
+        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "lint",
@@ -101,7 +101,7 @@ struct LintToolTests {
         let registry = ToolRegistry()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint")
+        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint", validator: testValidator())
 
         let response = try await registry.callTool(
             name: "lint",

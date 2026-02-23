@@ -12,7 +12,8 @@ import MCP
 func registerLaunchAppTool(
     with registry: ToolRegistry,
     session: SessionStore,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "launch_app",
@@ -57,6 +58,10 @@ func registerLaunchAppTool(
                     code: .invalidInput,
                     message: "No simulator UDID specified, and no session default is set. Run list_simulators first."
                 ))
+            }
+
+            if let error = await validator.validateSimulatorUDID(udid) {
+                return .error(error)
             }
 
             guard let bundleID else {

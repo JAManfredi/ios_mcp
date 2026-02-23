@@ -12,7 +12,8 @@ func registerDebugAttachTool(
     with registry: ToolRegistry,
     session: SessionStore,
     debugSession: any DebugSessionManaging,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "debug_attach",
@@ -67,6 +68,10 @@ func registerDebugAttachTool(
                     code: .invalidInput,
                     message: "No simulator UDID specified, and no session default is set. Run list_simulators first."
                 ))
+            }
+
+            if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+                return .error(error)
             }
 
             let lockKey = "lldb:\(pid ?? resolvedUDID.hashValue)"

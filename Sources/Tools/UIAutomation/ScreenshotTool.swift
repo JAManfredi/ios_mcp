@@ -12,7 +12,8 @@ func registerScreenshotTool(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    artifacts: ArtifactStore
+    artifacts: ArtifactStore,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "screenshot",
@@ -43,6 +44,10 @@ func registerScreenshotTool(
                 code: .invalidInput,
                 message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
             ))
+        }
+
+        if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+            return .error(error)
         }
 
         let tempPath = NSTemporaryDirectory() + "ios-mcp-screenshot-\(UUID().uuidString).png"

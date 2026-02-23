@@ -12,7 +12,8 @@ func registerShutdownSimulatorTool(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    concurrency: ConcurrencyPolicy
+    concurrency: ConcurrencyPolicy,
+    validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
         name: "shutdown_simulator",
@@ -42,6 +43,10 @@ func registerShutdownSimulatorTool(
                 code: .invalidInput,
                 message: "No simulator UDID provided, and no session default is set. Run list_simulators first."
             ))
+        }
+
+        if let error = await validator.validateSimulatorUDID(resolvedUDID) {
+            return .error(error)
         }
 
         return await concurrency.withLock(
