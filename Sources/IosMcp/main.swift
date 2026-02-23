@@ -76,6 +76,11 @@ private func startServer() async throws {
                     ))
                 }
             }
+            let steps = NextStepResolver.resolve(for: params.name)
+            if !steps.isEmpty {
+                let lines = steps.enumerated().map { "\($0.offset + 1). \($0.element.tool) — \($0.element.description)" }
+                content.append(.text("\nSuggested next steps:\n" + lines.joined(separator: "\n")))
+            }
             return .init(content: content)
         case .error(let error):
             return .init(content: [.text(error.message)], isError: true)

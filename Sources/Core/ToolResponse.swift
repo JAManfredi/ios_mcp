@@ -13,18 +13,36 @@ public enum ToolResponse: Sendable {
     case error(ToolError)
 }
 
+// MARK: - NextStep
+
+public struct NextStep: Sendable {
+    public let tool: String
+    public let description: String
+
+    public init(
+        tool: String,
+        description: String
+    ) {
+        self.tool = tool
+        self.description = description
+    }
+}
+
 // MARK: - ToolResult
 
 public struct ToolResult: Sendable {
     public let content: String
     public let artifacts: [ArtifactReference]
+    public let nextSteps: [NextStep]
 
     public init(
         content: String,
-        artifacts: [ArtifactReference] = []
+        artifacts: [ArtifactReference] = [],
+        nextSteps: [NextStep] = []
     ) {
         self.content = content
         self.artifacts = artifacts
+        self.nextSteps = nextSteps
     }
 }
 
