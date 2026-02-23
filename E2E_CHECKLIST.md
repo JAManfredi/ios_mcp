@@ -37,21 +37,21 @@ Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 
 - [ ] `long_press` — long presses element (requires axe)
 
 ## Debugging (8 tools)
-- [ ] `debug_attach` — LLDB attach timed out (x86_64 issue?)
-- [ ] `debug_breakpoint_add` — blocked on attach
-- [ ] `debug_continue` — blocked on attach
-- [ ] `debug_stack` — blocked on attach
-- [ ] `debug_variables` — blocked on attach
-- [ ] `debug_breakpoint_remove` — blocked on attach
-- [ ] `debug_lldb_command` — blocked on attach
-- [ ] `debug_detach` — blocked on attach
+- [x] `debug_attach` — attaches LLDB to running app. Fixed actor deadlock + removed --waitfor.
+- [x] `debug_breakpoint_add` — adds breakpoint by symbol (e.g. viewDidLoad)
+- [x] `debug_continue` — resumes execution, reports stop reason
+- [x] `debug_stack` — returns backtrace with frame details
+- [x] `debug_variables` — returns frame variables with types and values
+- [x] `debug_breakpoint_remove` — removes breakpoint by ID
+- [x] `debug_lldb_command` — executes arbitrary LLDB command (e.g. thread info)
+- [x] `debug_detach` — detaches and cleans up LLDB process
 
 ## Inspection (2 tools)
 - [x] `read_user_defaults` — reads app defaults
 - [x] `write_user_default` — writes a default value
 
 ## Quality (2 tools)
-- [x] `lint` — works after fixing --path → positional arg (needs restart to verify live)
+- [x] `lint` — returns full JSON violations. Fixed --path → positional arg + exit code 2 threshold.
 - [ ] `accessibility_audit` — accessibility check (requires axe)
 
 ## Extras (1 tool)
@@ -61,8 +61,11 @@ Test against Jarvis project (`/Users/jared/workspace/iOS/Jarvis`) with iOS 26.2 
 - [x] `build_sim` wrong runtime — fails (now improved with stderr)
 - [ ] `build_sim` lock held — returns resource_busy
 - [ ] Tool with stale UDID — returns stale_default
-- [ ] `debug_lldb_command` denied command — returns command_denied
+- [x] `debug_lldb_command` denied command — returns command_denied (tested `process kill`)
 
 ## Bugs Found & Fixed
 1. `build_run_sim` — `-showBuildSettings` missing `-destination`, resolved to iphoneos path instead of iphonesimulator
 2. `lint` — SwiftLint dropped `--path` flag, now uses positional argument
+3. `lint` — exit code 2 (error-severity violations) incorrectly treated as fatal, changed threshold to >= 3
+4. `debug_attach` — actor deadlock: `waitForPrompt` spin loop held actor while readTask needed actor isolation. Fixed with NSLock-based `LLDBOutputBuffer`.
+5. `debug_attach` — `--waitfor` flag waits for next process launch, not current. Removed flag.
