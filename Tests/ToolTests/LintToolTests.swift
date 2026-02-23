@@ -67,6 +67,29 @@ struct LintToolTests {
         #expect(capturedArgs.contains("json"))
     }
 
+    @Test("Exit code 2 (lint errors) returns violations as success")
+    func lintErrorsStillSuccess() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let lintOutput = "[{\"rule_id\":\"force_cast\",\"severity\":\"error\"}]"
+        let executor = MockCommandExecutor { _, _ in
+            CommandResult(stdout: lintOutput, stderr: "", exitCode: 2)
+        }
+
+        await registerLintTool(with: registry, session: session, executor: executor, swiftLintPath: "/usr/local/bin/swiftlint", validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "lint",
+            arguments: ["path": .string("/path/to/project")]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("force_cast"))
+        } else {
+            Issue.record("Expected success response even with lint errors")
+        }
+    }
+
     @Test("Falls back to session workspace path")
     func sessionFallbackPath() async throws {
         let session = SessionStore()
