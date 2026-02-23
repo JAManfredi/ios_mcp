@@ -22,6 +22,7 @@ public actor SessionStore {
         case bundleID = "bundle_id"
         case configuration
         case derivedDataPath = "derived_data_path"
+        case deploymentTarget = "deployment_target"
     }
 
     /// Get a session default.

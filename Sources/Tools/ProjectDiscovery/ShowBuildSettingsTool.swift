@@ -150,6 +150,10 @@ func registerShowBuildSettingsTool(
                 lines.append("\nSession default set: bundle_id = \(bundleID)")
             }
 
+            if let deployTarget = curated["IPHONEOS_DEPLOYMENT_TARGET"], !deployTarget.isEmpty {
+                await session.set(.deploymentTarget, value: deployTarget)
+            }
+
             if case .string = args["configuration"] {
                 if let config = configuration {
                     await session.set(.configuration, value: config)

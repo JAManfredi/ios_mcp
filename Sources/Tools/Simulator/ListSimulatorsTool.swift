@@ -110,11 +110,19 @@ func registerListSimulatorsTool(
             let grouped = Dictionary(grouping: filtered, by: \.runtime)
             var lines: [String] = ["Found \(filtered.count) simulator(s):\n"]
 
+            let deploymentTarget = await session.get(.deploymentTarget)
+
             for runtime in grouped.keys.sorted() {
                 lines.append("[\(runtime)]")
                 for sim in grouped[runtime]! {
-                    let availability = sim.isAvailable ? "" : " (unavailable)"
-                    lines.append("  \(sim.name) — \(sim.state)\(availability)")
+                    var suffix = ""
+                    if !sim.isAvailable {
+                        suffix = " (unavailable)"
+                    } else if let target = deploymentTarget,
+                              !runtimeMeetsDeploymentTarget(runtime: runtime, target: target) {
+                        suffix = " (requires iOS \(target)+)"
+                    }
+                    lines.append("  \(sim.name) — \(sim.state)\(suffix)")
                     lines.append("    UDID: \(sim.udid)")
                 }
             }
@@ -179,6 +187,29 @@ func parseSimctlDevices(_ jsonData: Data) throws -> [SimulatorInfo] {
     }
 
     return results.sorted { $0.runtime < $1.runtime }
+}
+
+/// Checks whether a runtime version (e.g. "iOS 18.5") meets a deployment target (e.g. "26.0").
+/// Compares major then minor as integers. Returns true if the runtime >= target.
+func runtimeMeetsDeploymentTarget(runtime: String, target: String) -> Bool {
+    // Extract version from runtime string like "iOS 18.5" → "18.5"
+    let runtimeVersion: String
+    if let spaceIndex = runtime.firstIndex(of: " ") {
+        runtimeVersion = String(runtime[runtime.index(after: spaceIndex)...])
+    } else {
+        runtimeVersion = runtime
+    }
+
+    let runtimeParts = runtimeVersion.split(separator: ".").compactMap { Int($0) }
+    let targetParts = target.split(separator: ".").compactMap { Int($0) }
+
+    let runtimeMajor = runtimeParts.first ?? 0
+    let runtimeMinor = runtimeParts.count > 1 ? runtimeParts[1] : 0
+    let targetMajor = targetParts.first ?? 0
+    let targetMinor = targetParts.count > 1 ? targetParts[1] : 0
+
+    if runtimeMajor != targetMajor { return runtimeMajor > targetMajor }
+    return runtimeMinor >= targetMinor
 }
 
 /// Converts "com.apple.CoreSimulator.SimRuntime.iOS-18-0" → "iOS 18.0"

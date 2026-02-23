@@ -222,6 +222,56 @@ struct ListSimulatorsToolTests {
         #expect(udid == nil)
     }
 
+    @Test("Shows compatibility hint when session has deployment target")
+    func deploymentTargetHint() async throws {
+        let session = SessionStore()
+        await session.set(.deploymentTarget, value: "26.0")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(name: "list_simulators", arguments: [:])
+
+        if case .success(let result) = response {
+            // iOS 17.5 and 18.0 are below 26.0, so all should show the hint
+            #expect(result.content.contains("requires iOS 26.0+"))
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
+    @Test("No hint when runtime meets deployment target")
+    func noHintWhenCompatible() async throws {
+        let session = SessionStore()
+        await session.set(.deploymentTarget, value: "17.0")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith(Self.simctlJSON)
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(name: "list_simulators", arguments: [:])
+
+        if case .success(let result) = response {
+            #expect(!result.content.contains("requires iOS"))
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
+    // MARK: - Version Comparison
+
+    @Test("runtimeMeetsDeploymentTarget compares versions correctly")
+    func versionComparison() {
+        #expect(runtimeMeetsDeploymentTarget(runtime: "iOS 26.0", target: "26.0") == true)
+        #expect(runtimeMeetsDeploymentTarget(runtime: "iOS 26.2", target: "26.0") == true)
+        #expect(runtimeMeetsDeploymentTarget(runtime: "iOS 18.5", target: "26.0") == false)
+        #expect(runtimeMeetsDeploymentTarget(runtime: "iOS 17.0", target: "17.0") == true)
+        #expect(runtimeMeetsDeploymentTarget(runtime: "iOS 17.5", target: "18.0") == false)
+    }
+
     @Test("Returns error on simctl failure")
     func commandFailure() async throws {
         let session = SessionStore()

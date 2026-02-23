@@ -254,6 +254,23 @@ struct ShowBuildSettingsToolTests {
         #expect(config == "Release")
     }
 
+    @Test("Auto-sets deployment target from IPHONEOS_DEPLOYMENT_TARGET")
+    func deploymentTargetAutoSet() async throws {
+        let session = SessionStore()
+        await session.set(.workspace, value: "/path/to/MyApp.xcworkspace")
+        await session.set(.scheme, value: "MyApp")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith(sampleOutput)
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        _ = try await registry.callTool(name: "show_build_settings", arguments: [:])
+
+        let target = await session.get(.deploymentTarget)
+        #expect(target == "17.0")
+    }
+
     @Test("Does not auto-set configuration from session fallback")
     func noConfigAutoSetFromSession() async throws {
         let session = SessionStore()

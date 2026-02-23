@@ -126,6 +126,12 @@ func registerBuildSimTool(
                     lines.append(warnLine)
                 }
 
+                if !result.succeeded && !result.stderr.isEmpty {
+                    lines.append("\nBuild output:")
+                    let stderrLines = result.stderr.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                    lines.append(contentsOf: stderrLines.suffix(50))
+                }
+
                 lines.append("xcresult: \(resultPath)")
 
                 if result.succeeded {
