@@ -206,6 +206,35 @@ struct BuildSimToolTests {
         }
     }
 
+    @Test("Reports success with zero counts when xcresulttool fails")
+    func xcresulttoolFailureFallback() async throws {
+        let session = SessionStore()
+        await session.set(.workspace, value: "/path/to/App.xcworkspace")
+        await session.set(.scheme, value: "MyApp")
+        await session.set(.simulatorUDID, value: "AAAA-1111")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor { exec, args in
+            if exec.contains("xcodebuild") {
+                return CommandResult(stdout: "", stderr: "", exitCode: 0)
+            }
+            // xcresulttool returns failure
+            return CommandResult(stdout: "", stderr: "error: no such file", exitCode: 1)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+
+        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("Build succeeded"))
+            #expect(result.content.contains("Errors: 0"))
+            #expect(result.content.contains("Warnings: 0"))
+        } else {
+            Issue.record("Expected success response even when xcresulttool fails")
+        }
+    }
+
     @Test("Returns resource busy when lock held")
     func resourceBusy() async throws {
         let session = SessionStore()

@@ -53,6 +53,24 @@ struct ConcurrencyPolicyTests {
         #expect(!isLocked)
     }
 
+    @Test("withLock releases lock when operation returns error")
+    func withLockReleasesOnError() async {
+        let policy = ConcurrencyPolicy()
+
+        let response = await policy.withLock(key: "build:test", owner: "build_sim") {
+            .error(ToolError(code: .commandFailed, message: "Build failed"))
+        }
+
+        if case .error(let error) = response {
+            #expect(error.code == .commandFailed)
+        } else {
+            Issue.record("Expected error response")
+        }
+
+        let isLocked = await policy.isLocked(key: "build:test")
+        #expect(!isLocked, "Lock should be released even when operation returns an error")
+    }
+
     @Test("withLock returns error when resource busy")
     func withLockResourceBusy() async {
         let policy = ConcurrencyPolicy()

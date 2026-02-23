@@ -51,6 +51,29 @@ struct LogCaptureLifecycleTests {
         #expect(!isStillActive, "Capture session should be inactive after stop")
     }
 
+    // MARK: - Buffer Overflow
+
+    @Test("Buffer overflow produces nonzero droppedEntryCount")
+    func bufferOverflow() async throws {
+        let udid = try await findBootedSimulator()
+
+        // Use a tiny buffer to force overflow from simulator log volume
+        let sessionID = try await manager.startCapture(
+            udid: udid,
+            predicate: nil,
+            bufferSize: 10
+        )
+
+        // Wait for enough log entries to exceed the small buffer
+        try await Task.sleep(for: .seconds(5))
+
+        let result = try await manager.stopCapture(sessionID: sessionID)
+
+        #expect(result.totalEntriesReceived > 10, "Expected more entries received than buffer capacity")
+        #expect(result.droppedEntryCount > 0, "Expected nonzero dropped count with tiny buffer")
+        #expect(result.entries.count <= 10, "Entries in buffer should not exceed capacity")
+    }
+
     // MARK: - Helpers
 
     private func findBootedSimulator() async throws -> String {

@@ -130,4 +130,18 @@ struct XcodebuildPhaseParserTests {
         let result = await parser.parse(line: "    CompileSwift normal arm64 /path/to/File.swift")
         #expect(result == "Compiling")
     }
+
+    @Test("Parses Linking line")
+    func parseLinking() async {
+        let parser = XcodebuildPhaseParser()
+        let result = await parser.parse(line: "Linking MyApp (arm64)")
+        #expect(result == "Linking")
+    }
+
+    @Test("Parses CompileSwiftSources line")
+    func parseCompileSwiftSources() async {
+        let parser = XcodebuildPhaseParser()
+        let result = await parser.parse(line: "CompileSwiftSources normal arm64 com.apple.xcode.tools.swift.compiler")
+        #expect(result == "Compiling")
+    }
 }

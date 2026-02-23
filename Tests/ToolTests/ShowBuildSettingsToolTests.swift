@@ -60,6 +60,36 @@ struct ShowBuildSettingsToolTests {
         #expect(settings["VALID_KEY"] == "valid_value")
     }
 
+    @Test("Splits on first delimiter only when value contains equals")
+    func parseValueContainingEquals() {
+        let output = """
+            OTHER_LDFLAGS = -framework UIKit -Xlinker -rpath=/usr/lib
+        """
+        let settings = parseBuildSettings(output)
+        #expect(settings["OTHER_LDFLAGS"] == "-framework UIKit -Xlinker -rpath=/usr/lib")
+    }
+
+    @Test("Parses paths with spaces in values")
+    func parsePathsWithSpaces() {
+        let output = """
+            BUILD_DIR = /Users/dev/Library/Developer/Xcode/DerivedData/My App-abc123/Build/Products
+        """
+        let settings = parseBuildSettings(output)
+        #expect(settings["BUILD_DIR"] == "/Users/dev/Library/Developer/Xcode/DerivedData/My App-abc123/Build/Products")
+    }
+
+    @Test("Skips lines where value is empty")
+    func parseEmptyValues() {
+        let output = """
+            SOME_KEY =
+            OTHER_KEY = value
+        """
+        let settings = parseBuildSettings(output)
+        // Empty values lack the " = " delimiter after trimming, so they're skipped
+        #expect(settings["SOME_KEY"] == nil)
+        #expect(settings["OTHER_KEY"] == "value")
+    }
+
     // MARK: - Tool Integration
 
     @Test("Returns curated settings")
