@@ -26,7 +26,7 @@ func registerScreenshotTool(
                 ),
                 "inline": .init(
                     type: "boolean",
-                    description: "When false, returns only the artifact path without inlining base64 image data. Defaults to true."
+                    description: "When true, inlines base64 image data. Defaults to false (metadata-only)."
                 ),
             ]
         ),
@@ -39,7 +39,7 @@ func registerScreenshotTool(
             udid = u
         }
 
-        var inlineImage = true
+        var inlineImage = false
         if case .bool(let b) = args["inline"] {
             inlineImage = b
         }

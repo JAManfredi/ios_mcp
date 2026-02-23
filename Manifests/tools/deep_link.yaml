@@ -27,7 +27,8 @@ output:
 idempotent: false
 destructive: true
 timeout:
-  default: "15s"
+  default: "60s"
+  max: "180s"
 cancellation: "simctl openurl process terminated"
 dependencies: []
 sessionDefaults:

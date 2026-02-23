@@ -18,7 +18,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "60s"
+  default: "30s"
+  max: "120s"
 cancellation: "Directory scan stops; partial results not returned"
 dependencies: []
 sessionDefaults: []

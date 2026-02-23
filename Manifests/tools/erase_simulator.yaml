@@ -22,7 +22,8 @@ output:
 idempotent: true
 destructive: true
 timeout:
-  default: "60s"
+  default: "30s"
+  max: "120s"
 cancellation: "simctl erase process terminated; partial erase possible"
 lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
 dependencies: []

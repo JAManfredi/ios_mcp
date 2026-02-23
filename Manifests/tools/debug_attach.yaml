@@ -28,7 +28,8 @@ output:
 idempotent: false
 destructive: false
 timeout:
-  default: "60s"
+  default: "30s"
+  max: "300s"
 cancellation: "LLDB process terminated"
 lock: "lldb:{pid} — one LLDB session per process"
 dependencies: []

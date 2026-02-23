@@ -10,7 +10,7 @@ input:
     inline:
       type: boolean
       required: false
-      description: "When false, returns only the artifact path without inlining base64 image data. Defaults to true."
+      description: "When true, inlines base64 image data. Defaults to false (metadata-only)."
   required: []
 output:
   success: "PNG image returned as MCP image content block. Artifact stored in ArtifactStore."
@@ -26,7 +26,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "120s"
 cancellation: "simctl process terminated; partial file cleaned up"
 artifacts: "PNG screenshot stored in ArtifactStore"
 dependencies: []

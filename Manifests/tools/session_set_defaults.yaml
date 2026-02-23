@@ -40,7 +40,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "120s"
 dependencies: []
 sessionDefaults: []
 nextSteps:

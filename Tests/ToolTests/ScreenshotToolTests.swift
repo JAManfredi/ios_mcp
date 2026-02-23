@@ -142,8 +142,8 @@ struct ScreenshotToolTests {
         }
     }
 
-    @Test("inline=true (default) returns inlineArtifacts true")
-    func inlineDefaultTrue() async throws {
+    @Test("Default (no inline param) returns inlineArtifacts false")
+    func inlineDefaultFalse() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
         let artifacts = ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-artifacts-\(UUID().uuidString)"))
@@ -163,7 +163,7 @@ struct ScreenshotToolTests {
         )
 
         if case .success(let result) = response {
-            #expect(result.inlineArtifacts, "inlineArtifacts should be true by default")
+            #expect(!result.inlineArtifacts, "inlineArtifacts should be false by default")
         } else {
             Issue.record("Expected success response")
         }

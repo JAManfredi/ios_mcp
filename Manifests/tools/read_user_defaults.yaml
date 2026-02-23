@@ -31,7 +31,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "120s"
 cancellation: "defaults process terminated"
 dependencies: []
 sessionDefaults:

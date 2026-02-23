@@ -23,6 +23,7 @@ idempotent: true
 destructive: true
 timeout:
   default: "30s"
+  max: "120s"
 cancellation: "simctl shutdown process terminated"
 lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
 dependencies: []

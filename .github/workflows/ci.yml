@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-manifests:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pyyaml
+        run: pip3 install pyyaml
+      - name: Validate manifest schemas
+        run: bash Scripts/validate-manifests.sh
+
+  build:
+    name: Build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+
+  test:
+    name: Test
+    runs-on: macos-15
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test

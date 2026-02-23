@@ -19,7 +19,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "300s"
 cancellation: "LLDB process force-terminated"
 dependencies: []
 sessionDefaults: []

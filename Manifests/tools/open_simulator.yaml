@@ -21,6 +21,7 @@ idempotent: true
 destructive: false
 timeout:
   default: "30s"
+  max: "120s"
 cancellation: "Boot/open processes terminated"
 dependencies: []
 sessionDefaults:

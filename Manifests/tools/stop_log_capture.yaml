@@ -23,7 +23,8 @@ output:
 idempotent: false
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "120s"
 cancellation: "Log stream process terminated; buffered entries returned"
 dependencies: []
 sessionDefaults: []

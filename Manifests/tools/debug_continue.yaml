@@ -22,6 +22,7 @@ idempotent: false
 destructive: false
 timeout:
   default: "5m"
+  max: "5m"
 cancellation: "LLDB process interrupted; target may still be running"
 dependencies: []
 sessionDefaults: []

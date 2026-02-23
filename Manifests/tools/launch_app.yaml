@@ -30,7 +30,8 @@ output:
 idempotent: false
 destructive: false
 timeout:
-  default: "30s"
+  default: "60s"
+  max: "180s"
 cancellation: "simctl launch process terminated"
 dependencies: []
 sessionDefaults:

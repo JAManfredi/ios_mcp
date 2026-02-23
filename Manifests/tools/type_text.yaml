@@ -45,7 +45,8 @@ output:
 idempotent: false
 destructive: false
 timeout:
-  default: "15s"
+  default: "120s"
+  max: "600s"
 cancellation: "axe process terminated"
 dependencies:
   - axe

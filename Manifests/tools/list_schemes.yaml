@@ -24,7 +24,8 @@ output:
 idempotent: true
 destructive: false
 timeout:
-  default: "60s"
+  default: "30s"
+  max: "120s"
 cancellation: "xcodebuild process terminated via SIGINT"
 dependencies: []
 sessionDefaults:

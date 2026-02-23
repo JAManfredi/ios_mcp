@@ -31,7 +31,8 @@ output:
 idempotent: false
 destructive: false
 timeout:
-  default: "15s"
+  default: "30s"
+  max: "300s"
 cancellation: "LLDB command abandoned"
 dependencies: []
 sessionDefaults: []

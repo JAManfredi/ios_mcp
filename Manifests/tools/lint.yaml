@@ -27,6 +27,7 @@ idempotent: true
 destructive: false
 timeout:
   default: "5m"
+  max: "5m"
 cancellation: "swiftlint process terminated"
 dependencies:
   - swiftlint

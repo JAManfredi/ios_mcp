@@ -26,7 +26,8 @@ output:
 idempotent: false
 destructive: true
 timeout:
-  default: "60s"
+  default: "30s"
+  max: "120s"
 cancellation: "simctl boot process terminated; simulator may be in partial state"
 lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
 dependencies: []
