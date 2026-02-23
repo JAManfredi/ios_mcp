@@ -88,27 +88,36 @@ public struct CommandExecutor: CommandExecuting, Sendable {
 
         logger.debug("Executing: \(executable) \(arguments.joined(separator: " "))")
 
+        // Read pipes concurrently to prevent deadlock when output exceeds
+        // the 64KB pipe buffer. Reads must start before the process runs.
+        let stdoutRead = Task.detached { stdoutPipe.fileHandleForReading.readDataToEndOfFile() }
+        let stderrRead = Task.detached { stderrPipe.fileHandleForReading.readDataToEndOfFile() }
+
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 process.terminationHandler = { _ in
-                    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    Task {
+                        let stdoutData = await stdoutRead.value
+                        let stderrData = await stderrRead.value
 
-                    let rawStdout = String(data: stdoutData, encoding: .utf8) ?? ""
-                    let rawStderr = String(data: stderrData, encoding: .utf8) ?? ""
+                        let rawStdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                        let rawStderr = String(data: stderrData, encoding: .utf8) ?? ""
 
-                    let result = CommandResult(
-                        stdout: Redactor.redact(rawStdout),
-                        stderr: Redactor.redact(rawStderr),
-                        exitCode: process.terminationStatus
-                    )
+                        let result = CommandResult(
+                            stdout: Redactor.redact(rawStdout),
+                            stderr: Redactor.redact(rawStderr),
+                            exitCode: process.terminationStatus
+                        )
 
-                    continuation.resume(returning: result)
+                        continuation.resume(returning: result)
+                    }
                 }
 
                 do {
                     try process.run()
                 } catch {
+                    stdoutRead.cancel()
+                    stderrRead.cancel()
                     continuation.resume(throwing: ToolError(
                         code: .commandFailed,
                         message: "Failed to launch \(executable): \(error.localizedDescription)"
