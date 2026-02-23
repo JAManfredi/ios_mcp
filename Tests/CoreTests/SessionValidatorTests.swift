@@ -36,13 +36,34 @@ struct DefaultsValidatorTests {
         #expect(error == nil)
     }
 
-    @Test("Stale UDID fails validation")
+    @Test("Stale UDID fails validation with candidates")
     func staleUDIDFails() async {
         let executor = MockValidator.executor(stdout: Self.simctlJSON)
         let validator = DefaultsValidator(executor: executor)
         let error = await validator.validateSimulatorUDID("NONEXISTENT-UDID")
         #expect(error != nil)
         #expect(error?.code == .staleDefault)
+        #expect(error?.details?.contains("VALID-UDID-1111") == true)
+        #expect(error?.details?.contains("iPhone 16") == true)
+    }
+
+    @Test("Stale UDID with no available devices has nil details")
+    func staleUDIDNoAvailableDevices() async {
+        let json = """
+        {
+          "devices": {
+            "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+              { "udid": "ONLY-UDID", "name": "iPhone 16", "state": "Shutdown", "isAvailable": false }
+            ]
+          }
+        }
+        """
+        let executor = MockValidator.executor(stdout: json)
+        let validator = DefaultsValidator(executor: executor)
+        let error = await validator.validateSimulatorUDID("NONEXISTENT-UDID")
+        #expect(error != nil)
+        #expect(error?.code == .staleDefault)
+        #expect(error?.details == nil)
     }
 
     @Test("Valid path passes validation")

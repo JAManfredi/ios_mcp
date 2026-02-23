@@ -75,6 +75,8 @@ func registerBuildRunSimTool(
             owner: "build_run_sim"
         ) {
             do {
+                let overallStart = ContinuousClock.now
+
                 // Step 1: Build
                 let timestamp = Int(Date().timeIntervalSince1970)
                 let resultPath = NSTemporaryDirectory() + "\(resolved.scheme)_buildrun_\(timestamp).xcresult"
@@ -89,12 +91,14 @@ func registerBuildRunSimTool(
                     2700
                 )
 
+                let buildStart = ContinuousClock.now
                 let buildResult = try await executor.execute(
                     executable: "/usr/bin/xcodebuild",
                     arguments: buildArgs,
                     timeout: buildTimeout,
                     environment: nil
                 )
+                let buildElapsed = ContinuousClock.now - buildStart
 
                 guard buildResult.succeeded else {
                     let diagnostics = await fetchBuildDiagnostics(
@@ -102,6 +106,7 @@ func registerBuildRunSimTool(
                         executor: executor
                     )
                     var lines = ["Build failed for scheme '\(resolved.scheme)'."]
+                    lines.append(String(format: "Elapsed: %.1fs", durationSeconds(buildElapsed)))
                     lines.append("Errors: \(diagnostics.errors.count)")
                     for error in diagnostics.errors {
                         lines.append("  error: \(error.message)")
@@ -152,12 +157,14 @@ func registerBuildRunSimTool(
                 await session.set(.bundleID, value: bundleID)
 
                 // Step 3: Install
+                let installStart = ContinuousClock.now
                 let installResult = try await executor.execute(
                     executable: "/usr/bin/xcrun",
                     arguments: ["simctl", "install", resolved.udid, appPath],
                     timeout: 60,
                     environment: nil
                 )
+                let installElapsed = ContinuousClock.now - installStart
 
                 guard installResult.succeeded else {
                     return .error(ToolError(
@@ -173,12 +180,14 @@ func registerBuildRunSimTool(
                     launchArgs += la.components(separatedBy: " ").filter { !$0.isEmpty }
                 }
 
+                let launchStart = ContinuousClock.now
                 let launchResult = try await executor.execute(
                     executable: "/usr/bin/xcrun",
                     arguments: launchArgs,
                     timeout: 60,
                     environment: nil
                 )
+                let launchElapsed = ContinuousClock.now - launchStart
 
                 guard launchResult.succeeded else {
                     return .error(ToolError(
@@ -187,6 +196,8 @@ func registerBuildRunSimTool(
                         details: launchResult.stderr
                     ))
                 }
+
+                let overallElapsed = ContinuousClock.now - overallStart
 
                 var lines = [
                     "Build, install, and launch succeeded for scheme '\(resolved.scheme)'.",
@@ -197,6 +208,11 @@ func registerBuildRunSimTool(
                 let pid = launchResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !pid.isEmpty { lines.append("PID: \(pid)") }
 
+                lines.append(String(format: "Timing: build %.1fs, install %.1fs, launch %.1fs (total %.1fs)",
+                    durationSeconds(buildElapsed),
+                    durationSeconds(installElapsed),
+                    durationSeconds(launchElapsed),
+                    durationSeconds(overallElapsed)))
                 lines.append("Session default set: bundle_id = \(bundleID)")
                 lines.append("xcresult: \(resultPath)")
 

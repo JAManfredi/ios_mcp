@@ -65,6 +65,7 @@ struct TestSimToolTests {
 
         if case .success(let result) = response {
             #expect(result.content.contains("Tests passed"))
+            #expect(result.content.contains("Elapsed:"))
             #expect(result.content.contains("8 passed"))
             #expect(result.content.contains("1 failed"))
             #expect(result.content.contains("1 skipped"))
@@ -160,6 +161,7 @@ struct TestSimToolTests {
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
             #expect(error.message.contains("Tests failed"))
+            #expect(error.message.contains("Elapsed:"))
             #expect(error.message.contains("MyTests/testBroken"))
         } else {
             Issue.record("Expected error response")

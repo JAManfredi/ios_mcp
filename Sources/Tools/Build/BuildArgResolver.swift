@@ -150,3 +150,8 @@ func xcodebuildBaseArgs(
 
     return args
 }
+
+/// Converts a `Duration` to seconds as a Double.
+func durationSeconds(_ duration: Duration) -> Double {
+    Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+}

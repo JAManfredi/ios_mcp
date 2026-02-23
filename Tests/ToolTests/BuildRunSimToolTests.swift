@@ -60,6 +60,7 @@ struct BuildRunSimToolTests {
 
         if case .success(let result) = response {
             #expect(result.content.contains("Build, install, and launch succeeded"))
+            #expect(result.content.contains("Timing:"))
             #expect(result.content.contains("Bundle ID: com.example.MyApp"))
             #expect(result.content.contains("bundle_id = com.example.MyApp"))
         } else {
@@ -102,6 +103,7 @@ struct BuildRunSimToolTests {
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
             #expect(error.message.contains("Build failed"))
+            #expect(error.message.contains("Elapsed:"))
         } else {
             Issue.record("Expected error response")
         }

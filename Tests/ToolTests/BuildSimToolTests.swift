@@ -54,6 +54,7 @@ struct BuildSimToolTests {
 
         if case .success(let result) = response {
             #expect(result.content.contains("Build succeeded"))
+            #expect(result.content.contains("Elapsed:"))
             #expect(result.content.contains("Errors: 0"))
             #expect(result.content.contains("Warnings: 1"))
             #expect(result.content.contains("xcresult:"))
@@ -199,6 +200,7 @@ struct BuildSimToolTests {
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
             #expect(error.message.contains("Build failed"))
+            #expect(error.message.contains("Elapsed:"))
         } else {
             Issue.record("Expected error response")
         }

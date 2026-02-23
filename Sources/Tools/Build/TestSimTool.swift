@@ -110,6 +110,7 @@ func registerTestSimTool(
                     3600
                 )
 
+                let testStart = ContinuousClock.now
                 let result = try await executor.execute(
                     executable: "/usr/bin/xcodebuild",
                     arguments: testArgs,
@@ -125,6 +126,7 @@ func registerTestSimTool(
                     resultBundlePath: resultPath,
                     executor: executor
                 )
+                let elapsed = ContinuousClock.now - testStart
 
                 var lines: [String] = []
 
@@ -133,6 +135,8 @@ func registerTestSimTool(
                 } else {
                     lines.append("Tests failed for scheme '\(resolved.scheme)'.")
                 }
+
+                lines.append(String(format: "Elapsed: %.1fs", durationSeconds(elapsed)))
 
                 lines.append("Results: \(testResults.passed) passed, \(testResults.failed) failed, \(testResults.skipped) skipped (total: \(testResults.totalTests))")
 

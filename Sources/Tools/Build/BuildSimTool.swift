@@ -81,6 +81,7 @@ func registerBuildSimTool(
                     2700
                 )
 
+                let buildStart = ContinuousClock.now
                 let result = try await executor.execute(
                     executable: "/usr/bin/xcodebuild",
                     arguments: buildArgs,
@@ -92,6 +93,7 @@ func registerBuildSimTool(
                     resultBundlePath: resultPath,
                     executor: executor
                 )
+                let elapsed = ContinuousClock.now - buildStart
 
                 var lines: [String] = []
 
@@ -101,6 +103,7 @@ func registerBuildSimTool(
                     lines.append("Build failed for scheme '\(resolved.scheme)'.")
                 }
 
+                lines.append(String(format: "Elapsed: %.1fs", durationSeconds(elapsed)))
                 lines.append("Errors: \(diagnostics.errors.count), Warnings: \(diagnostics.warnings.count)")
 
                 for error in diagnostics.errors {

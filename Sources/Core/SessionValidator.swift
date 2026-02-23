@@ -44,16 +44,27 @@ public struct DefaultsValidator: Sendable {
             }
             struct Device: Decodable {
                 let udid: String
+                let name: String
+                let state: String
+                let isAvailable: Bool
             }
 
             let decoded = try JSONDecoder().decode(DeviceList.self, from: data)
-            let allUDIDs = decoded.devices.values.flatMap { $0 }.map(\.udid)
+            let allDevices = decoded.devices.values.flatMap { $0 }
 
-            if allUDIDs.contains(udid) { return nil }
+            if allDevices.contains(where: { $0.udid == udid }) { return nil }
+
+            let candidates = allDevices
+                .filter(\.isAvailable)
+                .prefix(5)
+                .map { "  \($0.udid) — \($0.name) (\($0.state))" }
+                .joined(separator: "\n")
+            let details: String? = candidates.isEmpty ? nil : "Available devices:\n\(candidates)"
 
             return ToolError(
                 code: .staleDefault,
-                message: "Simulator UDID '\(udid)' not found in available devices. Run list_simulators to pick a valid device, then session_set_defaults to update."
+                message: "Simulator UDID '\(udid)' not found in available devices. Run list_simulators to pick a valid device, then session_set_defaults to update.",
+                details: details
             )
         } catch {
             return nil
