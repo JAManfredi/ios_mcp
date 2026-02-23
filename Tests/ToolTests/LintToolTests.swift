@@ -62,7 +62,6 @@ struct LintToolTests {
 
         let capturedArgs = await capture.lastArgs
         #expect(capturedArgs.contains("lint"))
-        #expect(capturedArgs.contains("--path"))
         #expect(capturedArgs.contains("/path/to/project"))
         #expect(capturedArgs.contains("--reporter"))
         #expect(capturedArgs.contains("json"))

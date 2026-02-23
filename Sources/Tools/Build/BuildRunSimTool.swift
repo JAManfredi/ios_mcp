@@ -134,6 +134,7 @@ func registerBuildRunSimTool(
                     settingsArgs += ["-project", proj]
                 }
                 settingsArgs += ["-configuration", resolved.configuration]
+                settingsArgs += ["-destination", "platform=iOS Simulator,id=\(resolved.udid)"]
 
                 let settingsResult = try await executor.execute(
                     executable: "/usr/bin/xcodebuild",
