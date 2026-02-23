@@ -10,16 +10,59 @@ import Testing
 @testable import Core
 @testable import Tools
 
+private let mockDescribeUIJSON = """
+[{
+  "AXUniqueId": "scrollView",
+  "AXLabel": "Scroll",
+  "frame": {"x": 0, "y": 100, "width": 400, "height": 600},
+  "children": []
+}]
+"""
+
 @Suite("swipe")
 struct SwipeToolTests {
 
-    @Test("Swipes element in given direction")
-    func happyPath() async throws {
+    @Test("Swipes with gesture preset when no target provided")
+    func gesturePreset() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
             await capture.capture(args)
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+
+        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "swipe",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "direction": .string("up"),
+            ]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("Swiped up"))
+        } else {
+            Issue.record("Expected success response")
+        }
+
+        let capturedArgs = await capture.lastArgs
+        #expect(capturedArgs.contains("gesture"))
+        #expect(capturedArgs.contains("scroll-up"))
+    }
+
+    @Test("Swipes with coordinates when accessibility target provided")
+    func targetedSwipe() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let allCalls = AllCallCapture()
+        let executor = MockCommandExecutor { _, args in
+            await allCalls.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockDescribeUIJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -36,17 +79,16 @@ struct SwipeToolTests {
 
         if case .success(let result) = response {
             #expect(result.content.contains("Swiped up"))
-            #expect(result.content.contains("AAAA-1111"))
         } else {
             Issue.record("Expected success response")
         }
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("swipe"))
-        #expect(capturedArgs.contains("--direction"))
-        #expect(capturedArgs.contains("up"))
-        #expect(capturedArgs.contains("--identifier"))
-        #expect(capturedArgs.contains("scrollView"))
+        let calls = await allCalls.allArgs
+        #expect(calls.count == 2)
+        #expect(calls[0].contains("describe-ui"))
+        #expect(calls[1].contains("swipe"))
+        #expect(calls[1].contains("--start-x"))
+        #expect(calls[1].contains("--end-y"))
     }
 
     @Test("Falls back to session UDID")
@@ -67,7 +109,6 @@ struct SwipeToolTests {
             name: "swipe",
             arguments: [
                 "direction": .string("down"),
-                "accessibility_id": .string("list"),
             ]
         )
 
@@ -91,37 +132,12 @@ struct SwipeToolTests {
             name: "swipe",
             arguments: [
                 "direction": .string("up"),
-                "accessibility_id": .string("list"),
             ]
         )
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
             #expect(error.message.contains("No simulator UDID"))
-        } else {
-            Issue.record("Expected error response")
-        }
-    }
-
-    @Test("Errors when no target provided")
-    func missingTarget() async throws {
-        let session = SessionStore()
-        let registry = ToolRegistry()
-        let executor = MockCommandExecutor.succeedingWith("")
-
-        await registerSwipeTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
-
-        let response = try await registry.callTool(
-            name: "swipe",
-            arguments: [
-                "udid": .string("AAAA-1111"),
-                "direction": .string("left"),
-            ]
-        )
-
-        if case .error(let error) = response {
-            #expect(error.code == .invalidInput)
-            #expect(error.message.contains("No target"))
         } else {
             Issue.record("Expected error response")
         }

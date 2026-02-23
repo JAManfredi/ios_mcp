@@ -56,16 +56,15 @@ struct UISnapshotFlowTests {
         let axePath = whichResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         #expect(!axePath.isEmpty, "axe should be resolvable via which")
 
-        // Run axe dump
         let dumpResult = try await executor.execute(
             executable: axePath,
-            arguments: ["dump", "--udid", udid],
+            arguments: ["describe-ui", "--udid", udid],
             timeout: 30,
             environment: nil
         )
 
-        #expect(dumpResult.succeeded, "axe dump should succeed on a booted simulator")
-        #expect(!dumpResult.stdout.isEmpty, "axe dump should return accessibility tree content")
+        #expect(dumpResult.succeeded, "axe describe-ui should succeed on a booted simulator")
+        #expect(!dumpResult.stdout.isEmpty, "axe describe-ui should return accessibility tree content")
     }
 
     // MARK: - Helpers

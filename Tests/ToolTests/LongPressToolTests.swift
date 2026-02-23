@@ -10,6 +10,15 @@ import Testing
 @testable import Core
 @testable import Tools
 
+private let mockDescribeUIJSON = """
+[{
+  "AXUniqueId": "cellItem",
+  "AXLabel": "Cell",
+  "frame": {"x": 50, "y": 200, "width": 300, "height": 50},
+  "children": []
+}]
+"""
+
 @Suite("long_press")
 struct LongPressToolTests {
 
@@ -17,9 +26,12 @@ struct LongPressToolTests {
     func happyPath() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let capture = ArgCapture()
+        let allCalls = AllCallCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            await allCalls.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockDescribeUIJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -40,10 +52,45 @@ struct LongPressToolTests {
             Issue.record("Expected success response")
         }
 
-        let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("longpress"))
-        #expect(capturedArgs.contains("--identifier"))
-        #expect(capturedArgs.contains("cellItem"))
+        let calls = await allCalls.allArgs
+        #expect(calls.count == 2)
+        #expect(calls[0].contains("describe-ui"))
+        #expect(calls[1].contains("touch"))
+        #expect(calls[1].contains("--down"))
+        #expect(calls[1].contains("--up"))
+        #expect(calls[1].contains("--delay"))
+    }
+
+    @Test("Long presses by coordinates without describe-ui call")
+    func coordinatesDirect() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let allCalls = AllCallCapture()
+        let executor = MockCommandExecutor { _, args in
+            await allCalls.capture(args)
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+
+        await registerLongPressTool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "long_press",
+            arguments: [
+                "udid": .string("AAAA-1111"),
+                "x": .int(100),
+                "y": .int(200),
+            ]
+        )
+
+        if case .success = response {
+            let calls = await allCalls.allArgs
+            #expect(calls.count == 1, "Should not call describe-ui when coordinates are provided")
+            #expect(calls[0].contains("touch"))
+            #expect(calls[0].contains("-x"))
+            #expect(calls[0].contains("100"))
+        } else {
+            Issue.record("Expected success response")
+        }
     }
 
     @Test("Falls back to session UDID")
@@ -52,9 +99,12 @@ struct LongPressToolTests {
         await session.set(.simulatorUDID, value: "SESSION-UDID")
 
         let registry = ToolRegistry()
-        let capture = ArgCapture()
+        let allCalls = AllCallCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            await allCalls.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockDescribeUIJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -62,12 +112,13 @@ struct LongPressToolTests {
 
         let response = try await registry.callTool(
             name: "long_press",
-            arguments: ["accessibility_id": .string("item")]
+            arguments: ["accessibility_id": .string("cellItem")]
         )
 
         if case .success = response {
-            let capturedArgs = await capture.lastArgs
-            #expect(capturedArgs.contains("SESSION-UDID"))
+            let calls = await allCalls.allArgs
+            let touchCall = calls.last!
+            #expect(touchCall.contains("SESSION-UDID"))
         } else {
             Issue.record("Expected success response")
         }
@@ -115,13 +166,16 @@ struct LongPressToolTests {
         }
     }
 
-    @Test("Passes custom duration to axe")
+    @Test("Passes custom duration to axe touch")
     func customDuration() async throws {
         let session = SessionStore()
         let registry = ToolRegistry()
-        let capture = ArgCapture()
+        let allCalls = AllCallCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            await allCalls.capture(args)
+            if args.contains("describe-ui") {
+                return CommandResult(stdout: mockDescribeUIJSON, stderr: "", exitCode: 0)
+            }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -131,15 +185,16 @@ struct LongPressToolTests {
             name: "long_press",
             arguments: [
                 "udid": .string("AAAA-1111"),
-                "accessibility_id": .string("item"),
+                "accessibility_id": .string("cellItem"),
                 "duration": .double(2.5),
             ]
         )
 
         if case .success = response {
-            let capturedArgs = await capture.lastArgs
-            #expect(capturedArgs.contains("--duration"))
-            #expect(capturedArgs.contains("2.5"))
+            let calls = await allCalls.allArgs
+            let touchCall = calls.last!
+            #expect(touchCall.contains("--delay"))
+            #expect(touchCall.contains("2.5"))
         } else {
             Issue.record("Expected success response")
         }

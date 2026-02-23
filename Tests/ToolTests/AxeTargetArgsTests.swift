@@ -24,7 +24,7 @@ struct AxeTargetArgsTests {
         ])
 
         if case .success(let args) = result {
-            #expect(args == ["--identifier", "loginButton"])
+            #expect(args == ["--id", "loginButton"])
         } else {
             Issue.record("Expected success")
         }
@@ -53,7 +53,7 @@ struct AxeTargetArgsTests {
         ])
 
         if case .success(let args) = result {
-            #expect(args == ["--x", "150", "--y", "300"])
+            #expect(args == ["-x", "150", "-y", "300"])
         } else {
             Issue.record("Expected success")
         }
@@ -79,7 +79,7 @@ struct AxeTargetArgsTests {
         ])
 
         if case .success(let args) = result {
-            #expect(args == ["--x", "42", "--y", "84"])
+            #expect(args == ["-x", "42", "-y", "84"])
         } else {
             Issue.record("Expected success")
         }
@@ -93,7 +93,7 @@ struct AxeTargetArgsTests {
         ])
 
         if case .success(let args) = result {
-            #expect(args == ["--x", "42", "--y", "84"])
+            #expect(args == ["-x", "42", "-y", "84"])
         } else {
             Issue.record("Expected success")
         }

@@ -8,6 +8,20 @@
 import Core
 import Foundation
 
+private let keyNameToKeycode: [String: String] = [
+    "return": "40",
+    "enter": "40",
+    "escape": "41",
+    "backspace": "42",
+    "delete": "42",
+    "tab": "43",
+    "space": "44",
+    "right": "79",
+    "left": "80",
+    "down": "81",
+    "up": "82",
+]
+
 func registerKeyPressTool(
     with registry: ToolRegistry,
     session: SessionStore,
@@ -52,6 +66,18 @@ func registerKeyPressTool(
             ))
         }
 
+        let keycode: String
+        if let mapped = keyNameToKeycode[key.lowercased()] {
+            keycode = mapped
+        } else if Int(key) != nil {
+            keycode = key
+        } else {
+            return .error(ToolError(
+                code: .invalidInput,
+                message: "Unknown key '\(key)'. Use a key name (return, escape, delete, tab, space, up, down, left, right) or a numeric HID keycode."
+            ))
+        }
+
         var udid: String?
         if case .string(let u) = args["udid"] {
             udid = u
@@ -73,7 +99,7 @@ func registerKeyPressTool(
         do {
             let result = try await executor.execute(
                 executable: resolvedAxe,
-                arguments: ["key", "--udid", resolvedUDID, "--key", key],
+                arguments: ["key", keycode, "--udid", resolvedUDID],
                 timeout: 120,
                 environment: nil
             )
