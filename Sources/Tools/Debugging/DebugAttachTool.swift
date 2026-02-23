@@ -86,6 +86,8 @@ func registerDebugAttachTool(
                     udid: resolvedUDID
                 )
 
+                await debugSession.storeLockKey(sessionID: sessionID, lockKey: lockKey)
+
                 var lines = [
                     "LLDB session attached.",
                     "Session ID: \(sessionID)",

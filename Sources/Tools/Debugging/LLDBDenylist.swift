@@ -90,11 +90,6 @@ private let denylistEntries: [DenylistEntry] = [
         suggestion: "Use read-only inspection commands"
     ),
     DenylistEntry(
-        prefix: "memory region",
-        reason: "Memory permission changes",
-        suggestion: "Use read-only inspection commands"
-    ),
-    DenylistEntry(
         prefix: "register write",
         reason: "Register mutation",
         suggestion: "Use read-only inspection commands"

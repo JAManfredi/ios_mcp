@@ -102,6 +102,68 @@ struct DebugLLDBCommandToolTests {
         }
     }
 
+    @Test("Sets unsafeCommandExecuted flag when allow_unsafe is true")
+    func unsafeCommandExecutedFlag() async throws {
+        let session = SessionStore()
+        await session.set(.simulatorUDID, value: "SIM-1111")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+        let mockDebug = MockDebugSession(
+            nextSessionID: "dbg-flag",
+            commandResponses: ["memory write 0x1000 0xFF": "done"]
+        )
+        _ = try await mockDebug.attach(pid: 1, bundleID: nil, udid: nil)
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "debug_lldb_command",
+            arguments: [
+                "session_id": .string("dbg-flag"),
+                "command": .string("memory write 0x1000 0xFF"),
+                "allow_unsafe": .bool(true),
+            ]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.unsafeCommandExecuted == true)
+            #expect(result.content.contains("[UNSAFE]"))
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
+    @Test("Does not set unsafeCommandExecuted flag for normal commands")
+    func normalCommandNoFlag() async throws {
+        let session = SessionStore()
+        await session.set(.simulatorUDID, value: "SIM-1111")
+
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.succeedingWith("")
+        let mockDebug = MockDebugSession(
+            nextSessionID: "dbg-noflag",
+            commandResponses: ["bt": "frame #0"]
+        )
+        _ = try await mockDebug.attach(pid: 1, bundleID: nil, udid: nil)
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator())
+
+        let response = try await registry.callTool(
+            name: "debug_lldb_command",
+            arguments: [
+                "session_id": .string("dbg-noflag"),
+                "command": .string("bt"),
+            ]
+        )
+
+        if case .success(let result) = response {
+            #expect(result.unsafeCommandExecuted == false)
+        } else {
+            Issue.record("Expected success response")
+        }
+    }
+
     @Test("Errors when command is missing")
     func missingCommand() async throws {
         let session = SessionStore()

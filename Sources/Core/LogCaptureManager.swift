@@ -21,6 +21,8 @@ public protocol LogCapturing: Sendable {
     func stopCapture(sessionID: String) async throws -> LogCaptureResult
 
     func hasActiveCapture(sessionID: String) async -> Bool
+
+    func stopAll() async
 }
 
 // MARK: - Types
@@ -121,6 +123,13 @@ public actor LogCaptureManager: LogCapturing {
 
     public func hasActiveCapture(sessionID: String) async -> Bool {
         sessions[sessionID] != nil
+    }
+
+    public func stopAll() async {
+        for (_, session) in sessions {
+            _ = await session.stop()
+        }
+        sessions.removeAll()
     }
 }
 

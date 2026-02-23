@@ -67,7 +67,11 @@ private func startServer() async throws {
         )
         switch response {
         case .success(let result):
-            var content: [Tool.Content] = [.text(result.content)]
+            var content: [Tool.Content] = []
+            if result.unsafeCommandExecuted {
+                content.append(.text("{\"unsafeCommandExecuted\":true}"))
+            }
+            content.append(.text(result.content))
             if result.inlineArtifacts {
                 for artifact in result.artifacts where artifact.mimeType.hasPrefix("image/") {
                     if let data = try? Data(contentsOf: URL(fileURLWithPath: artifact.path)) {
@@ -118,6 +122,12 @@ private func startServer() async throws {
 
     // Keep the server running until the transport closes.
     await server.waitUntilCompleted()
+
+    // Cleanup: tear down active sessions, log captures, and locks
+    await debugSession.teardownAll()
+    await logCapture.stopAll()
+    await concurrency.releaseAll()
+    logger.info("ios-mcp server shut down")
 }
 
 // MARK: - Doctor Subcommand
@@ -135,7 +145,16 @@ struct Doctor: AsyncParsableCommand {
         print("ios-mcp doctor")
         print("==============\n")
 
-        // Xcode (required)
+        // macOS version (required: 14+)
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        if osVersion.majorVersion >= 14 {
+            print("[ok] macOS: \(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)")
+        } else {
+            print("[!!] macOS: \(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion) — requires macOS 14+")
+            requiredFailed = true
+        }
+
+        // Xcode (required: path exists)
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcode-select",
@@ -150,6 +169,37 @@ struct Doctor: AsyncParsableCommand {
             }
         } catch {
             print("[!!] Xcode: check failed — \(error)")
+            requiredFailed = true
+        }
+
+        // Xcode version (required: 16+)
+        do {
+            let result = try await executor.execute(
+                executable: "/usr/bin/xcodebuild",
+                arguments: ["-version"],
+                timeout: 10
+            )
+            if result.succeeded {
+                let firstLine = result.stdout.components(separatedBy: .newlines).first ?? ""
+                // Expected format: "Xcode 16.2"
+                let parts = firstLine.components(separatedBy: " ")
+                if parts.count >= 2,
+                   let majorVersion = Int(parts[1].components(separatedBy: ".").first ?? "") {
+                    if majorVersion >= 16 {
+                        print("[ok] Xcode version: \(parts[1])")
+                    } else {
+                        print("[!!] Xcode version: \(parts[1]) — requires Xcode 16+")
+                        requiredFailed = true
+                    }
+                } else {
+                    print("[--] Xcode version: could not parse '\(firstLine)'")
+                }
+            } else {
+                print("[!!] Xcode version: xcodebuild -version failed")
+                requiredFailed = true
+            }
+        } catch {
+            print("[!!] Xcode version: check failed — \(error)")
             requiredFailed = true
         }
 

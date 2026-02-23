@@ -79,7 +79,10 @@ func registerDebugLLDBCommandTool(
             )
 
             if allowUnsafe {
-                return .success(ToolResult(content: "[UNSAFE] Denylist bypassed.\n\(output)"))
+                return .success(ToolResult(
+                    content: "[UNSAFE] Denylist bypassed.\n\(output)",
+                    unsafeCommandExecuted: true
+                ))
             }
 
             return .success(ToolResult(content: output))

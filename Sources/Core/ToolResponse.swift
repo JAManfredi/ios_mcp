@@ -38,17 +38,20 @@ public struct ToolResult: Sendable {
     public let artifacts: [ArtifactReference]
     public let nextSteps: [NextStep]
     public let inlineArtifacts: Bool
+    public let unsafeCommandExecuted: Bool
 
     public init(
         content: String,
         artifacts: [ArtifactReference] = [],
         nextSteps: [NextStep] = [],
-        inlineArtifacts: Bool = true
+        inlineArtifacts: Bool = true,
+        unsafeCommandExecuted: Bool = false
     ) {
         self.content = content
         self.artifacts = artifacts
         self.nextSteps = nextSteps
         self.inlineArtifacts = inlineArtifacts
+        self.unsafeCommandExecuted = unsafeCommandExecuted
     }
 }
 

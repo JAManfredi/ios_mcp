@@ -17,6 +17,7 @@ struct LLDBDenylistTests {
         #expect(checkDenylist(command: "bt") == .allowed)
         #expect(checkDenylist(command: "frame variable") == .allowed)
         #expect(checkDenylist(command: "breakpoint set --name viewDidLoad") == .allowed)
+        #expect(checkDenylist(command: "memory region 0x1000") == .allowed)
     }
 
     @Test("Blocks shell escape")

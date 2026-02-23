@@ -39,12 +39,9 @@ func registerDebugDetachTool(
 
             try await debugSession.detach(sessionID: sessionID)
 
-            // Release any concurrency lock held for this session's PID.
-            // The lock key format is "lldb:<pid>", but since we don't track
-            // the PID-to-session mapping here, we rely on the caller pattern:
-            // attach acquires the lock, detach releases it via the session ID.
-            // For robustness, we scan and release any lock owned by debug_attach
-            // that matches this session. In practice, the lock key is stable.
+            if let lockKey = await debugSession.removeLockKey(sessionID: sessionID) {
+                await concurrency.release(key: lockKey)
+            }
 
             return .success(ToolResult(
                 content: "Debug session \(sessionID) detached and cleaned up."

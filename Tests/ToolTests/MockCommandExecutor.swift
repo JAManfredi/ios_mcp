@@ -125,4 +125,8 @@ actor MockLogCapture: LogCapturing {
     func hasActiveCapture(sessionID: String) async -> Bool {
         sessions[sessionID] != nil
     }
+
+    func stopAll() async {
+        sessions.removeAll()
+    }
 }

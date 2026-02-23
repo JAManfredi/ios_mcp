@@ -40,6 +40,11 @@ public actor ConcurrencyPolicy {
         locks[key] != nil
     }
 
+    /// Release all held locks. Used during server shutdown.
+    public func releaseAll() {
+        locks.removeAll()
+    }
+
     /// Acquire a lock, run the operation, and release. Returns the lock error if busy.
     public func withLock(
         key: String,

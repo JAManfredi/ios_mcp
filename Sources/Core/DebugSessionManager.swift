@@ -27,6 +27,10 @@ public protocol DebugSessionManaging: Sendable {
     ) async throws -> String
 
     func isActive(sessionID: String) async -> Bool
+
+    func storeLockKey(sessionID: String, lockKey: String) async
+    func removeLockKey(sessionID: String) async -> String?
+    func teardownAll() async
 }
 
 // MARK: - Manager
@@ -34,6 +38,7 @@ public protocol DebugSessionManaging: Sendable {
 /// Actor managing persistent LLDB subprocesses for interactive debugging.
 public actor LLDBSessionManager: DebugSessionManaging {
     private var sessions: [String: LLDBSession] = [:]
+    private var lockKeys: [String: String] = [:]
     private let logger = Logger(label: "ios-mcp.lldb-audit")
 
     public init() {}
@@ -101,6 +106,25 @@ public actor LLDBSessionManager: DebugSessionManaging {
 
     public func isActive(sessionID: String) async -> Bool {
         sessions[sessionID] != nil
+    }
+
+    public func storeLockKey(sessionID: String, lockKey: String) {
+        lockKeys[sessionID] = lockKey
+    }
+
+    public func removeLockKey(sessionID: String) -> String? {
+        lockKeys.removeValue(forKey: sessionID)
+    }
+
+    public func teardownAll() async {
+        for (id, session) in sessions {
+            _ = try? await session.sendCommand("detach", timeout: 5)
+            _ = try? await session.sendCommand("quit", timeout: 3)
+            await session.terminate()
+            logger.info("Torn down session \(id)")
+        }
+        sessions.removeAll()
+        lockKeys.removeAll()
     }
 }
 

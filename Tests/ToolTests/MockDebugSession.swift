@@ -15,6 +15,8 @@ actor MockDebugSession: DebugSessionManaging {
     var commandResponses: [String: String] = [:]
     var lastCommand: String?
     var shouldFailDetach: Bool = false
+    private var lockKeys: [String: String] = [:]
+    private(set) var teardownAllCalled: Bool = false
 
     init() {}
 
@@ -63,5 +65,23 @@ actor MockDebugSession: DebugSessionManaging {
 
     func isActive(sessionID: String) async -> Bool {
         attachedSessions[sessionID] != nil
+    }
+
+    func setNextSessionID(_ id: String) {
+        nextSessionID = id
+    }
+
+    func storeLockKey(sessionID: String, lockKey: String) {
+        lockKeys[sessionID] = lockKey
+    }
+
+    func removeLockKey(sessionID: String) -> String? {
+        lockKeys.removeValue(forKey: sessionID)
+    }
+
+    func teardownAll() async {
+        attachedSessions.removeAll()
+        lockKeys.removeAll()
+        teardownAllCalled = true
     }
 }

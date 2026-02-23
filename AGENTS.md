@@ -98,13 +98,12 @@ All 37 tools have next-step mappings.
 | `process kill` | Kill target process | Use `stop_app` |
 | `process destroy` | Destroy target process | Use `stop_app` |
 | `memory write` | Memory mutation | Read-only inspection |
-| `memory region` | Permission changes | Read-only inspection |
 | `register write` | Register mutation | Read-only inspection |
 | `expression @import` | Load frameworks | `expression` without `@import` |
 | `settings set target.run-args` | Modify launch args | Use `build_run_sim` |
 | `target delete` | Remove debug target | Use `debug_detach` |
 
-Set `allow_unsafe: true` to bypass — response is marked `[UNSAFE]` and audit-logged.
+Set `allow_unsafe: true` to bypass — response is marked `[UNSAFE]` and audit-logged. **Never set `allow_unsafe: true` without explicit user confirmation.** The denylist exists to prevent accidental damage.
 
 ### Concurrency / Resource Locking
 
