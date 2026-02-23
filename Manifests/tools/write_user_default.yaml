@@ -1,0 +1,56 @@
+name: write_user_default
+description: "Write a user default value for an app on the iOS simulator. Falls back to session default simulator_udid."
+category: inspection
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    domain:
+      type: string
+      required: true
+      description: "App bundle ID (e.g. com.example.MyApp)."
+    key:
+      type: string
+      required: true
+      description: "The defaults key to write."
+    value:
+      type: string
+      required: true
+      description: "The value to write."
+    type:
+      type: string
+      required: false
+      description: "Value type. Defaults to string."
+      enum:
+        - string
+        - int
+        - float
+        - bool
+  required:
+    - domain
+    - key
+    - value
+output:
+  success: "Success message with key, value, type, domain, and simulator."
+  errors:
+    - code: invalid_input
+      condition: "Missing required parameters or invalid type"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "defaults write exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: true
+timeout:
+  default: "15s"
+cancellation: "defaults process terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: read_user_defaults
+    description: "Verify the written value"

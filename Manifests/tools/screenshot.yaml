@@ -1,0 +1,35 @@
+name: screenshot
+description: "Capture a screenshot of the iOS simulator screen. Returns the image as an MCP image content block. Falls back to session default simulator_udid."
+category: ui_automation
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required: []
+output:
+  success: "PNG image returned as MCP image content block. Artifact stored in ArtifactStore."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "simctl io screenshot failed or output file is empty"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "simctl process terminated; partial file cleaned up"
+artifacts: "PNG screenshot stored in ArtifactStore"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: snapshot_ui
+    description: "Capture the accessibility tree for element inspection"
+  - tool: tap
+    description: "Tap a UI element"

@@ -1,0 +1,39 @@
+name: deep_link
+description: "Open a URL (deep link or universal link) in the iOS simulator. Falls back to session default simulator_udid."
+category: ui_automation
+input:
+  properties:
+    url:
+      type: string
+      required: true
+      description: "The URL to open in the simulator."
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required:
+    - url
+output:
+  success: "Success message with URL and simulator UDID."
+  errors:
+    - code: invalid_input
+      condition: "Missing url or no UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "simctl openurl exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: true
+timeout:
+  default: "15s"
+cancellation: "simctl openurl process terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: screenshot
+    description: "Take a screenshot after navigation"
+  - tool: snapshot_ui
+    description: "Capture the accessibility tree after navigation"

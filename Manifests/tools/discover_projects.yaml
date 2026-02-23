@@ -1,0 +1,29 @@
+name: discover_projects
+description: "Scan a directory tree for Xcode workspaces (.xcworkspace) and projects (.xcodeproj). Returns structured results sorted with workspaces first. Automatically sets session defaults when a single workspace or project is found."
+category: project_discovery
+input:
+  properties:
+    directory:
+      type: string
+      required: false
+      description: "Root directory to scan. Defaults to the current working directory."
+  required: []
+output:
+  success: "Structured list of discovered workspaces and projects with paths, sorted workspaces-first. Auto-sets session workspace/project if only one found."
+  errors:
+    - code: invalid_input
+      condition: "Directory does not exist"
+    - code: internal_error
+      condition: "Failed to scan directory or create file enumerator"
+idempotent: true
+destructive: false
+timeout:
+  default: "60s"
+cancellation: "Directory scan stops; partial results not returned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: list_schemes
+    description: "List available schemes for a discovered project"
+  - tool: session_set_defaults
+    description: "Set workspace/project as session default"

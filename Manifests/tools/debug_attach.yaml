@@ -1,0 +1,43 @@
+name: debug_attach
+description: "Attach LLDB to a running process by PID or bundle ID. Returns a session ID for use with other debug tools. Falls back to session default for udid."
+category: debugging
+input:
+  properties:
+    pid:
+      type: number
+      required: false
+      description: "Process ID to attach to."
+    bundle_id:
+      type: string
+      required: false
+      description: "Bundle identifier of the app to attach to."
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required: []
+output:
+  success: "Session ID for use with other debug tools, simulator UDID, PID and/or bundle ID."
+  errors:
+    - code: invalid_input
+      condition: "Neither pid nor bundle_id provided, or no UDID and no session default"
+    - code: resource_busy
+      condition: "An LLDB session is already attached to this process"
+    - code: internal_error
+      condition: "Failed to launch or attach LLDB"
+idempotent: false
+destructive: false
+timeout:
+  default: "60s"
+cancellation: "LLDB process terminated"
+lock: "lldb:{pid} — one LLDB session per process"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: debug_breakpoint_add
+    description: "Set a breakpoint"
+  - tool: debug_stack
+    description: "View the call stack"
+  - tool: debug_variables
+    description: "Inspect frame variables"

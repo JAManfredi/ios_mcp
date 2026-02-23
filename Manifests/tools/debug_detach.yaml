@@ -1,0 +1,30 @@
+name: debug_detach
+description: "Detach from an LLDB debug session and clean up the LLDB process."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+  required:
+    - session_id
+output:
+  success: "Success message confirming detach and cleanup."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or unknown session"
+    - code: internal_error
+      condition: "Failed to detach LLDB"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "LLDB process force-terminated"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_attach
+    description: "Reattach to the process"
+  - tool: stop_app
+    description: "Stop the app"

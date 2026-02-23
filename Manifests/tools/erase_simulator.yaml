@@ -1,0 +1,33 @@
+name: erase_simulator
+description: "Erase all content and settings from an iOS simulator by UDID. The simulator must be shut down first. Falls back to session default simulator_udid."
+category: simulator
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required: []
+output:
+  success: "Success message confirming erase."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: command_failed
+      condition: "simctl erase exited non-zero (e.g., simulator still booted)"
+    - code: resource_busy
+      condition: "Another operation is in progress on this simulator"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: true
+timeout:
+  default: "60s"
+cancellation: "simctl erase process terminated; partial erase possible"
+lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: boot_simulator
+    description: "Boot the erased simulator"

@@ -1,0 +1,37 @@
+name: list_schemes
+description: "List Xcode schemes, targets, and build configurations for a workspace or project. Falls back to session defaults if workspace/project are not provided. Automatically sets session default scheme when exactly one scheme is found."
+category: project_discovery
+input:
+  properties:
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace. Falls back to session default."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj. Falls back to session default. Ignored if workspace is provided."
+  required: []
+output:
+  success: "Schemes, targets, and build configurations. Auto-sets session scheme if only one found."
+  errors:
+    - code: invalid_input
+      condition: "No workspace/project specified and no session default"
+    - code: command_failed
+      condition: "xcodebuild -list exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure parsing xcodebuild output"
+idempotent: true
+destructive: false
+timeout:
+  default: "60s"
+cancellation: "xcodebuild process terminated via SIGINT"
+dependencies: []
+sessionDefaults:
+  - workspace
+  - project
+nextSteps:
+  - tool: session_set_defaults
+    description: "Set scheme as session default"
+  - tool: build_sim
+    description: "Build the project for simulator"

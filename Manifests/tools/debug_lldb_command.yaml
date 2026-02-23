@@ -1,0 +1,41 @@
+name: debug_lldb_command
+description: "Execute an arbitrary LLDB command in the attached session. Commands are checked against a denylist for safety. Set allow_unsafe to bypass the denylist (response will be marked accordingly)."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+    command:
+      type: string
+      required: true
+      description: "The LLDB command to execute."
+    allow_unsafe:
+      type: boolean
+      required: false
+      description: "If true, bypass the command denylist. Default false."
+  required:
+    - session_id
+    - command
+output:
+  success: "LLDB command output. Marked with [UNSAFE] prefix if denylist was bypassed."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or command"
+    - code: command_denied
+      condition: "Command matches denylist and allow_unsafe is false"
+    - code: internal_error
+      condition: "LLDB command execution failed or session not found"
+idempotent: false
+destructive: true
+timeout:
+  default: "30s"
+cancellation: "LLDB command abandoned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_variables
+    description: "Inspect frame variables"
+  - tool: debug_continue
+    description: "Continue execution"

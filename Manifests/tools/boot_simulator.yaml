@@ -1,0 +1,41 @@
+name: boot_simulator
+description: "Boot an iOS simulator by UDID. Falls back to session default simulator_udid. If 'name' is provided without 'udid', resolves the name to a UDID via simctl. Sets session simulator_udid on success."
+category: simulator
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    name:
+      type: string
+      required: false
+      description: "Simulator name. Used to resolve UDID if udid is not provided."
+  required: []
+output:
+  success: "Success message with simulator UDID. Sets session simulator_udid."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided, no session default, or name resolution failed"
+    - code: command_failed
+      condition: "simctl boot exited non-zero"
+    - code: resource_busy
+      condition: "Another operation is in progress on this simulator"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: true
+timeout:
+  default: "60s"
+cancellation: "simctl boot process terminated; simulator may be in partial state"
+lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: build_sim
+    description: "Build an app for the booted simulator"
+  - tool: launch_app
+    description: "Launch an already-built app"
+  - tool: screenshot
+    description: "Take a screenshot of the simulator"

@@ -1,0 +1,28 @@
+name: clean_derived_data
+description: "Delete the DerivedData directory. Falls back to session default, then ~/Library/Developer/Xcode/DerivedData."
+category: build
+input:
+  properties:
+    derived_data_path:
+      type: string
+      required: false
+      description: "Path to DerivedData directory. Falls back to session default, then ~/Library/Developer/Xcode/DerivedData."
+  required: []
+output:
+  success: "Success message with deleted path."
+  errors:
+    - code: invalid_input
+      condition: "DerivedData path does not exist"
+    - code: command_failed
+      condition: "Failed to delete DerivedData directory"
+idempotent: true
+destructive: true
+timeout:
+  default: "60s"
+cancellation: "Deletion may be partial"
+dependencies: []
+sessionDefaults:
+  - derived_data_path
+nextSteps:
+  - tool: build_sim
+    description: "Rebuild from clean state"

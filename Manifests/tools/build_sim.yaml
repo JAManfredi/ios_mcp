@@ -1,0 +1,74 @@
+name: build_sim
+description: "Build an Xcode project for the iOS Simulator. Falls back to session defaults for workspace, project, scheme, configuration, udid, and derived_data_path. Returns error/warning counts and xcresult artifact path."
+category: build
+input:
+  properties:
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace. Falls back to session default."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj. Falls back to session default. Ignored if workspace is provided."
+    scheme:
+      type: string
+      required: false
+      description: "Scheme name. Falls back to session default."
+    configuration:
+      type: string
+      required: false
+      description: "Build configuration (e.g., Debug, Release). Falls back to session default, then Debug."
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID for destination. Falls back to session default."
+    derived_data_path:
+      type: string
+      required: false
+      description: "Custom DerivedData path. Falls back to session default."
+    extra_args:
+      type: string
+      required: false
+      description: "Additional xcodebuild arguments, space-separated."
+    timeout:
+      type: integer
+      required: false
+      description: "Custom timeout in seconds (max 2700)."
+  required: []
+output:
+  success: "Build status with error/warning counts, error details, and xcresult path."
+  errors:
+    - code: invalid_input
+      condition: "No workspace/project/scheme resolvable from input or session defaults"
+    - code: stale_default
+      condition: "Session UDID or path no longer valid"
+    - code: command_failed
+      condition: "xcodebuild exits non-zero"
+    - code: resource_busy
+      condition: "Another build is running for the same workspace"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "20m"
+  max: "45m"
+cancellation: "SIGINT to xcodebuild process tree; partial xcresult may exist but is not parsed"
+lock: "One active build/test per workspace (resource_busy)"
+artifacts: "xcresult bundle path returned in response"
+dependencies: []
+sessionDefaults:
+  - workspace
+  - project
+  - scheme
+  - configuration
+  - simulator_udid
+  - derived_data_path
+nextSteps:
+  - tool: build_run_sim
+    description: "Build and run the app on simulator"
+  - tool: test_sim
+    description: "Run tests on simulator"
+  - tool: launch_app
+    description: "Launch the built app"

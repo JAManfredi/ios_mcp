@@ -1,0 +1,55 @@
+name: start_log_capture
+description: "Start capturing logs from an iOS simulator. Returns a session ID for later retrieval with stop_log_capture. Falls back to session default for udid. Supports filtering by bundle_id, process_name, pid, subsystem, and category."
+category: logging
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    bundle_id:
+      type: string
+      required: false
+      description: "Filter logs to this bundle identifier."
+    process_name:
+      type: string
+      required: false
+      description: "Filter logs to this process name."
+    pid:
+      type: number
+      required: false
+      description: "Filter logs to this process ID."
+    subsystem:
+      type: string
+      required: false
+      description: "Filter logs to this subsystem."
+    category:
+      type: string
+      required: false
+      description: "Filter logs to this category."
+    buffer_size:
+      type: number
+      required: false
+      description: "Maximum number of log entries to retain (default 50000)."
+  required: []
+output:
+  success: "Session ID, simulator UDID, active filters, and buffer size."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: internal_error
+      condition: "Failed to start log capture process"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "Log stream process terminated"
+lock: "log:{udid}:{filter} — acquired and released immediately after start"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: stop_log_capture
+    description: "Stop capture and retrieve logs"

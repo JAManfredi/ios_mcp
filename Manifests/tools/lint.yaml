@@ -1,0 +1,38 @@
+name: lint
+description: "Run SwiftLint on a directory or file. Returns lint violations as JSON by default. Falls back to session workspace or project path."
+category: quality
+input:
+  properties:
+    path:
+      type: string
+      required: false
+      description: "Directory or file to lint. Falls back to session workspace or project."
+    reporter:
+      type: string
+      required: false
+      description: "SwiftLint reporter format (e.g. json, xcode). Defaults to json."
+  required: []
+output:
+  success: "SwiftLint output in the requested reporter format (default JSON)."
+  errors:
+    - code: dependency_missing
+      condition: "swiftlint not found in PATH"
+    - code: invalid_input
+      condition: "No path provided and no session workspace/project"
+    - code: command_failed
+      condition: "swiftlint exited with code 2+ (serious error, not just violations)"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "5m"
+cancellation: "swiftlint process terminated"
+dependencies:
+  - swiftlint
+sessionDefaults:
+  - workspace
+  - project
+nextSteps:
+  - tool: build_sim
+    description: "Build after fixing lint issues"

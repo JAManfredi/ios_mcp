@@ -1,0 +1,42 @@
+name: key_press
+description: "Send a key press to the iOS simulator (e.g. return, escape, delete). The key is sent to the currently focused responder. Falls back to session default simulator_udid."
+category: ui_automation
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    key:
+      type: string
+      required: true
+      description: "The key to press. Examples: return, escape, delete, tab."
+  required:
+    - key
+output:
+  success: "Success message with key name and simulator UDID."
+  errors:
+    - code: invalid_input
+      condition: "Missing key or no UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: dependency_missing
+      condition: "axe CLI tool not found"
+    - code: command_failed
+      condition: "axe key exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "axe process terminated"
+dependencies:
+  - axe
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: snapshot_ui
+    description: "Capture UI state after key press"
+  - tool: screenshot
+    description: "Take a screenshot after key press"

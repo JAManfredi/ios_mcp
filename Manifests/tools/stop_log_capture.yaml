@@ -1,0 +1,32 @@
+name: stop_log_capture
+description: "Stop a running log capture session and retrieve captured log entries. Requires the session_id from start_log_capture."
+category: logging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "Session ID returned by start_log_capture."
+    max_entries:
+      type: number
+      required: false
+      description: "Limit the number of returned entries (returns the most recent). Default: all."
+  required:
+    - session_id
+output:
+  success: "Log entries formatted as [timestamp] [level] process(pid) [subsystem:category] message. Includes entry count and dropped count."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or unknown session"
+    - code: internal_error
+      condition: "Failed to stop log capture"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "Log stream process terminated; buffered entries returned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: start_log_capture
+    description: "Start a new log capture session"

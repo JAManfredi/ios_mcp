@@ -1,0 +1,57 @@
+# Tool Contract Schema — ios-mcp
+#
+# Each tool YAML file in this directory describes the operational contract
+# for one MCP tool. Fields are defined below.
+#
+# name: string (required)
+#   The MCP tool name (e.g., "build_sim"). Must match the ToolManifest.name in code.
+#
+# description: string (required)
+#   Human-readable description of what the tool does.
+#
+# category: string (required)
+#   One of: project_discovery, simulator, build, logging, ui_automation,
+#   debugging, inspection, quality, extras.
+#
+# input: object (required)
+#   properties: map of parameter name → { type, required, description, enum? }
+#     type: "string" | "integer" | "number" | "boolean"
+#     required: boolean (default false)
+#     description: human-readable description
+#     enum: optional list of allowed values
+#   required: list of parameter names that must be provided
+#
+# output: object (required)
+#   success: description of the successful response content
+#   errors: list of { code, condition }
+#     code: one of resource_busy, dependency_missing, stale_default,
+#           command_denied, command_failed, timeout, invalid_input, internal_error
+#     condition: when this error occurs
+#
+# idempotent: boolean (required)
+#   Whether calling the tool twice with the same input produces the same result.
+#
+# destructive: boolean (required)
+#   Whether the tool modifies system state (matches ToolManifest.isDestructive).
+#
+# timeout: object (optional)
+#   default: default timeout string (e.g., "60s", "20m")
+#   max: maximum allowed timeout string
+#
+# cancellation: string (optional)
+#   Description of what happens when the operation is cancelled.
+#
+# lock: string (optional)
+#   Description of the ConcurrencyPolicy lock key used by this tool.
+#
+# artifacts: string (optional)
+#   Description of artifacts produced (stored in ArtifactStore).
+#
+# dependencies: list of strings (optional)
+#   External tools required (e.g., "swiftlint", "axe").
+#
+# nextSteps: list of { tool, description }
+#   Suggested follow-up tools from NextStepResolver.
+#
+# sessionDefaults: list of strings (optional)
+#   SessionStore keys used as fallbacks (e.g., "simulator_udid", "workspace").

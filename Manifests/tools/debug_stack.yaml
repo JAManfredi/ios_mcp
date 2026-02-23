@@ -1,0 +1,34 @@
+name: debug_stack
+description: "Fetch the backtrace (stack trace) from the attached LLDB session."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+    thread_id:
+      type: number
+      required: false
+      description: "Thread ID to inspect. Defaults to the current thread."
+  required:
+    - session_id
+output:
+  success: "Backtrace output showing frame numbers, function names, and source locations."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or unknown session"
+    - code: internal_error
+      condition: "LLDB command failed"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "LLDB command abandoned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_variables
+    description: "Inspect variables in the current frame"
+  - tool: debug_lldb_command
+    description: "Run a custom LLDB command"

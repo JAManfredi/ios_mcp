@@ -1,0 +1,83 @@
+name: test_sim
+description: "Run tests for an Xcode project on the iOS Simulator. Falls back to session defaults. Returns pass/fail/skip counts and failing test names."
+category: build
+input:
+  properties:
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace. Falls back to session default."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj. Falls back to session default. Ignored if workspace is provided."
+    scheme:
+      type: string
+      required: false
+      description: "Scheme name. Falls back to session default."
+    configuration:
+      type: string
+      required: false
+      description: "Build configuration. Falls back to session default, then Debug."
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    derived_data_path:
+      type: string
+      required: false
+      description: "Custom DerivedData path. Falls back to session default."
+    extra_args:
+      type: string
+      required: false
+      description: "Additional xcodebuild arguments, space-separated."
+    test_plan:
+      type: string
+      required: false
+      description: "Test plan name to use."
+    only_testing:
+      type: string
+      required: false
+      description: "Only run specified tests (e.g., 'MyTests/testFoo'). Comma-separated for multiple."
+    skip_testing:
+      type: string
+      required: false
+      description: "Skip specified tests (e.g., 'MyTests/testSlow'). Comma-separated for multiple."
+    timeout:
+      type: integer
+      required: false
+      description: "Custom timeout in seconds (max 3600)."
+  required: []
+output:
+  success: "Test results with pass/fail/skip counts, failing test details, build errors, and xcresult path."
+  errors:
+    - code: invalid_input
+      condition: "No workspace/project/scheme resolvable"
+    - code: stale_default
+      condition: "Session UDID or path no longer valid"
+    - code: command_failed
+      condition: "Build or tests failed"
+    - code: resource_busy
+      condition: "Another build/test is running for the same workspace"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "30m"
+  max: "60m"
+cancellation: "SIGINT to xcodebuild test process; partial xcresult may exist"
+lock: "One active build/test per workspace (resource_busy)"
+dependencies: []
+sessionDefaults:
+  - workspace
+  - project
+  - scheme
+  - configuration
+  - simulator_udid
+  - derived_data_path
+nextSteps:
+  - tool: build_sim
+    description: "Rebuild after fixing test failures"
+  - tool: lint
+    description: "Run linter on the project"

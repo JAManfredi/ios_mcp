@@ -1,0 +1,47 @@
+name: launch_app
+description: "Launch an app on a running iOS simulator. Falls back to session defaults for udid and bundle_id. Optional launch arguments can be passed."
+category: build
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    bundle_id:
+      type: string
+      required: false
+      description: "App bundle identifier. Falls back to session default."
+    args:
+      type: string
+      required: false
+      description: "Space-separated launch arguments to pass to the app."
+  required: []
+output:
+  success: "Success message with bundle ID, simulator UDID, and optional PID."
+  errors:
+    - code: invalid_input
+      condition: "No UDID or bundle_id provided and no session defaults"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "simctl launch exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: false
+timeout:
+  default: "30s"
+cancellation: "simctl launch process terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+  - bundle_id
+nextSteps:
+  - tool: screenshot
+    description: "Take a screenshot of the running app"
+  - tool: snapshot_ui
+    description: "Capture the accessibility tree"
+  - tool: start_log_capture
+    description: "Start capturing app logs"
+  - tool: debug_attach
+    description: "Attach debugger to the running app"

@@ -1,0 +1,83 @@
+name: build_run_sim
+description: "Build, install, and launch an app on the iOS Simulator. Falls back to session defaults. Automatically resolves the app path from build settings and sets session bundle_id."
+category: build
+input:
+  properties:
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace. Falls back to session default."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj. Falls back to session default. Ignored if workspace is provided."
+    scheme:
+      type: string
+      required: false
+      description: "Scheme name. Falls back to session default."
+    configuration:
+      type: string
+      required: false
+      description: "Build configuration. Falls back to session default, then Debug."
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    derived_data_path:
+      type: string
+      required: false
+      description: "Custom DerivedData path. Falls back to session default."
+    extra_args:
+      type: string
+      required: false
+      description: "Additional xcodebuild arguments, space-separated."
+    bundle_id:
+      type: string
+      required: false
+      description: "App bundle identifier. Auto-resolved from build settings if not provided."
+    launch_args:
+      type: string
+      required: false
+      description: "Space-separated launch arguments to pass to the app."
+    timeout:
+      type: integer
+      required: false
+      description: "Custom timeout in seconds (max 2700)."
+  required: []
+output:
+  success: "Success message with bundle ID, simulator UDID, PID, and xcresult path. Sets session bundle_id."
+  errors:
+    - code: invalid_input
+      condition: "Invalid build arguments or could not resolve bundle_id"
+    - code: stale_default
+      condition: "Session UDID or path no longer valid"
+    - code: command_failed
+      condition: "Build, install, or launch failed"
+    - code: resource_busy
+      condition: "Another build is running for the same workspace"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: false
+timeout:
+  default: "20m"
+  max: "45m"
+cancellation: "SIGINT to xcodebuild; app may be partially installed"
+lock: "One active build/test per workspace (resource_busy)"
+dependencies: []
+sessionDefaults:
+  - workspace
+  - project
+  - scheme
+  - configuration
+  - simulator_udid
+  - derived_data_path
+nextSteps:
+  - tool: screenshot
+    description: "Take a screenshot of the running app"
+  - tool: snapshot_ui
+    description: "Capture the accessibility tree"
+  - tool: start_log_capture
+    description: "Start capturing app logs"
+  - tool: debug_attach
+    description: "Attach debugger to the running app"

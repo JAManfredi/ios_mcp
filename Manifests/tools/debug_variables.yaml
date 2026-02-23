@@ -1,0 +1,34 @@
+name: debug_variables
+description: "Fetch frame variables from the attached LLDB session."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+    frame_index:
+      type: number
+      required: false
+      description: "Frame index to inspect. Defaults to the current frame."
+  required:
+    - session_id
+output:
+  success: "Frame variables output with names, types, and values."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or unknown session"
+    - code: internal_error
+      condition: "LLDB command failed"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "LLDB command abandoned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_lldb_command
+    description: "Run a custom LLDB command for deeper inspection"
+  - tool: debug_continue
+    description: "Continue execution"

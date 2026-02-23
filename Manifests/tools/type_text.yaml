@@ -1,0 +1,60 @@
+name: type_text
+description: "Type text into the iOS simulator. Types into the currently focused field by default, or targets a specific element via accessibility identifier, label, or coordinates. Falls back to session default simulator_udid."
+category: ui_automation
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    text:
+      type: string
+      required: true
+      description: "The text to type."
+    accessibility_id:
+      type: string
+      required: false
+      description: "Accessibility identifier of the target element (optional)."
+    accessibility_label:
+      type: string
+      required: false
+      description: "Accessibility label of the target element (optional)."
+    x:
+      type: number
+      required: false
+      description: "X coordinate (used with y, optional)."
+    y:
+      type: number
+      required: false
+      description: "Y coordinate (used with x, optional)."
+  required:
+    - text
+output:
+  success: "Success message confirming text was typed."
+  errors:
+    - code: invalid_input
+      condition: "Missing text or no UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: dependency_missing
+      condition: "axe CLI tool not found"
+    - code: command_failed
+      condition: "axe type exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "axe process terminated"
+dependencies:
+  - axe
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: snapshot_ui
+    description: "Capture UI state after typing"
+  - tool: screenshot
+    description: "Take a screenshot after typing"
+  - tool: tap
+    description: "Tap another element"

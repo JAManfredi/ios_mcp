@@ -1,0 +1,40 @@
+name: list_simulators
+description: "List available iOS simulators with their UDID, name, runtime, and state. Filters out unavailable devices by default. Automatically sets session simulator_udid when exactly one booted device is found."
+category: simulator
+input:
+  properties:
+    runtime:
+      type: string
+      required: false
+      description: "Filter by runtime (substring match, e.g. 'iOS 18')."
+    state:
+      type: string
+      required: false
+      description: "Filter by device state."
+      enum:
+        - Booted
+        - Shutdown
+    show_unavailable:
+      type: boolean
+      required: false
+      description: "Include unavailable devices. Defaults to false."
+  required: []
+output:
+  success: "Grouped list of simulators by runtime with UDID, name, state. Auto-sets session simulator_udid if only one booted device."
+  errors:
+    - code: command_failed
+      condition: "simctl list devices exited non-zero"
+    - code: internal_error
+      condition: "Failed to read simctl output as UTF-8 or parse JSON"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "simctl process terminated"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: session_set_defaults
+    description: "Set simulator UDID as session default"
+  - tool: boot_simulator
+    description: "Boot a simulator device"

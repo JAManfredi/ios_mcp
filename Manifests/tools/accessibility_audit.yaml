@@ -1,0 +1,37 @@
+name: accessibility_audit
+description: "Run an accessibility audit on the iOS simulator's current screen. Falls back to session default simulator_udid."
+category: quality
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required: []
+output:
+  success: "Accessibility audit results with violations and warnings."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: dependency_missing
+      condition: "axe CLI tool not found"
+    - code: command_failed
+      condition: "axe audit/dump exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "30s"
+cancellation: "axe process terminated"
+dependencies:
+  - axe
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: snapshot_ui
+    description: "Inspect the accessibility tree for details"
+  - tool: screenshot
+    description: "Take a screenshot for context"

@@ -1,0 +1,57 @@
+name: long_press
+description: "Long press a UI element in the iOS simulator by accessibility identifier, label, or coordinates. Falls back to session default simulator_udid."
+category: ui_automation
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    duration:
+      type: number
+      required: false
+      description: "Press duration in seconds (optional, default ~1.0s)."
+    accessibility_id:
+      type: string
+      required: false
+      description: "Accessibility identifier of the target element (preferred)."
+    accessibility_label:
+      type: string
+      required: false
+      description: "Accessibility label of the target element."
+    x:
+      type: number
+      required: false
+      description: "X coordinate (used with y when no accessibility target)."
+    y:
+      type: number
+      required: false
+      description: "Y coordinate (used with x when no accessibility target)."
+  required: []
+output:
+  success: "Success message confirming long press action."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: dependency_missing
+      condition: "axe CLI tool not found"
+    - code: command_failed
+      condition: "axe longpress exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "axe process terminated"
+dependencies:
+  - axe
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: snapshot_ui
+    description: "Capture UI state after long press"
+  - tool: screenshot
+    description: "Take a screenshot after long press"

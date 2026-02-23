@@ -1,0 +1,50 @@
+name: session_set_defaults
+description: "Manually set session defaults for simulator UDID, workspace, project, scheme, bundle ID, configuration, or derived data path. At least one parameter is required. These defaults are used as fallbacks by other tools."
+category: simulator
+input:
+  properties:
+    simulator_udid:
+      type: string
+      required: false
+      description: "Simulator UDID to use as default."
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj."
+    scheme:
+      type: string
+      required: false
+      description: "Xcode scheme name."
+    bundle_id:
+      type: string
+      required: false
+      description: "App bundle identifier."
+    configuration:
+      type: string
+      required: false
+      description: "Build configuration (e.g. Debug, Release)."
+    derived_data_path:
+      type: string
+      required: false
+      description: "Custom derived data path."
+  required: []
+output:
+  success: "Confirmation listing all defaults that were set."
+  errors:
+    - code: invalid_input
+      condition: "No parameters provided, or UDID/path validation failed"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: build_sim
+    description: "Build the project with updated defaults"
+  - tool: list_simulators
+    description: "List available simulators"

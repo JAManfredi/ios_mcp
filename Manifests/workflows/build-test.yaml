@@ -1,0 +1,32 @@
+# Build & Test Workflow
+#
+# Standard workflow for building and testing an Xcode project.
+# Covers discovery through testing and linting.
+
+name: build-test
+description: "Discover a project, set defaults, build, test, and lint."
+
+steps:
+  - tool: discover_projects
+    description: "Find Xcode workspaces and projects in the working directory."
+    notes: "Auto-sets session workspace/project if only one found."
+
+  - tool: list_schemes
+    description: "List available schemes for the discovered project."
+    notes: "Auto-sets session scheme if only one found."
+
+  - tool: session_set_defaults
+    description: "Set simulator UDID, workspace, and scheme as session defaults."
+    notes: "Required if multiple projects/schemes were found. Optional if auto-set."
+
+  - tool: build_sim
+    description: "Build the project for iOS Simulator."
+    notes: "Returns error/warning counts and xcresult path."
+
+  - tool: test_sim
+    description: "Run tests on the iOS Simulator."
+    notes: "Returns pass/fail/skip counts with failing test names."
+
+  - tool: lint
+    description: "Run SwiftLint on the project."
+    notes: "Requires swiftlint in PATH. Returns violations as JSON."

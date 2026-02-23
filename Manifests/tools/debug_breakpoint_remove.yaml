@@ -1,0 +1,35 @@
+name: debug_breakpoint_remove
+description: "Remove a breakpoint by its ID from the attached LLDB session."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+    breakpoint_id:
+      type: number
+      required: true
+      description: "The breakpoint ID to remove."
+  required:
+    - session_id
+    - breakpoint_id
+output:
+  success: "LLDB output confirming breakpoint removal."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or breakpoint_id"
+    - code: internal_error
+      condition: "LLDB command failed or session not found"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "LLDB command abandoned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_breakpoint_add
+    description: "Add a different breakpoint"
+  - tool: debug_continue
+    description: "Continue execution"

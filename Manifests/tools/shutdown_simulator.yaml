@@ -1,0 +1,35 @@
+name: shutdown_simulator
+description: "Shut down a running iOS simulator by UDID. Falls back to session default simulator_udid. Keeps the session default so subsequent boot re-targets the same device."
+category: simulator
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+  required: []
+output:
+  success: "Success message confirming shutdown."
+  errors:
+    - code: invalid_input
+      condition: "No UDID provided and no session default"
+    - code: command_failed
+      condition: "simctl shutdown exited non-zero"
+    - code: resource_busy
+      condition: "Another operation is in progress on this simulator"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: true
+timeout:
+  default: "30s"
+cancellation: "simctl shutdown process terminated"
+lock: "simulator:{udid} — one boot/shutdown/erase at a time per device"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: boot_simulator
+    description: "Boot a different simulator"
+  - tool: list_simulators
+    description: "List available simulators"

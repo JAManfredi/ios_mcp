@@ -1,0 +1,34 @@
+name: debug_continue
+description: "Resume execution in the attached LLDB session. Returns stop reason if a breakpoint is hit."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+  required:
+    - session_id
+output:
+  success: "LLDB output with stop reason and status."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id or unknown session"
+    - code: timeout
+      condition: "No breakpoint hit within timeout period"
+    - code: internal_error
+      condition: "LLDB command failed"
+idempotent: false
+destructive: false
+timeout:
+  default: "5m"
+cancellation: "LLDB process interrupted; target may still be running"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_stack
+    description: "View the call stack"
+  - tool: debug_variables
+    description: "Inspect frame variables"
+  - tool: debug_detach
+    description: "Detach the debugger"

@@ -1,0 +1,41 @@
+name: read_user_defaults
+description: "Read user defaults for an app on the iOS simulator. Reads a specific key or all keys for the given domain (bundle ID). Falls back to session default simulator_udid."
+category: inspection
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    domain:
+      type: string
+      required: true
+      description: "App bundle ID (e.g. com.example.MyApp)."
+    key:
+      type: string
+      required: false
+      description: "Specific key to read. Reads all keys if omitted."
+  required:
+    - domain
+output:
+  success: "User defaults output in plist or key-value format."
+  errors:
+    - code: invalid_input
+      condition: "Missing domain or no UDID provided and no session default"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "defaults read exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "defaults process terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: write_user_default
+    description: "Write a user default value"

@@ -1,0 +1,47 @@
+name: show_build_settings
+description: "Show curated Xcode build settings for a scheme. Displays a focused subset (~19 key settings) instead of the full 500+ settings dump. Falls back to session defaults. Automatically sets session bundle ID and configuration."
+category: project_discovery
+input:
+  properties:
+    workspace:
+      type: string
+      required: false
+      description: "Path to .xcworkspace. Falls back to session default."
+    project:
+      type: string
+      required: false
+      description: "Path to .xcodeproj. Falls back to session default. Ignored if workspace is provided."
+    scheme:
+      type: string
+      required: false
+      description: "Scheme name. Falls back to session default."
+    configuration:
+      type: string
+      required: false
+      description: "Build configuration (e.g., Debug, Release). Falls back to session default."
+  required: []
+output:
+  success: "Curated build settings display (~19 key values). Auto-sets session bundle_id and configuration."
+  errors:
+    - code: invalid_input
+      condition: "No scheme or no workspace/project specified and no session defaults"
+    - code: command_failed
+      condition: "xcodebuild -showBuildSettings exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "60s"
+cancellation: "xcodebuild process terminated via SIGINT"
+dependencies: []
+sessionDefaults:
+  - workspace
+  - project
+  - scheme
+  - configuration
+nextSteps:
+  - tool: build_sim
+    description: "Build the project for simulator"
+  - tool: session_set_defaults
+    description: "Update session defaults based on settings"

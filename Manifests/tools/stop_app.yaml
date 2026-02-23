@@ -1,0 +1,39 @@
+name: stop_app
+description: "Stop a running app on an iOS simulator. Falls back to session defaults for udid and bundle_id."
+category: build
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID. Falls back to session default."
+    bundle_id:
+      type: string
+      required: false
+      description: "App bundle identifier. Falls back to session default."
+  required: []
+output:
+  success: "Success message confirming app termination."
+  errors:
+    - code: invalid_input
+      condition: "No UDID or bundle_id provided and no session defaults"
+    - code: stale_default
+      condition: "Session UDID no longer valid"
+    - code: command_failed
+      condition: "simctl terminate exited non-zero"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "simctl terminate process terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+  - bundle_id
+nextSteps:
+  - tool: launch_app
+    description: "Relaunch the app"
+  - tool: build_sim
+    description: "Rebuild the app"

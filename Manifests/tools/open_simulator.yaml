@@ -1,0 +1,30 @@
+name: open_simulator
+description: "Open the iOS Simulator app. Optionally boots a specific simulator by UDID first. Falls back to session default simulator_udid."
+category: extras
+input:
+  properties:
+    udid:
+      type: string
+      required: false
+      description: "Simulator UDID to boot before opening. Falls back to session default."
+  required: []
+output:
+  success: "Success message indicating whether simulator was booted and/or Simulator.app opened."
+  errors:
+    - code: invalid_input
+      condition: "Invalid UDID"
+    - code: command_failed
+      condition: "Failed to boot simulator or open Simulator.app"
+    - code: internal_error
+      condition: "Unexpected failure"
+idempotent: true
+destructive: false
+timeout:
+  default: "30s"
+cancellation: "Boot/open processes terminated"
+dependencies: []
+sessionDefaults:
+  - simulator_udid
+nextSteps:
+  - tool: screenshot
+    description: "Take a screenshot of the visible simulator"

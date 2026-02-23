@@ -1,0 +1,42 @@
+name: debug_breakpoint_add
+description: "Add a breakpoint by symbol name or file:line location in the attached LLDB session."
+category: debugging
+input:
+  properties:
+    session_id:
+      type: string
+      required: true
+      description: "The debug session ID returned by debug_attach."
+    symbol:
+      type: string
+      required: false
+      description: "Symbol name to break on (e.g. 'viewDidLoad')."
+    file:
+      type: string
+      required: false
+      description: "Source file path for file:line breakpoint."
+    line:
+      type: number
+      required: false
+      description: "Line number for file:line breakpoint."
+  required:
+    - session_id
+output:
+  success: "LLDB output with breakpoint ID and location."
+  errors:
+    - code: invalid_input
+      condition: "Missing session_id, or neither symbol nor file+line provided"
+    - code: internal_error
+      condition: "LLDB command failed or session not found"
+idempotent: false
+destructive: false
+timeout:
+  default: "15s"
+cancellation: "LLDB command abandoned"
+dependencies: []
+sessionDefaults: []
+nextSteps:
+  - tool: debug_continue
+    description: "Continue execution to hit the breakpoint"
+  - tool: debug_breakpoint_remove
+    description: "Remove a breakpoint"
