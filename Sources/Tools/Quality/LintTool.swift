@@ -110,7 +110,7 @@ func registerLintTool(
         do {
             let result = try await executor.execute(
                 executable: resolvedSwiftLint,
-                arguments: ["lint", "--path", resolvedPath, "--reporter", reporter],
+                arguments: ["lint", "--reporter", reporter, resolvedPath],
                 timeout: 300,
                 environment: nil
             )
