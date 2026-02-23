@@ -99,7 +99,7 @@ func resolveTargetCoordinates(
         let target = identifier ?? label ?? "unknown"
         return .failure(ToolError(
             code: .invalidInput,
-            message: "Element not found in accessibility tree: \(target)"
+            message: "Element not found in accessibility tree: \(target). Use snapshot_ui to inspect available elements, or provide x/y coordinates."
         ))
     } catch let error as ToolError {
         return .failure(error)

@@ -20,7 +20,7 @@ func registerSwipeTool(
 ) async {
     let manifest = ToolManifest(
         name: "swipe",
-        description: "Swipe on a UI element in the iOS simulator. Requires a direction and a target element. Falls back to session default simulator_udid.",
+        description: "Swipe on a UI element in the iOS simulator. Requires a direction and an optional target element via accessibility identifier, label, or coordinates. If no target is provided, swipes from the screen center. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(

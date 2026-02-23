@@ -18,7 +18,7 @@ func registerAccessibilityAuditTool(
 ) async {
     let manifest = ToolManifest(
         name: "accessibility_audit",
-        description: "Run an accessibility audit on the iOS simulator's current screen. Falls back to session default simulator_udid.",
+        description: "Run an accessibility audit on the iOS simulator's current screen. Returns the full accessibility tree for manual review of accessibility properties, labels, and roles. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(
