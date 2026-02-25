@@ -51,7 +51,7 @@ func registerSwiftPackageInitTool(
             return .error(error)
         }
 
-        var arguments = ["package", "init", "--package-path", path]
+        var arguments = ["package", "--package-path", path, "init"]
 
         if case .string(let type) = args["type"] {
             arguments += ["--type", type]

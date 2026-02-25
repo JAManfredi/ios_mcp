@@ -37,7 +37,7 @@ func registerSwiftPackageResolveTool(
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/swift",
-                    arguments: ["package", "resolve", "--package-path", packagePath],
+                    arguments: ["package", "--package-path", packagePath, "resolve"],
                     timeout: 300,
                     environment: nil
                 )

@@ -46,90 +46,101 @@ func registerInspectXCResultTool(
             requestedSections = ["diagnostics", "tests", "coverage", "attachments", "timeline"]
         }
 
-        // Fetch the xcresult JSON
-        guard let result = try? await executor.execute(
-            executable: "/usr/bin/xcrun",
-            arguments: ["xcresulttool", "get", "--path", path, "--format", "json"],
-            timeout: 30,
-            environment: nil
-        ), result.succeeded, let data = result.stdout.data(using: .utf8) else {
-            return .error(ToolError(
-                code: .commandFailed,
-                message: "Failed to read xcresult bundle at '\(path)'. Verify the path exists and contains a valid .xcresult."
-            ))
-        }
-
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let actions = root["actions"] as? [[String: Any]] else {
-            return .error(ToolError(
-                code: .commandFailed,
-                message: "Unable to parse xcresult JSON. The format may not be supported."
-            ))
-        }
-
         var output: [String] = ["XCResult Inspection: \(path)", ""]
 
-        // MARK: Diagnostics
-        if requestedSections.contains("diagnostics") {
-            output.append("## Diagnostics")
-            let diag = parseBuildDiagnostics(data)
-            if diag.errors.isEmpty && diag.warnings.isEmpty {
-                output.append("No diagnostics found.")
-            } else {
-                if !diag.errors.isEmpty {
-                    output.append("Errors (\(diag.errors.count)):")
-                    for entry in diag.errors {
-                        var line = "  - \(entry.message)"
-                        if let file = entry.file {
-                            line += " (\(file)"
-                            if let lineNum = entry.line { line += ":\(lineNum)" }
-                            line += ")"
+        // MARK: Diagnostics & Timeline (from build-results)
+        if requestedSections.contains("diagnostics") || requestedSections.contains("timeline") {
+            let buildJSON = await fetchBuildResults(path: path, executor: executor)
+
+            if requestedSections.contains("diagnostics") {
+                output.append("## Diagnostics")
+                if let build = buildJSON {
+                    let errors = build["errors"] as? [[String: Any]] ?? []
+                    let warnings = build["warnings"] as? [[String: Any]] ?? []
+                    let errorCount = build["errorCount"] as? Int ?? errors.count
+                    let warningCount = build["warningCount"] as? Int ?? warnings.count
+
+                    if errors.isEmpty && warnings.isEmpty {
+                        output.append("No diagnostics found (errors: \(errorCount), warnings: \(warningCount)).")
+                    } else {
+                        if !errors.isEmpty {
+                            output.append("Errors (\(errorCount)):")
+                            for entry in errors.prefix(50) {
+                                let message = entry["message"] as? String ?? "Unknown error"
+                                let issueType = entry["issueType"] as? String
+                                var line = "  - \(message)"
+                                if let t = issueType { line += " [\(t)]" }
+                                output.append(line)
+                            }
                         }
-                        output.append(line)
-                    }
-                }
-                if !diag.warnings.isEmpty {
-                    output.append("Warnings (\(diag.warnings.count)):")
-                    for entry in diag.warnings {
-                        var line = "  - \(entry.message)"
-                        if let file = entry.file {
-                            line += " (\(file)"
-                            if let lineNum = entry.line { line += ":\(lineNum)" }
-                            line += ")"
+                        if !warnings.isEmpty {
+                            output.append("Warnings (\(warningCount)):")
+                            for entry in warnings.prefix(20) {
+                                let message = entry["message"] as? String ?? "Unknown warning"
+                                output.append("  - \(message)")
+                            }
+                            if warnings.count > 20 {
+                                output.append("  ... and \(warnings.count - 20) more")
+                            }
                         }
-                        output.append(line)
                     }
+                } else {
+                    output.append("Build results not available.")
                 }
+                output.append("")
             }
-            output.append("")
+
+            if requestedSections.contains("timeline") {
+                output.append("## Build Timeline")
+                if let build = buildJSON {
+                    let startTime = build["startTime"] as? Double
+                    let endTime = build["endTime"] as? Double
+                    let status = build["status"] as? String ?? "unknown"
+                    output.append("Status: \(status)")
+                    if let start = startTime, let end = endTime {
+                        let duration = end - start
+                        output.append("Duration: \(String(format: "%.1fs", duration))")
+                    }
+                    if let dest = build["destination"] as? [String: Any] {
+                        let deviceName = dest["deviceName"] as? String ?? "?"
+                        let osVersion = dest["osVersion"] as? String ?? "?"
+                        output.append("Destination: \(deviceName) (iOS \(osVersion))")
+                    }
+                } else {
+                    output.append("No timeline data available.")
+                }
+                output.append("")
+            }
         }
 
         // MARK: Tests
         if requestedSections.contains("tests") {
             output.append("## Test Results")
-            let tests = parseTestResults(data)
-            output.append("Total: \(tests.totalTests) | Passed: \(tests.passed) | Failed: \(tests.failed) | Skipped: \(tests.skipped)")
-            if !tests.failedTests.isEmpty {
-                output.append("Failed tests:")
-                for test in tests.failedTests {
-                    var line = "  - \(test.name)"
-                    if let msg = test.message { line += ": \(msg)" }
-                    output.append(line)
-                }
-            }
 
-            // Extract per-test durations if available
-            for action in actions {
-                if let testResult = action["testResult"] as? [String: Any],
-                   let testNodes = testResult["testNodes"] as? [[String: Any]] {
-                    let durations = extractTestDurations(testNodes)
-                    if !durations.isEmpty {
-                        output.append("Test durations:")
-                        for (name, duration) in durations.sorted(by: { $0.1 > $1.1 }).prefix(20) {
-                            output.append("  \(name): \(String(format: "%.2fs", duration))")
-                        }
+            if let testSummary = await fetchTestSummary(path: path, executor: executor) {
+                let total = testSummary["totalTestCount"] as? Int ?? 0
+                let passed = testSummary["passedTests"] as? Int ?? 0
+                let failed = testSummary["failedTests"] as? Int ?? 0
+                let skipped = testSummary["skippedTests"] as? Int ?? 0
+                let result = testSummary["result"] as? String ?? "unknown"
+
+                output.append("Result: \(result)")
+                output.append("Total: \(total) | Passed: \(passed) | Failed: \(failed) | Skipped: \(skipped)")
+
+                if let failures = testSummary["testFailures"] as? [[String: Any]], !failures.isEmpty {
+                    output.append("Failures:")
+                    for failure in failures.prefix(20) {
+                        let testName = failure["testName"] as? String ?? "?"
+                        let message = failure["message"] as? String ?? ""
+                        output.append("  - \(testName): \(message)")
                     }
                 }
+
+                if let title = testSummary["title"] as? String {
+                    output.append("Title: \(title)")
+                }
+            } else {
+                output.append("Test results not available.")
             }
             output.append("")
         }
@@ -138,33 +149,28 @@ func registerInspectXCResultTool(
         if requestedSections.contains("coverage") {
             output.append("## Code Coverage")
 
-            // Try fetching coverage data via xcresulttool
             if let covResult = try? await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["xcresulttool", "get", "--path", path, "--format", "json", "--type", "codeCoverage"],
+                arguments: ["xcresulttool", "get", "object", "--legacy", "--path", path, "--format", "json", "--type", "codeCoverage"],
                 timeout: 30,
                 environment: nil
             ), covResult.succeeded,
                let covData = covResult.stdout.data(using: .utf8),
-               let covJSON = try? JSONSerialization.jsonObject(with: covData) as? [String: Any] {
-                if let targets = covJSON["targets"] as? [[String: Any]] {
-                    for target in targets {
-                        let name = target["name"] as? String ?? "Unknown"
-                        let lineCoverage = target["lineCoverage"] as? Double ?? 0.0
-                        output.append("  \(name): \(String(format: "%.1f%%", lineCoverage * 100))")
+               let covJSON = try? JSONSerialization.jsonObject(with: covData) as? [String: Any],
+               let targets = covJSON["targets"] as? [[String: Any]] {
+                for target in targets {
+                    let name = target["name"] as? String ?? "Unknown"
+                    let lineCoverage = target["lineCoverage"] as? Double ?? 0.0
+                    output.append("  \(name): \(String(format: "%.1f%%", lineCoverage * 100))")
 
-                        // Per-file coverage (top 10 lowest)
-                        if let files = target["files"] as? [[String: Any]] {
-                            let sorted = files.sorted { ($0["lineCoverage"] as? Double ?? 0) < ($1["lineCoverage"] as? Double ?? 0) }
-                            for file in sorted.prefix(10) {
-                                let fileName = file["name"] as? String ?? "?"
-                                let fileCov = file["lineCoverage"] as? Double ?? 0.0
-                                output.append("    \(fileName): \(String(format: "%.1f%%", fileCov * 100))")
-                            }
+                    if let files = target["files"] as? [[String: Any]] {
+                        let sorted = files.sorted { ($0["lineCoverage"] as? Double ?? 0) < ($1["lineCoverage"] as? Double ?? 0) }
+                        for file in sorted.prefix(10) {
+                            let fileName = file["name"] as? String ?? "?"
+                            let fileCov = file["lineCoverage"] as? Double ?? 0.0
+                            output.append("    \(fileName): \(String(format: "%.1f%%", fileCov * 100))")
                         }
                     }
-                } else {
-                    output.append("No coverage data found.")
                 }
             } else {
                 output.append("Code coverage not available (tests may not have been run with coverage enabled).")
@@ -204,64 +210,44 @@ func registerInspectXCResultTool(
             output.append("")
         }
 
-        // MARK: Timeline
-        if requestedSections.contains("timeline") {
-            output.append("## Build Timeline")
-
-            var hasTimeline = false
-            for action in actions {
-                if let buildResult = action["buildResult"] as? [String: Any] {
-                    if let metrics = buildResult["metrics"] as? [String: Any] {
-                        if let wallClock = metrics["totalWallClockTime"] as? Double {
-                            output.append("Total wall clock time: \(String(format: "%.1fs", wallClock))")
-                        }
-                        if let cpuTime = metrics["totalCPUTime"] as? Double {
-                            output.append("Total CPU time: \(String(format: "%.1fs", cpuTime))")
-                        }
-                        hasTimeline = true
-                    }
-                }
-
-                // Per-target timing from build steps
-                if let buildResult = action["buildResult"] as? [String: Any],
-                   let steps = buildResult["buildSteps"] as? [[String: Any]] {
-                    let targetTimes = steps.compactMap { step -> (String, Double)? in
-                        guard let title = step["title"] as? String,
-                              let duration = step["duration"] as? Double else { return nil }
-                        return (title, duration)
-                    }.sorted(by: { $0.1 > $1.1 })
-
-                    if !targetTimes.isEmpty {
-                        output.append("Per-target build duration (top 10):")
-                        for (target, duration) in targetTimes.prefix(10) {
-                            output.append("  \(target): \(String(format: "%.1fs", duration))")
-                        }
-                        hasTimeline = true
-                    }
-                }
-            }
-
-            if !hasTimeline {
-                output.append("No timeline data available.")
-            }
-            output.append("")
-        }
-
         return .success(ToolResult(content: output.joined(separator: "\n")))
     }
 }
 
-/// Recursively extract test durations from test node trees.
-private func extractTestDurations(_ nodes: [[String: Any]]) -> [(String, Double)] {
-    var result: [(String, Double)] = []
-    for node in nodes {
-        let name = node["name"] as? String ?? "?"
-        if let duration = node["duration"] as? Double, duration > 0 {
-            result.append((name, duration))
-        }
-        if let children = node["children"] as? [[String: Any]] {
-            result += extractTestDurations(children)
-        }
+// MARK: - xcresulttool Helpers
+
+/// Fetches build-results JSON from xcresulttool.
+private func fetchBuildResults(
+    path: String,
+    executor: any CommandExecuting
+) async -> [String: Any]? {
+    guard let result = try? await executor.execute(
+        executable: "/usr/bin/xcrun",
+        arguments: ["xcresulttool", "get", "build-results", "--path", path, "--format", "json"],
+        timeout: 30,
+        environment: nil
+    ), result.succeeded,
+          let data = result.stdout.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return nil
     }
-    return result
+    return json
+}
+
+/// Fetches test-results summary JSON from xcresulttool.
+private func fetchTestSummary(
+    path: String,
+    executor: any CommandExecuting
+) async -> [String: Any]? {
+    guard let result = try? await executor.execute(
+        executable: "/usr/bin/xcrun",
+        arguments: ["xcresulttool", "get", "test-results", "summary", "--path", path],
+        timeout: 30,
+        environment: nil
+    ), result.succeeded,
+          let data = result.stdout.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return nil
+    }
+    return json
 }

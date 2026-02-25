@@ -38,7 +38,7 @@ func registerSwiftPackageCleanTool(
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/swift",
-                    arguments: ["package", "clean", "--package-path", packagePath],
+                    arguments: ["package", "--package-path", packagePath, "clean"],
                     timeout: 30,
                     environment: nil
                 )

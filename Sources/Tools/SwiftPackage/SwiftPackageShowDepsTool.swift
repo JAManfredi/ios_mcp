@@ -38,7 +38,7 @@ func registerSwiftPackageShowDepsTool(
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/swift",
-                    arguments: ["package", "show-dependencies", "--format", "json", "--package-path", packagePath],
+                    arguments: ["package", "--package-path", packagePath, "show-dependencies", "--format", "json"],
                     timeout: 300,
                     environment: nil
                 )

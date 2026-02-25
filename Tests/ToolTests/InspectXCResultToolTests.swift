@@ -12,32 +12,45 @@ import Testing
 
 @testable import Tools
 
-private let xcresultJSON = """
+private let buildResultsJSON = """
 {
-  "actions": [
-    {
-      "buildResult": {
-        "issues": {
-          "errorSummaries": [
-            {"message": "Type 'Foo' does not conform to protocol 'Bar'", "documentLocationInCreatingWorkspace": {"url": "file:///src/Foo.swift", "line": 42}}
-          ],
-          "warningSummaries": [
-            {"message": "Unused variable 'x'", "documentLocationInCreatingWorkspace": {"url": "file:///src/Bar.swift", "line": 10}}
-          ]
-        },
-        "metrics": {
-          "totalWallClockTime": 12.5,
-          "totalCPUTime": 45.2
-        }
-      },
-      "testResult": {
-        "summary": {"totalCount": 10, "passedCount": 8, "failedCount": 1, "skippedCount": 1},
-        "failures": [
-          {"testName": "testFoo()", "message": "Expected true but got false"}
-        ]
-      }
-    }
-  ]
+  "status": "succeeded",
+  "startTime": 1000.0,
+  "endTime": 1012.5,
+  "errorCount": 1,
+  "errors": [
+    {"message": "Type 'Foo' does not conform to protocol 'Bar'", "issueType": "Semantic Issue"}
+  ],
+  "warningCount": 1,
+  "warnings": [
+    {"message": "Unused variable 'x'"}
+  ],
+  "analyzerWarningCount": 0,
+  "analyzerWarnings": [],
+  "destination": {
+    "deviceName": "iPhone 16 Pro",
+    "osVersion": "18.0"
+  }
+}
+"""
+
+private let testSummaryJSON = """
+{
+  "totalTestCount": 10,
+  "passedTests": 8,
+  "failedTests": 1,
+  "skippedTests": 1,
+  "result": "failed",
+  "title": "Test - MyApp",
+  "testFailures": [
+    {"testName": "testFoo()", "message": "Expected true but got false"}
+  ],
+  "startTime": 1000.0,
+  "finishTime": 1012.5,
+  "devicesAndConfigurations": [],
+  "statistics": [],
+  "topInsights": [],
+  "expectedFailures": 0
 }
 """
 
@@ -49,10 +62,16 @@ struct InspectXCResultToolTests {
         let session = SessionStore()
         let registry = ToolRegistry()
         let executor = MockCommandExecutor { _, args in
-            if args.contains("xcresulttool") && args.contains("get") {
-                return CommandResult(stdout: xcresultJSON, stderr: "", exitCode: 0)
+            if args.contains("build-results") {
+                return CommandResult(stdout: buildResultsJSON, stderr: "", exitCode: 0)
             }
-            if args.contains("xcresulttool") && args.contains("export") {
+            if args.contains("test-results") && args.contains("summary") {
+                return CommandResult(stdout: testSummaryJSON, stderr: "", exitCode: 0)
+            }
+            if args.contains("codeCoverage") {
+                return CommandResult(stdout: "", stderr: "not available", exitCode: 1)
+            }
+            if args.contains("export") {
                 return CommandResult(stdout: "", stderr: "", exitCode: 1)
             }
             return CommandResult(stdout: validatorSimctlJSON, stderr: "", exitCode: 0)
@@ -75,7 +94,7 @@ struct InspectXCResultToolTests {
             #expect(result.content.contains("Failed: 1"))
             #expect(result.content.contains("testFoo()"))
             #expect(result.content.contains("## Build Timeline"))
-            #expect(result.content.contains("12.5s"))
+            #expect(result.content.contains("Duration: 12.5s"))
         } else {
             Issue.record("Expected success response")
         }
@@ -86,8 +105,11 @@ struct InspectXCResultToolTests {
         let session = SessionStore()
         let registry = ToolRegistry()
         let executor = MockCommandExecutor { _, args in
-            if args.contains("xcresulttool") {
-                return CommandResult(stdout: xcresultJSON, stderr: "", exitCode: 0)
+            if args.contains("build-results") {
+                return CommandResult(stdout: buildResultsJSON, stderr: "", exitCode: 0)
+            }
+            if args.contains("test-results") && args.contains("summary") {
+                return CommandResult(stdout: testSummaryJSON, stderr: "", exitCode: 0)
             }
             return CommandResult(stdout: validatorSimctlJSON, stderr: "", exitCode: 0)
         }

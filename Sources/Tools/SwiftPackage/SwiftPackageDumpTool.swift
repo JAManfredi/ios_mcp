@@ -38,7 +38,7 @@ func registerSwiftPackageDumpTool(
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/swift",
-                    arguments: ["package", "dump-package", "--package-path", packagePath],
+                    arguments: ["package", "--package-path", packagePath, "dump-package"],
                     timeout: 30,
                     environment: nil
                 )
