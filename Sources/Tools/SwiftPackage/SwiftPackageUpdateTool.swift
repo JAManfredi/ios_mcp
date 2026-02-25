@@ -38,7 +38,7 @@ func registerSwiftPackageUpdateTool(
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/swift",
-                    arguments: ["package", "update", "--package-path", packagePath],
+                    arguments: ["package", "--package-path", packagePath, "update"],
                     timeout: 300,
                     environment: nil
                 )
