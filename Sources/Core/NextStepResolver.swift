@@ -34,6 +34,7 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "build_simulator", description: "Build an app for the booted simulator"),
             NextStep(tool: "launch_app", description: "Launch an already-built app"),
             NextStep(tool: "screenshot", description: "Take a screenshot of the simulator"),
+            NextStep(tool: "set_appearance", description: "Set light or dark mode"),
         ],
         "shutdown_simulator": [
             NextStep(tool: "boot_simulator", description: "Boot a different simulator"),
@@ -45,6 +46,7 @@ public struct NextStepResolver: Sendable {
         "session_set_defaults": [
             NextStep(tool: "build_simulator", description: "Build the project with updated defaults"),
             NextStep(tool: "list_simulators", description: "List available simulators"),
+            NextStep(tool: "show_session", description: "View current session defaults"),
         ],
 
         // Build & Run
@@ -59,6 +61,7 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "inspect_ui", description: "Capture the accessibility tree"),
             NextStep(tool: "start_log_capture", description: "Start capturing app logs"),
             NextStep(tool: "debug_attach", description: "Attach debugger to the running app"),
+            NextStep(tool: "manage_privacy", description: "Grant or revoke app permissions"),
         ],
         "test_simulator": [
             NextStep(tool: "build_simulator", description: "Rebuild after fixing test failures"),
@@ -263,6 +266,48 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "debug_attach", description: "Attach debugger to investigate"),
             NextStep(tool: "build_simulator", description: "Rebuild after fixing crash"),
         ],
+
+        // Simulator Utilities
+        "simulate_location": [
+            NextStep(tool: "clear_location", description: "Clear the simulated location"),
+            NextStep(tool: "screenshot", description: "Take a screenshot to verify location change"),
+        ],
+        "clear_location": [
+            NextStep(tool: "simulate_location", description: "Set a new simulated location"),
+        ],
+        "set_appearance": [
+            NextStep(tool: "screenshot", description: "Take a screenshot to verify appearance"),
+        ],
+        "override_status_bar": [
+            NextStep(tool: "screenshot", description: "Take a screenshot to verify status bar"),
+        ],
+
+        // Session Management
+        "show_session": [
+            NextStep(tool: "session_set_defaults", description: "Update session defaults"),
+            NextStep(tool: "clear_session", description: "Clear session defaults"),
+        ],
+        "clear_session": [
+            NextStep(tool: "session_set_defaults", description: "Set new session defaults"),
+            NextStep(tool: "show_session", description: "Verify session is cleared"),
+        ],
+
+        // Agent Workflow
+        "manage_privacy": [
+            NextStep(tool: "launch_app", description: "Launch the app after permission change"),
+            NextStep(tool: "build_run_simulator", description: "Build and run with updated permissions"),
+        ],
+        "send_push_notification": [
+            NextStep(tool: "screenshot", description: "Take a screenshot to verify notification"),
+            NextStep(tool: "inspect_ui", description: "Inspect UI for notification content"),
+        ],
+        "get_app_container": [
+            NextStep(tool: "launch_app", description: "Launch the app"),
+        ],
+        "uninstall_app": [
+            NextStep(tool: "build_run_simulator", description: "Reinstall and run the app"),
+            NextStep(tool: "install_app_device", description: "Install on a physical device instead"),
+        ],
     ]
 
     /// Returns the suggested next steps for a tool, or an empty array if unknown.
@@ -301,6 +346,8 @@ public struct NextStepResolver: Sendable {
             "screenshot", "inspect_ui", "deep_link", "tap", "swipe", "type_text",
             "key_press", "long_press", "start_log_capture", "debug_attach",
             "accessibility_audit", "open_simulator",
+            "simulate_location", "clear_location", "set_appearance", "override_status_bar",
+            "manage_privacy", "send_push_notification", "get_app_container", "uninstall_app",
         ]
 
         let needsWorkspace: Set<String> = [
@@ -317,6 +364,7 @@ public struct NextStepResolver: Sendable {
         let needsBundleID: Set<String> = [
             "launch_app", "stop_app", "read_user_defaults", "write_user_default",
             "debug_attach",
+            "manage_privacy", "send_push_notification", "get_app_container", "uninstall_app",
         ]
 
         let needsDevice: Set<String> = [

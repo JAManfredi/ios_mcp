@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  An <a href="https://modelcontextprotocol.io/">MCP</a> server for the iOS development lifecycle — <b>55 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, package management, and quality checks. Works with any MCP-compatible client.
+  An <a href="https://modelcontextprotocol.io/">MCP</a> server for the iOS development lifecycle — <b>65 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, package management, and quality checks. Works with any MCP-compatible client.
 </p>
 
 ---
@@ -23,7 +23,7 @@
 - **Security by default** — secrets are automatically redacted from all output (tokens, keys, signing identities). Dangerous debugger commands are blocked. All subprocesses use argument arrays — never shell execution. No telemetry. No network access.
 - **Post-mortem analysis** — parse crash logs with symbolicated backtraces, inspect xcresult bundles for diagnostics, test failures, code coverage, and build timelines. Understand *what went wrong* without leaving the terminal.
 - **Session intelligence** — tools auto-discover context (workspace, scheme, simulator, device) and validate it before use. Stale defaults are caught, not silently reused. Every response includes suggested next steps for natural workflow progression.
-- **Full lifecycle coverage** — 55 tools spanning project discovery, simulator and device management, building, testing, UI automation, debugging, logging, Swift packages, crash analysis, and quality checks.
+- **Full lifecycle coverage** — 65 tools spanning project discovery, simulator and device management, building, testing, UI automation, debugging, logging, Swift packages, crash analysis, and quality checks.
 
 ---
 
@@ -42,12 +42,12 @@ ios-mcp doctor
 
 ## 🛠 What's Included
 
-**55 tools** across **12 categories**:
+**65 tools** across **12 categories**:
 
 | Category | Count | Tools |
 |----------|:-----:|-------|
 | 🔍 **Project Discovery** | 3 | `discover_projects` · `list_schemes` · `show_build_settings` |
-| 📱 **Simulator** | 5 | `list_simulators` · `boot_simulator` · `shutdown_simulator` · `erase_simulator` · `session_set_defaults` |
+| 📱 **Simulator** | 15 | `list_simulators` · `boot_simulator` · `shutdown_simulator` · `erase_simulator` · `session_set_defaults` · `simulate_location` · `clear_location` · `set_appearance` · `override_status_bar` · `show_session` · `clear_session` · `manage_privacy` · `send_push_notification` · `get_app_container` · `uninstall_app` |
 | 🔨 **Build** | 8 | `build_simulator` · `build_run_simulator` · `test_simulator` · `launch_app` · `stop_app` · `clean_derived_data` · `inspect_xcresult` · `list_crash_logs` |
 | 📲 **Device** | 8 | `list_devices` · `build_for_device` · `build_run_device` · `test_on_device` · `install_app_device` · `launch_app_device` · `stop_app_device` · `device_screenshot` |
 | 📋 **Logging** | 2 | `start_log_capture` · `stop_log_capture` |
@@ -177,7 +177,7 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 - **bundle_id** — app bundle identifier
 - **configuration** — Debug / Release
 
-A typical session starts with `discover_projects → list_schemes → session_set_defaults`, after which tools like `build_simulator`, `test_simulator`, and `launch_app` pick up the context automatically.
+A typical session starts with `discover_projects → list_schemes → session_set_defaults`, after which tools like `build_simulator`, `test_simulator`, and `launch_app` pick up the context automatically. Use `show_session` to inspect current defaults and `clear_session` to reset them.
 
 Some tools auto-set defaults as a side effect:
 - `show_build_settings` → `bundle_id`
@@ -235,7 +235,7 @@ Verdict: SUPPORTED — all checks passed.
 | Module | Role |
 |--------|------|
 | **Core** | Tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, log capture, LLDB sessions, video recording |
-| **Tools** | 55 tool implementations across 12 categories |
+| **Tools** | 65 tool implementations across 12 categories |
 | **IosMcp** | Executable entry point — MCP server, ArgumentParser routing, `doctor` |
 
 See [AGENTS.md](AGENTS.md) for contributor guidance including coding conventions, error handling patterns, and detailed type documentation.

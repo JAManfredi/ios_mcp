@@ -145,12 +145,12 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 - Integration tests in `IntegrationTests` gated with `CI_INTEGRATION` environment variable.
 - Prefer testing through public interfaces over internal implementation details.
 
-## Tool Categories (55 tools)
+## Tool Categories (65 tools)
 
 | Category | Directory | Count | Tools |
 |----------|-----------|-------|-------|
 | Project Discovery | `Tools/ProjectDiscovery/` | 3 | `discover_projects`, `list_schemes`, `show_build_settings` |
-| Simulator | `Tools/Simulator/` | 5 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `session_set_defaults` |
+| Simulator | `Tools/Simulator/` | 15 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `session_set_defaults`, `simulate_location`, `clear_location`, `set_appearance`, `override_status_bar`, `show_session`, `clear_session`, `manage_privacy`, `send_push_notification`, `get_app_container`, `uninstall_app` |
 | Build | `Tools/Build/` | 8 | `build_simulator`, `build_run_simulator`, `test_simulator`, `launch_app`, `stop_app`, `clean_derived_data`, `inspect_xcresult`, `list_crash_logs` |
 | Logging | `Tools/Logging/` | 2 | `start_log_capture`, `stop_log_capture` |
 | UI Automation | `Tools/UIAutomation/` | 10 | `screenshot`, `inspect_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press`, `start_recording`, `stop_recording` |

@@ -64,7 +64,7 @@
   <g transform="translate(300, 135)">
     <rect width="70" height="22" rx="11" fill="url(#accent)" opacity="0.2"/>
     <rect width="70" height="22" rx="11" stroke="url(#accent)" stroke-width="1" fill="none" opacity="0.4"/>
-    <text x="35" y="15" font-family="SF Mono, Menlo, monospace" font-size="11" fill="#007AFF" text-anchor="middle" font-weight="600">55 tools</text>
+    <text x="35" y="15" font-family="SF Mono, Menlo, monospace" font-size="11" fill="#007AFF" text-anchor="middle" font-weight="600">65 tools</text>
   </g>
 
   <!-- MCP badge -->

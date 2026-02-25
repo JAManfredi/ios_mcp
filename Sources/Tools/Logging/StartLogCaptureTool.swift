@@ -18,7 +18,7 @@ func registerStartLogCaptureTool(
 ) async {
     let manifest = ToolManifest(
         name: "start_log_capture",
-        description: "Start capturing logs from an iOS simulator. Returns a session ID for later retrieval with stop_log_capture. Falls back to session default for udid. Supports filtering by bundle_id, process_name, pid, subsystem, and category.",
+        description: "Start capturing logs from an iOS simulator. Returns a session ID for later retrieval with stop_log_capture. Falls back to session default simulator_udid. Supports filtering by bundle_id, process_name, pid, subsystem, and category.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(
