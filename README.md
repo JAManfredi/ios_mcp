@@ -1,16 +1,5 @@
-<p align="center">
-  <pre align="center">
-  ┌─────────────────────────────────────────────┐
-  │                                             │
-  │   ╦╔═╗╔═╗   ╔╦╗╔═╗╔═╗                     │
-  │   ║║ ║╚═╗───║║║║  ╠═╝                      │
-  │   ╩╚═╝╚═╝   ╩ ╩╚═╝╩                        │
-  │                                             │
-  │   headless iOS dev, straight from the CLI   │
-  │                                             │
-  └─────────────────────────────────────────────┘
-  </pre>
-</p>
+<h1 align="center">ios-mcp</h1>
+<p align="center"><i>headless iOS dev, straight from the CLI</i></p>
 
 <p align="center">
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-Compatible-blue?style=flat-square" alt="MCP Compatible"></a>
