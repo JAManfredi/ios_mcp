@@ -23,6 +23,7 @@ public actor SessionStore {
         case configuration
         case derivedDataPath = "derived_data_path"
         case deploymentTarget = "deployment_target"
+        case deviceUDID = "device_udid"
     }
 
     /// Get a session default.

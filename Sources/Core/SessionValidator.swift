@@ -71,6 +71,57 @@ public struct DefaultsValidator: Sendable {
         }
     }
 
+    /// Validates that a device UDID exists in `devicectl list devices`.
+    /// Returns nil if valid or if devicectl fails (graceful degradation).
+    public func validateDeviceUDID(_ udid: String) async -> ToolError? {
+        do {
+            let result = try await executor.execute(
+                executable: "/usr/bin/xcrun",
+                arguments: ["devicectl", "list", "devices", "--json-output", "-"],
+                timeout: 15,
+                environment: nil
+            )
+
+            guard result.succeeded, let data = result.stdout.data(using: .utf8) else {
+                return nil
+            }
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let resultObj = json["result"] as? [String: Any],
+                  let devices = resultObj["devices"] as? [[String: Any]] else {
+                return nil
+            }
+
+            let found = devices.contains { device in
+                if let identifier = device["identifier"] as? String {
+                    return identifier == udid
+                }
+                if let hardwareProps = device["hardwareProperties"] as? [String: Any],
+                   let identifier = hardwareProps["udid"] as? String {
+                    return identifier == udid
+                }
+                return false
+            }
+
+            if found { return nil }
+
+            let candidates = devices.prefix(5).compactMap { device -> String? in
+                let id = device["identifier"] as? String ?? "?"
+                let name = (device["deviceProperties"] as? [String: Any])?["name"] as? String ?? "Unknown"
+                return "  \(id) — \(name)"
+            }.joined(separator: "\n")
+            let details: String? = candidates.isEmpty ? nil : "Connected devices:\n\(candidates)"
+
+            return ToolError(
+                code: .staleDefault,
+                message: "Device UDID '\(udid)' not found in connected devices. Run list_devices to pick a valid device, then session_set_defaults to update.",
+                details: details
+            )
+        } catch {
+            return nil
+        }
+    }
+
     /// Validates that a filesystem path exists and is within allowed roots.
     /// Returns nil if valid, ToolError if outside policy or missing.
     public func validatePathExists(

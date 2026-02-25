@@ -18,15 +18,18 @@ public func registerAllTools(
     logCapture: any LogCapturing,
     debugSession: any DebugSessionManaging,
     validator: DefaultsValidator,
+    videoRecording: any VideoRecording,
     progressReporter: ProgressReporter? = nil
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
     await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
     await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency, validator: validator)
-    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
+    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator, videoRecording: videoRecording)
     await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency, validator: validator)
     await registerInspectionTools(with: registry, session: session, executor: executor, validator: validator)
     await registerQualityTools(with: registry, session: session, executor: executor, validator: validator)
     await registerExtrasTools(with: registry, session: session, executor: executor, validator: validator)
+    await registerSwiftPackageTools(with: registry, session: session, executor: executor, validator: validator)
+    await registerDeviceTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
 }

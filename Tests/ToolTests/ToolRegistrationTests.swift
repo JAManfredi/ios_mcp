@@ -18,10 +18,10 @@ struct ToolRegistrationTests {
         let session = SessionStore()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 37)
+        #expect(tools.count == 55)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -61,5 +61,23 @@ struct ToolRegistrationTests {
         #expect(names.contains("lint"))
         #expect(names.contains("accessibility_audit"))
         #expect(names.contains("open_simulator"))
+        #expect(names.contains("swift_package_resolve"))
+        #expect(names.contains("swift_package_update"))
+        #expect(names.contains("swift_package_init"))
+        #expect(names.contains("swift_package_clean"))
+        #expect(names.contains("swift_package_show_deps"))
+        #expect(names.contains("swift_package_dump"))
+        #expect(names.contains("start_recording"))
+        #expect(names.contains("stop_recording"))
+        #expect(names.contains("list_devices"))
+        #expect(names.contains("build_device"))
+        #expect(names.contains("build_run_device"))
+        #expect(names.contains("test_device"))
+        #expect(names.contains("install_app_device"))
+        #expect(names.contains("launch_app_device"))
+        #expect(names.contains("stop_app_device"))
+        #expect(names.contains("device_screenshot"))
+        #expect(names.contains("inspect_xcresult"))
+        #expect(names.contains("list_crash_logs"))
     }
 }

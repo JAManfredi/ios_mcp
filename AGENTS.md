@@ -10,8 +10,8 @@ ios-mcp is a Model Context Protocol (MCP) server that gives Claude Code full con
 
 | Module | Role |
 |--------|------|
-| **Core** | Shared infrastructure — tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, next-step resolution, log capture management, LLDB session management |
-| **Tools** | 37 tool implementations grouped into 9 categories. Each subdirectory maps to a tool category. |
+| **Core** | Shared infrastructure — tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, next-step resolution, log capture management, LLDB session management, video recording management |
+| **Tools** | 55 tool implementations grouped into 12 categories. Each subdirectory maps to a tool category. |
 | **IosMcp** | Executable entry point — MCP server startup, ArgumentParser routing, `doctor` diagnostic command |
 
 ### How Tools Work
@@ -32,7 +32,8 @@ ios-mcp is a Model Context Protocol (MCP) server that gives Claude Code full con
 | `ToolResult` | Content string + optional artifact references + next steps |
 | `ToolError` | Typed error with `ErrorCode`, message, and optional details |
 | `CommandExecutor` | Async `Process` wrapper — arg arrays only, no shell execution. Applies `Redactor` automatically. Supports cancellation. |
-| `SessionStore` | Actor holding session-scoped defaults (simulator UDID, workspace, scheme, bundle ID, configuration, derived data path) |
+| `SessionStore` | Actor holding session-scoped defaults (simulator UDID, device UDID, workspace, scheme, bundle ID, configuration, derived data path) |
+| `VideoRecordingManager` | Actor managing background `simctl io recordVideo` processes. Uses SIGINT for graceful MP4 finalization. |
 | `ConcurrencyPolicy` | Actor-based resource locking — prevents conflicting operations on the same resource |
 | `ArtifactStore` | File-backed storage for screenshots, logs, and transient outputs. TTL-based eviction + size cap. Periodic stale directory cleanup. |
 | `DefaultsValidator` | Validates session defaults (UDIDs, paths) against actual system state. Returns `stale_default` errors. |
@@ -84,7 +85,7 @@ Every successful `ToolResult` includes a `nextSteps` array of `NextStep(tool:des
 - `build_run_sim` → `screenshot`, `snapshot_ui`, `start_log_capture`, `debug_attach`
 - `debug_attach` → `debug_breakpoint_add`, `debug_stack`, `debug_variables`
 
-All 37 tools have next-step mappings.
+All 55 tools have next-step mappings.
 
 ### LLDB Denylist
 
@@ -118,7 +119,7 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 ## Coding Conventions
 
 ### Swift Concurrency
-- All shared mutable state lives in **actors** (`SessionStore`, `ToolRegistry`, `ConcurrencyPolicy`, `ArtifactStore`, `LLDBSessionManager`, `LogCaptureManager`).
+- All shared mutable state lives in **actors** (`SessionStore`, `ToolRegistry`, `ConcurrencyPolicy`, `ArtifactStore`, `LLDBSessionManager`, `LogCaptureManager`, `VideoRecordingManager`).
 - Tool handlers are `@Sendable` async closures.
 - Target Swift 6 strict concurrency — no data races.
 
@@ -144,18 +145,20 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 - Integration tests in `IntegrationTests` gated with `CI_INTEGRATION` environment variable.
 - Prefer testing through public interfaces over internal implementation details.
 
-## Tool Categories (37 tools)
+## Tool Categories (55 tools)
 
 | Category | Directory | Count | Tools |
 |----------|-----------|-------|-------|
 | Project Discovery | `Tools/ProjectDiscovery/` | 3 | `discover_projects`, `list_schemes`, `show_build_settings` |
 | Simulator | `Tools/Simulator/` | 5 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `session_set_defaults` |
-| Build | `Tools/Build/` | 6 | `build_sim`, `build_run_sim`, `test_sim`, `launch_app`, `stop_app`, `clean_derived_data` |
+| Build | `Tools/Build/` | 8 | `build_sim`, `build_run_sim`, `test_sim`, `launch_app`, `stop_app`, `clean_derived_data`, `inspect_xcresult`, `list_crash_logs` |
 | Logging | `Tools/Logging/` | 2 | `start_log_capture`, `stop_log_capture` |
-| UI Automation | `Tools/UIAutomation/` | 8 | `screenshot`, `snapshot_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press` |
+| UI Automation | `Tools/UIAutomation/` | 10 | `screenshot`, `snapshot_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press`, `start_recording`, `stop_recording` |
 | Debugging | `Tools/Debugging/` | 8 | `debug_attach`, `debug_detach`, `debug_breakpoint_add`, `debug_breakpoint_remove`, `debug_continue`, `debug_stack`, `debug_variables`, `debug_lldb_command` |
 | Inspection | `Tools/Inspection/` | 2 | `read_user_defaults`, `write_user_default` |
 | Quality | `Tools/Quality/` | 2 | `lint`, `accessibility_audit` |
+| Swift Package | `Tools/SwiftPackage/` | 6 | `swift_package_resolve`, `swift_package_update`, `swift_package_init`, `swift_package_clean`, `swift_package_show_deps`, `swift_package_dump` |
+| Device | `Tools/Device/` | 8 | `list_devices`, `build_device`, `build_run_device`, `test_device`, `install_app_device`, `launch_app_device`, `stop_app_device`, `device_screenshot` |
 | Extras | `Tools/Extras/` | 1 | `open_simulator` |
 
 ## Workflow Examples
@@ -208,3 +211,41 @@ start_log_capture → [interact with app] → stop_log_capture
 1. Start capturing logs with optional subsystem/category/process filters
 2. Perform app interactions (tap, type, navigate)
 3. Stop capture and retrieve filtered log entries with timestamps
+
+### Device Workflow
+
+```
+list_devices → session_set_defaults → build_device → install_app_device → launch_app_device → device_screenshot
+```
+
+1. List connected physical devices (auto-sets session device UDID if exactly one)
+2. Set device UDID, workspace, and scheme as session defaults
+3. Build for the physical device (requires valid code signing)
+4. Install the app on the device
+5. Launch the app
+6. Capture a screenshot from the device
+
+### Swift Package Management
+
+```
+swift_package_show_deps → swift_package_resolve → swift_package_update
+```
+
+1. Show the dependency tree in JSON format
+2. Resolve package dependencies
+3. Update packages to latest compatible versions
+
+## Installation
+
+### Homebrew (build from source)
+
+```bash
+brew install --build-from-source Formula/ios-mcp.rb
+```
+
+### Manual
+
+```bash
+make build
+make install  # installs to /usr/local/bin
+```
