@@ -11,7 +11,7 @@ ios-mcp is a Model Context Protocol (MCP) server that gives Claude Code full con
 | Module | Role |
 |--------|------|
 | **Core** | Shared infrastructure — tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, next-step resolution, log capture management, LLDB session management, video recording management |
-| **Tools** | 55 tool implementations grouped into 12 categories. Each subdirectory maps to a tool category. |
+| **Tools** | 65 tool implementations grouped into 12 categories. Each subdirectory maps to a tool category. |
 | **IosMcp** | Executable entry point — MCP server startup, ArgumentParser routing, `doctor` diagnostic command |
 
 ### How Tools Work
@@ -85,7 +85,7 @@ Every successful `ToolResult` includes a `nextSteps` array of `NextStep(tool:des
 - `build_run_simulator` → `screenshot`, `inspect_ui`, `start_log_capture`, `debug_attach`
 - `debug_attach` → `debug_add_breakpoint`, `debug_backtrace`, `debug_variables`
 
-All 55 tools have next-step mappings.
+All 65 tools have next-step mappings.
 
 ### LLDB Denylist
 
