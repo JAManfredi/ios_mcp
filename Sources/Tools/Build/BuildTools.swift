@@ -23,4 +23,6 @@ func registerBuildTools(
     await registerStopAppTool(with: registry, session: session, executor: executor, validator: validator)
     await registerTestSimTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
     await registerCleanDerivedDataTool(with: registry, session: session)
+    await registerInspectXCResultTool(with: registry, executor: executor, artifacts: artifacts)
+    await registerCrashLogTool(with: registry, session: session, executor: executor, validator: validator)
 }

@@ -15,10 +15,11 @@ struct NextStepResolverTests {
     @Test("Resolves build_sim next steps")
     func resolvesBuildSimNextSteps() {
         let steps = NextStepResolver.resolve(for: "build_sim")
-        #expect(steps.count == 3)
+        #expect(steps.count == 4)
         #expect(steps[0].tool == "build_run_sim")
         #expect(steps[1].tool == "test_sim")
         #expect(steps[2].tool == "launch_app")
+        #expect(steps[3].tool == "inspect_xcresult")
     }
 
     @Test("Resolves discover_projects next steps")
@@ -67,7 +68,7 @@ struct NextStepResolverTests {
     func sessionAwareEmptySessionReturnsNoContext() async {
         let session = SessionStore()
         let steps = await NextStepResolver.resolve(for: "build_sim", session: session)
-        #expect(steps.count == 3)
+        #expect(steps.count == 4)
         #expect(steps[0].context.isEmpty)
     }
 
@@ -78,7 +79,7 @@ struct NextStepResolverTests {
         #expect(steps.isEmpty)
     }
 
-    @Test("All 37 registered tools have next steps")
+    @Test("All registered tools have next steps")
     func allRegisteredToolsHaveNextSteps() {
         let allToolNames: Set<String> = [
             "discover_projects", "list_schemes", "show_build_settings",
@@ -96,6 +97,15 @@ struct NextStepResolverTests {
             "read_user_defaults", "write_user_default",
             "accessibility_audit", "lint",
             "open_simulator",
+            "swift_package_resolve", "swift_package_update",
+            "swift_package_init", "swift_package_clean",
+            "swift_package_show_deps", "swift_package_dump",
+            "start_recording", "stop_recording",
+            "list_devices", "build_device", "build_run_device",
+            "test_device", "install_app_device", "launch_app_device",
+            "stop_app_device", "device_screenshot",
+            "inspect_xcresult",
+            "list_crash_logs",
         ]
 
         for toolName in allToolNames {

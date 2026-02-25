@@ -52,6 +52,7 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "build_run_sim", description: "Build and run the app on simulator"),
             NextStep(tool: "test_sim", description: "Run tests on simulator"),
             NextStep(tool: "launch_app", description: "Launch the built app"),
+            NextStep(tool: "inspect_xcresult", description: "Inspect build results in detail"),
         ],
         "build_run_sim": [
             NextStep(tool: "screenshot", description: "Take a screenshot of the running app"),
@@ -62,6 +63,7 @@ public struct NextStepResolver: Sendable {
         "test_sim": [
             NextStep(tool: "build_sim", description: "Rebuild after fixing test failures"),
             NextStep(tool: "lint", description: "Run linter on the project"),
+            NextStep(tool: "inspect_xcresult", description: "Inspect test results in detail"),
         ],
         "launch_app": [
             NextStep(tool: "screenshot", description: "Take a screenshot of the running app"),
@@ -180,6 +182,87 @@ public struct NextStepResolver: Sendable {
         "open_simulator": [
             NextStep(tool: "screenshot", description: "Take a screenshot of the visible simulator"),
         ],
+
+        // Swift Package
+        "swift_package_resolve": [
+            NextStep(tool: "build_sim", description: "Build the project after resolving dependencies"),
+            NextStep(tool: "swift_package_show_deps", description: "View the dependency tree"),
+        ],
+        "swift_package_update": [
+            NextStep(tool: "build_sim", description: "Build the project after updating dependencies"),
+            NextStep(tool: "swift_package_show_deps", description: "View the updated dependency tree"),
+        ],
+        "swift_package_init": [
+            NextStep(tool: "swift_package_resolve", description: "Resolve dependencies for the new package"),
+            NextStep(tool: "swift_package_dump", description: "Inspect the generated Package.swift"),
+        ],
+        "swift_package_clean": [
+            NextStep(tool: "swift_package_resolve", description: "Re-resolve dependencies after cleaning"),
+            NextStep(tool: "build_sim", description: "Rebuild the project from clean state"),
+        ],
+        "swift_package_show_deps": [
+            NextStep(tool: "swift_package_update", description: "Update dependencies to latest versions"),
+            NextStep(tool: "swift_package_resolve", description: "Resolve dependencies"),
+        ],
+        "swift_package_dump": [
+            NextStep(tool: "swift_package_show_deps", description: "View the dependency tree"),
+            NextStep(tool: "build_sim", description: "Build the project"),
+        ],
+
+        // Video Recording
+        "start_recording": [
+            NextStep(tool: "stop_recording", description: "Stop recording and retrieve the video"),
+        ],
+        "stop_recording": [
+            NextStep(tool: "screenshot", description: "Take a screenshot for comparison"),
+            NextStep(tool: "start_recording", description: "Start a new recording"),
+        ],
+
+        // Device
+        "list_devices": [
+            NextStep(tool: "session_set_defaults", description: "Set device UDID as session default"),
+            NextStep(tool: "build_device", description: "Build for a connected device"),
+        ],
+        "build_device": [
+            NextStep(tool: "build_run_device", description: "Build, install, and launch on device"),
+            NextStep(tool: "test_device", description: "Run tests on device"),
+            NextStep(tool: "install_app_device", description: "Install the built app on device"),
+        ],
+        "build_run_device": [
+            NextStep(tool: "device_screenshot", description: "Take a screenshot from the device"),
+            NextStep(tool: "stop_app_device", description: "Stop the app on device"),
+        ],
+        "test_device": [
+            NextStep(tool: "build_device", description: "Rebuild after fixing test failures"),
+            NextStep(tool: "inspect_xcresult", description: "Inspect test results in detail"),
+        ],
+        "install_app_device": [
+            NextStep(tool: "launch_app_device", description: "Launch the installed app"),
+        ],
+        "launch_app_device": [
+            NextStep(tool: "device_screenshot", description: "Take a screenshot from the device"),
+            NextStep(tool: "stop_app_device", description: "Stop the app on device"),
+        ],
+        "stop_app_device": [
+            NextStep(tool: "launch_app_device", description: "Relaunch the app"),
+            NextStep(tool: "build_device", description: "Rebuild the app"),
+        ],
+        "device_screenshot": [
+            NextStep(tool: "launch_app_device", description: "Launch a different screen"),
+            NextStep(tool: "stop_app_device", description: "Stop the app"),
+        ],
+
+        // XCResult Inspection
+        "inspect_xcresult": [
+            NextStep(tool: "build_sim", description: "Rebuild after fixing issues"),
+            NextStep(tool: "test_sim", description: "Re-run tests"),
+        ],
+
+        // Crash Log Analysis
+        "list_crash_logs": [
+            NextStep(tool: "debug_attach", description: "Attach debugger to investigate"),
+            NextStep(tool: "build_sim", description: "Rebuild after fixing crash"),
+        ],
     ]
 
     /// Returns the suggested next steps for a tool, or an empty array if unknown.
@@ -223,6 +306,8 @@ public struct NextStepResolver: Sendable {
         let needsWorkspace: Set<String> = [
             "list_schemes", "show_build_settings", "build_sim", "build_run_sim",
             "test_sim", "clean_derived_data", "lint",
+            "swift_package_resolve", "swift_package_update", "swift_package_clean",
+            "swift_package_show_deps", "swift_package_dump",
         ]
 
         let needsScheme: Set<String> = [
@@ -234,8 +319,17 @@ public struct NextStepResolver: Sendable {
             "debug_attach",
         ]
 
+        let needsDevice: Set<String> = [
+            "build_device", "build_run_device", "test_device",
+            "install_app_device", "launch_app_device", "stop_app_device",
+            "device_screenshot",
+        ]
+
         if needsSimulator.contains(toolName), let udid = defaults[.simulatorUDID] {
             ctx["simulator_udid"] = udid
+        }
+        if needsDevice.contains(toolName), let udid = defaults[.deviceUDID] {
+            ctx["device_udid"] = udid
         }
         if needsWorkspace.contains(toolName) {
             if let ws = defaults[.workspace] {

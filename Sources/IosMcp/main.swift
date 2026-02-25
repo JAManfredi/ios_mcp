@@ -41,6 +41,7 @@ private func startServer() async throws {
     )
     let logCapture = LogCaptureManager()
     let debugSession = LLDBSessionManager()
+    let videoRecording = VideoRecordingManager()
     try? await artifacts.cleanupStaleDirectories()
 
     let pathPolicy = PathPolicy()
@@ -63,7 +64,7 @@ private func startServer() async throws {
     }
 
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, progressReporter: progressReporter)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, progressReporter: progressReporter)
 
     await server.withMethodHandler(ListTools.self) { _ in
         let manifests = await registry.listTools()
@@ -146,6 +147,7 @@ private func startServer() async throws {
     // Cleanup: tear down active sessions, log captures, and locks
     await debugSession.teardownAll()
     await logCapture.stopAll()
+    await videoRecording.stopAll()
     await concurrency.releaseAll()
     logger.info("ios-mcp server shut down")
 }
@@ -283,6 +285,24 @@ struct Doctor: AsyncParsableCommand {
             }
         case .failure:
             print("[--] axe: not found — UI automation tools will be unavailable")
+            optionalFailed = true
+        }
+
+        // devicectl (optional — for physical device support)
+        do {
+            let result = try await executor.execute(
+                executable: "/usr/bin/xcrun",
+                arguments: ["devicectl", "list", "devices", "--json-output", "-"],
+                timeout: 10
+            )
+            if result.succeeded {
+                print("[ok] devicectl: available (physical device support)")
+            } else {
+                print("[--] devicectl: not available — physical device tools will be unavailable")
+                optionalFailed = true
+            }
+        } catch {
+            print("[--] devicectl: check failed — \(error)")
             optionalFailed = true
         }
 

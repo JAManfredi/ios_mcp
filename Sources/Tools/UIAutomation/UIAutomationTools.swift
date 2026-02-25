@@ -8,13 +8,15 @@
 import Core
 
 /// Registers all UI automation tools: screenshot, deep_link,
-/// snapshot_ui, tap, swipe, type_text, key_press, long_press.
+/// snapshot_ui, tap, swipe, type_text, key_press, long_press,
+/// start_recording, stop_recording.
 func registerUIAutomationTools(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
     artifacts: ArtifactStore,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    videoRecording: any VideoRecording
 ) async {
     await registerScreenshotTool(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
     await registerDeepLinkTool(with: registry, session: session, executor: executor, validator: validator)
@@ -24,4 +26,6 @@ func registerUIAutomationTools(
     await registerTypeTextTool(with: registry, session: session, executor: executor, validator: validator)
     await registerKeyPressTool(with: registry, session: session, executor: executor, validator: validator)
     await registerLongPressTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerStartRecordingTool(with: registry, session: session, videoRecording: videoRecording, validator: validator)
+    await registerStopRecordingTool(with: registry, videoRecording: videoRecording, artifacts: artifacts)
 }

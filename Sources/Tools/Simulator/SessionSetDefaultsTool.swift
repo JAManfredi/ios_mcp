@@ -46,6 +46,10 @@ func registerSessionSetDefaultsTool(
                     type: "string",
                     description: "Custom derived data path."
                 ),
+                "device_udid": .init(
+                    type: "string",
+                    description: "Physical device UDID to use as default."
+                ),
             ]
         ),
         category: .simulator
@@ -60,6 +64,7 @@ func registerSessionSetDefaultsTool(
             ("bundle_id", .bundleID),
             ("configuration", .configuration),
             ("derived_data_path", .derivedDataPath),
+            ("device_udid", .deviceUDID),
         ]
 
         // Validate UDID before setting
