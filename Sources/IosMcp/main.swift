@@ -17,7 +17,7 @@ struct IosMcpCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "ios-mcp",
         abstract: "MCP server for headless iOS development",
-        version: "0.1.0",
+        version: "0.2.0",
         subcommands: [Doctor.self],
         defaultSubcommand: nil
     )
@@ -49,7 +49,7 @@ private func startServer() async throws {
 
     let server = Server(
         name: "ios-mcp",
-        version: "0.1.0",
+        version: "0.2.0",
         capabilities: .init(tools: .init())
     )
 
@@ -326,7 +326,7 @@ struct Doctor: AsyncParsableCommand {
         }
 
         // Version
-        print("[ok] ios-mcp version: 0.1.0")
+        print("[ok] ios-mcp version: 0.2.0")
 
         // Verdict
         if requiredFailed {
