@@ -1,4 +1,4 @@
-name: debug_breakpoint_remove
+name: debug_remove_breakpoint
 description: "Remove a breakpoint by its ID from the attached LLDB session."
 category: debugging
 input:
@@ -30,7 +30,7 @@ cancellation: "LLDB command abandoned"
 dependencies: []
 sessionDefaults: []
 nextSteps:
-  - tool: debug_breakpoint_add
+  - tool: debug_add_breakpoint
     description: "Add a different breakpoint"
-  - tool: debug_continue
+  - tool: debug_resume
     description: "Continue execution"

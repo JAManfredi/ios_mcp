@@ -45,7 +45,7 @@ timeout:
 dependencies: []
 sessionDefaults: []
 nextSteps:
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build the project with updated defaults"
   - tool: list_simulators
     description: "List available simulators"

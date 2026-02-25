@@ -36,5 +36,5 @@ sessionDefaults:
 nextSteps:
   - tool: screenshot
     description: "Take a screenshot after navigation"
-  - tool: snapshot_ui
+  - tool: inspect_ui
     description: "Capture the accessibility tree after navigation"

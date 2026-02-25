@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("snapshot_ui")
+@Suite("inspect_ui")
 struct SnapshotUIToolTests {
 
     @Test("Returns accessibility tree content")
@@ -25,7 +25,7 @@ struct SnapshotUIToolTests {
         await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
-            name: "snapshot_ui",
+            name: "inspect_ui",
             arguments: ["udid": .string("AAAA-1111")]
         )
 
@@ -51,7 +51,7 @@ struct SnapshotUIToolTests {
 
         await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
-        let response = try await registry.callTool(name: "snapshot_ui", arguments: [:])
+        let response = try await registry.callTool(name: "inspect_ui", arguments: [:])
 
         if case .success = response {
             let capturedArgs = await capture.lastArgs
@@ -69,7 +69,7 @@ struct SnapshotUIToolTests {
 
         await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
-        let response = try await registry.callTool(name: "snapshot_ui", arguments: [:])
+        let response = try await registry.callTool(name: "inspect_ui", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -88,7 +88,7 @@ struct SnapshotUIToolTests {
         await registerSnapshotUITool(with: registry, session: session, executor: executor, axePath: "/usr/local/bin/axe", validator: testValidator())
 
         let response = try await registry.callTool(
-            name: "snapshot_ui",
+            name: "inspect_ui",
             arguments: ["udid": .string("AAAA-1111")]
         )
 

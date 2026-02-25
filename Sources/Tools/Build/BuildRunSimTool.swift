@@ -19,7 +19,7 @@ func registerBuildRunSimTool(
     progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
-        name: "build_run_sim",
+        name: "build_run_simulator",
         description: "Build, install, and launch an app on the iOS Simulator. Falls back to session defaults for workspace, project, scheme, configuration, udid, and derived_data_path. Automatically resolves the app path from build settings and sets session bundle_id.",
         inputSchema: JSONSchema(
             properties: [
@@ -73,7 +73,7 @@ func registerBuildRunSimTool(
 
         return await concurrency.withLock(
             key: resolved.lockKey,
-            owner: "build_run_sim"
+            owner: "build_run_simulator"
         ) {
             do {
                 let overallStart = ContinuousClock.now

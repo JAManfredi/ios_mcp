@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("test_sim")
+@Suite("test_simulator")
 struct TestSimToolTests {
 
     private let testResultJSON = """
@@ -61,7 +61,7 @@ struct TestSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "test_sim", arguments: [:])
+        let response = try await registry.callTool(name: "test_simulator", arguments: [:])
 
         if case .success(let result) = response {
             #expect(result.content.contains("Tests passed"))
@@ -99,7 +99,7 @@ struct TestSimToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         _ = try await registry.callTool(
-            name: "test_sim",
+            name: "test_simulator",
             arguments: [
                 "only_testing": .string("MyTests/testFoo,MyTests/testBar"),
                 "skip_testing": .string("MyTests/testSlow"),
@@ -130,7 +130,7 @@ struct TestSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "test_sim", arguments: [:])
+        let response = try await registry.callTool(name: "test_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .resourceBusy)
@@ -156,7 +156,7 @@ struct TestSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "test_sim", arguments: [:])
+        let response = try await registry.callTool(name: "test_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)

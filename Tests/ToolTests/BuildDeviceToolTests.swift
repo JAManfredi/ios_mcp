@@ -12,7 +12,7 @@ import Testing
 
 @testable import Tools
 
-@Suite("build_device")
+@Suite("build_for_device")
 struct BuildDeviceToolTests {
 
     @Test("Builds for device with session defaults")
@@ -42,7 +42,7 @@ struct BuildDeviceToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-\(UUID())")), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: deviceValidator, videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_device", arguments: [:])
+        let response = try await registry.callTool(name: "build_for_device", arguments: [:])
 
         if case .success(let result) = response {
             #expect(result.content.contains("Device build succeeded"))
@@ -77,7 +77,7 @@ struct BuildDeviceToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-\(UUID())")), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: deviceValidator, videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_device", arguments: [:])
+        let response = try await registry.callTool(name: "build_for_device", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)

@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("debug_lldb_command")
+@Suite("debug_run_command")
 struct DebugLLDBCommandToolTests {
 
     @Test("Executes allowed command")
@@ -29,7 +29,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-cmd1"),
                 "command": .string("po self.view"),
@@ -56,7 +56,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-cmd2"),
                 "command": .string("platform shell ls"),
@@ -86,7 +86,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-cmd3"),
                 "command": .string("platform shell ls"),
@@ -118,7 +118,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-flag"),
                 "command": .string("memory write 0x1000 0xFF"),
@@ -150,7 +150,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-noflag"),
                 "command": .string("bt"),
@@ -173,7 +173,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: ["session_id": .string("any")]
         )
 
@@ -193,7 +193,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: ["command": .string("bt")]
         )
 
@@ -220,7 +220,7 @@ struct DebugLLDBCommandToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         _ = try await registry.callTool(
-            name: "debug_lldb_command",
+            name: "debug_run_command",
             arguments: [
                 "session_id": .string("dbg-audit"),
                 "command": .string("thread info"),

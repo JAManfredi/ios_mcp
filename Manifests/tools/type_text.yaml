@@ -53,7 +53,7 @@ dependencies:
 sessionDefaults:
   - simulator_udid
 nextSteps:
-  - tool: snapshot_ui
+  - tool: inspect_ui
     description: "Capture UI state after typing"
   - tool: screenshot
     description: "Take a screenshot after typing"

@@ -1,4 +1,4 @@
-name: debug_continue
+name: debug_resume
 description: "Resume execution in the attached LLDB session. Returns stop reason if a breakpoint is hit."
 category: debugging
 input:
@@ -27,7 +27,7 @@ cancellation: "LLDB process interrupted; target may still be running"
 dependencies: []
 sessionDefaults: []
 nextSteps:
-  - tool: debug_stack
+  - tool: debug_backtrace
     description: "View the call stack"
   - tool: debug_variables
     description: "Inspect frame variables"

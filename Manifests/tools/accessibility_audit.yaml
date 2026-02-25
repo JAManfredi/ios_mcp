@@ -32,7 +32,7 @@ dependencies:
 sessionDefaults:
   - simulator_udid
 nextSteps:
-  - tool: snapshot_ui
+  - tool: inspect_ui
     description: "Inspect the accessibility tree for details"
   - tool: screenshot
     description: "Take a screenshot for context"

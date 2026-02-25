@@ -40,7 +40,7 @@ sessionDefaults:
 nextSteps:
   - tool: screenshot
     description: "Take a screenshot of the running app"
-  - tool: snapshot_ui
+  - tool: inspect_ui
     description: "Capture the accessibility tree"
   - tool: start_log_capture
     description: "Start capturing app logs"

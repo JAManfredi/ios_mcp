@@ -16,7 +16,7 @@ func registerDebugLLDBCommandTool(
     let logger = Logger(label: "ios-mcp.lldb-audit")
 
     let manifest = ToolManifest(
-        name: "debug_lldb_command",
+        name: "debug_run_command",
         description: "Execute an arbitrary LLDB command in the attached session. Commands are checked against a denylist for safety. Set allow_unsafe to bypass the denylist (response will be marked accordingly).",
         inputSchema: JSONSchema(
             properties: [

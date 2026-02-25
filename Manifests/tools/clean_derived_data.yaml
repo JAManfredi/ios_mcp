@@ -29,5 +29,5 @@ dependencies: []
 sessionDefaults:
   - derived_data_path
 nextSteps:
-  - tool: build_sim
+  - tool: build_simulator
     description: "Rebuild from clean state"

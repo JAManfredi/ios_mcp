@@ -18,10 +18,10 @@ public struct NextStepResolver: Sendable {
         ],
         "list_schemes": [
             NextStep(tool: "session_set_defaults", description: "Set scheme as session default"),
-            NextStep(tool: "build_sim", description: "Build the project for simulator"),
+            NextStep(tool: "build_simulator", description: "Build the project for simulator"),
         ],
         "show_build_settings": [
-            NextStep(tool: "build_sim", description: "Build the project for simulator"),
+            NextStep(tool: "build_simulator", description: "Build the project for simulator"),
             NextStep(tool: "session_set_defaults", description: "Update session defaults based on settings"),
         ],
 
@@ -31,7 +31,7 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "boot_simulator", description: "Boot a simulator device"),
         ],
         "boot_simulator": [
-            NextStep(tool: "build_sim", description: "Build an app for the booted simulator"),
+            NextStep(tool: "build_simulator", description: "Build an app for the booted simulator"),
             NextStep(tool: "launch_app", description: "Launch an already-built app"),
             NextStep(tool: "screenshot", description: "Take a screenshot of the simulator"),
         ],
@@ -43,48 +43,48 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "boot_simulator", description: "Boot the erased simulator"),
         ],
         "session_set_defaults": [
-            NextStep(tool: "build_sim", description: "Build the project with updated defaults"),
+            NextStep(tool: "build_simulator", description: "Build the project with updated defaults"),
             NextStep(tool: "list_simulators", description: "List available simulators"),
         ],
 
         // Build & Run
-        "build_sim": [
-            NextStep(tool: "build_run_sim", description: "Build and run the app on simulator"),
-            NextStep(tool: "test_sim", description: "Run tests on simulator"),
+        "build_simulator": [
+            NextStep(tool: "build_run_simulator", description: "Build and run the app on simulator"),
+            NextStep(tool: "test_simulator", description: "Run tests on simulator"),
             NextStep(tool: "launch_app", description: "Launch the built app"),
             NextStep(tool: "inspect_xcresult", description: "Inspect build results in detail"),
         ],
-        "build_run_sim": [
+        "build_run_simulator": [
             NextStep(tool: "screenshot", description: "Take a screenshot of the running app"),
-            NextStep(tool: "snapshot_ui", description: "Capture the accessibility tree"),
+            NextStep(tool: "inspect_ui", description: "Capture the accessibility tree"),
             NextStep(tool: "start_log_capture", description: "Start capturing app logs"),
             NextStep(tool: "debug_attach", description: "Attach debugger to the running app"),
         ],
-        "test_sim": [
-            NextStep(tool: "build_sim", description: "Rebuild after fixing test failures"),
+        "test_simulator": [
+            NextStep(tool: "build_simulator", description: "Rebuild after fixing test failures"),
             NextStep(tool: "lint", description: "Run linter on the project"),
             NextStep(tool: "inspect_xcresult", description: "Inspect test results in detail"),
         ],
         "launch_app": [
             NextStep(tool: "screenshot", description: "Take a screenshot of the running app"),
-            NextStep(tool: "snapshot_ui", description: "Capture the accessibility tree"),
+            NextStep(tool: "inspect_ui", description: "Capture the accessibility tree"),
             NextStep(tool: "start_log_capture", description: "Start capturing app logs"),
             NextStep(tool: "debug_attach", description: "Attach debugger to the running app"),
         ],
         "stop_app": [
             NextStep(tool: "launch_app", description: "Relaunch the app"),
-            NextStep(tool: "build_sim", description: "Rebuild the app"),
+            NextStep(tool: "build_simulator", description: "Rebuild the app"),
         ],
         "clean_derived_data": [
-            NextStep(tool: "build_sim", description: "Rebuild from clean state"),
+            NextStep(tool: "build_simulator", description: "Rebuild from clean state"),
         ],
 
         // UI Automation
         "screenshot": [
-            NextStep(tool: "snapshot_ui", description: "Capture the accessibility tree for element inspection"),
+            NextStep(tool: "inspect_ui", description: "Capture the accessibility tree for element inspection"),
             NextStep(tool: "tap", description: "Tap a UI element"),
         ],
-        "snapshot_ui": [
+        "inspect_ui": [
             NextStep(tool: "tap", description: "Tap an element by coordinate or identifier"),
             NextStep(tool: "type_text", description: "Type text into a focused field"),
             NextStep(tool: "swipe", description: "Swipe on the screen"),
@@ -92,28 +92,28 @@ public struct NextStepResolver: Sendable {
         ],
         "deep_link": [
             NextStep(tool: "screenshot", description: "Take a screenshot after navigation"),
-            NextStep(tool: "snapshot_ui", description: "Capture the accessibility tree after navigation"),
+            NextStep(tool: "inspect_ui", description: "Capture the accessibility tree after navigation"),
         ],
         "tap": [
-            NextStep(tool: "snapshot_ui", description: "Capture UI state after tap"),
+            NextStep(tool: "inspect_ui", description: "Capture UI state after tap"),
             NextStep(tool: "screenshot", description: "Take a screenshot after tap"),
             NextStep(tool: "type_text", description: "Type text into the tapped field"),
         ],
         "swipe": [
-            NextStep(tool: "snapshot_ui", description: "Capture UI state after swipe"),
+            NextStep(tool: "inspect_ui", description: "Capture UI state after swipe"),
             NextStep(tool: "screenshot", description: "Take a screenshot after swipe"),
         ],
         "type_text": [
-            NextStep(tool: "snapshot_ui", description: "Capture UI state after typing"),
+            NextStep(tool: "inspect_ui", description: "Capture UI state after typing"),
             NextStep(tool: "screenshot", description: "Take a screenshot after typing"),
             NextStep(tool: "tap", description: "Tap another element"),
         ],
         "key_press": [
-            NextStep(tool: "snapshot_ui", description: "Capture UI state after key press"),
+            NextStep(tool: "inspect_ui", description: "Capture UI state after key press"),
             NextStep(tool: "screenshot", description: "Take a screenshot after key press"),
         ],
         "long_press": [
-            NextStep(tool: "snapshot_ui", description: "Capture UI state after long press"),
+            NextStep(tool: "inspect_ui", description: "Capture UI state after long press"),
             NextStep(tool: "screenshot", description: "Take a screenshot after long press"),
         ],
 
@@ -127,38 +127,38 @@ public struct NextStepResolver: Sendable {
 
         // Debugging
         "debug_attach": [
-            NextStep(tool: "debug_breakpoint_add", description: "Set a breakpoint"),
-            NextStep(tool: "debug_stack", description: "View the call stack"),
+            NextStep(tool: "debug_add_breakpoint", description: "Set a breakpoint"),
+            NextStep(tool: "debug_backtrace", description: "View the call stack"),
             NextStep(tool: "debug_variables", description: "Inspect frame variables"),
         ],
         "debug_detach": [
             NextStep(tool: "debug_attach", description: "Reattach to the process"),
             NextStep(tool: "stop_app", description: "Stop the app"),
         ],
-        "debug_breakpoint_add": [
-            NextStep(tool: "debug_continue", description: "Continue execution to hit the breakpoint"),
-            NextStep(tool: "debug_breakpoint_remove", description: "Remove a breakpoint"),
+        "debug_add_breakpoint": [
+            NextStep(tool: "debug_resume", description: "Continue execution to hit the breakpoint"),
+            NextStep(tool: "debug_remove_breakpoint", description: "Remove a breakpoint"),
         ],
-        "debug_breakpoint_remove": [
-            NextStep(tool: "debug_breakpoint_add", description: "Add a different breakpoint"),
-            NextStep(tool: "debug_continue", description: "Continue execution"),
+        "debug_remove_breakpoint": [
+            NextStep(tool: "debug_add_breakpoint", description: "Add a different breakpoint"),
+            NextStep(tool: "debug_resume", description: "Continue execution"),
         ],
-        "debug_continue": [
-            NextStep(tool: "debug_stack", description: "View the call stack"),
+        "debug_resume": [
+            NextStep(tool: "debug_backtrace", description: "View the call stack"),
             NextStep(tool: "debug_variables", description: "Inspect frame variables"),
             NextStep(tool: "debug_detach", description: "Detach the debugger"),
         ],
-        "debug_stack": [
+        "debug_backtrace": [
             NextStep(tool: "debug_variables", description: "Inspect variables in the current frame"),
-            NextStep(tool: "debug_lldb_command", description: "Run a custom LLDB command"),
+            NextStep(tool: "debug_run_command", description: "Run a custom LLDB command"),
         ],
         "debug_variables": [
-            NextStep(tool: "debug_lldb_command", description: "Run a custom LLDB command for deeper inspection"),
-            NextStep(tool: "debug_continue", description: "Continue execution"),
+            NextStep(tool: "debug_run_command", description: "Run a custom LLDB command for deeper inspection"),
+            NextStep(tool: "debug_resume", description: "Continue execution"),
         ],
-        "debug_lldb_command": [
+        "debug_run_command": [
             NextStep(tool: "debug_variables", description: "Inspect frame variables"),
-            NextStep(tool: "debug_continue", description: "Continue execution"),
+            NextStep(tool: "debug_resume", description: "Continue execution"),
         ],
 
         // Inspection
@@ -171,11 +171,11 @@ public struct NextStepResolver: Sendable {
 
         // Quality
         "accessibility_audit": [
-            NextStep(tool: "snapshot_ui", description: "Inspect the accessibility tree for details"),
+            NextStep(tool: "inspect_ui", description: "Inspect the accessibility tree for details"),
             NextStep(tool: "screenshot", description: "Take a screenshot for context"),
         ],
         "lint": [
-            NextStep(tool: "build_sim", description: "Build after fixing lint issues"),
+            NextStep(tool: "build_simulator", description: "Build after fixing lint issues"),
         ],
 
         // Extras
@@ -185,11 +185,11 @@ public struct NextStepResolver: Sendable {
 
         // Swift Package
         "swift_package_resolve": [
-            NextStep(tool: "build_sim", description: "Build the project after resolving dependencies"),
+            NextStep(tool: "build_simulator", description: "Build the project after resolving dependencies"),
             NextStep(tool: "swift_package_show_deps", description: "View the dependency tree"),
         ],
         "swift_package_update": [
-            NextStep(tool: "build_sim", description: "Build the project after updating dependencies"),
+            NextStep(tool: "build_simulator", description: "Build the project after updating dependencies"),
             NextStep(tool: "swift_package_show_deps", description: "View the updated dependency tree"),
         ],
         "swift_package_init": [
@@ -198,7 +198,7 @@ public struct NextStepResolver: Sendable {
         ],
         "swift_package_clean": [
             NextStep(tool: "swift_package_resolve", description: "Re-resolve dependencies after cleaning"),
-            NextStep(tool: "build_sim", description: "Rebuild the project from clean state"),
+            NextStep(tool: "build_simulator", description: "Rebuild the project from clean state"),
         ],
         "swift_package_show_deps": [
             NextStep(tool: "swift_package_update", description: "Update dependencies to latest versions"),
@@ -206,7 +206,7 @@ public struct NextStepResolver: Sendable {
         ],
         "swift_package_dump": [
             NextStep(tool: "swift_package_show_deps", description: "View the dependency tree"),
-            NextStep(tool: "build_sim", description: "Build the project"),
+            NextStep(tool: "build_simulator", description: "Build the project"),
         ],
 
         // Video Recording
@@ -221,19 +221,19 @@ public struct NextStepResolver: Sendable {
         // Device
         "list_devices": [
             NextStep(tool: "session_set_defaults", description: "Set device UDID as session default"),
-            NextStep(tool: "build_device", description: "Build for a connected device"),
+            NextStep(tool: "build_for_device", description: "Build for a connected device"),
         ],
-        "build_device": [
+        "build_for_device": [
             NextStep(tool: "build_run_device", description: "Build, install, and launch on device"),
-            NextStep(tool: "test_device", description: "Run tests on device"),
+            NextStep(tool: "test_on_device", description: "Run tests on device"),
             NextStep(tool: "install_app_device", description: "Install the built app on device"),
         ],
         "build_run_device": [
             NextStep(tool: "device_screenshot", description: "Take a screenshot from the device"),
             NextStep(tool: "stop_app_device", description: "Stop the app on device"),
         ],
-        "test_device": [
-            NextStep(tool: "build_device", description: "Rebuild after fixing test failures"),
+        "test_on_device": [
+            NextStep(tool: "build_for_device", description: "Rebuild after fixing test failures"),
             NextStep(tool: "inspect_xcresult", description: "Inspect test results in detail"),
         ],
         "install_app_device": [
@@ -245,7 +245,7 @@ public struct NextStepResolver: Sendable {
         ],
         "stop_app_device": [
             NextStep(tool: "launch_app_device", description: "Relaunch the app"),
-            NextStep(tool: "build_device", description: "Rebuild the app"),
+            NextStep(tool: "build_for_device", description: "Rebuild the app"),
         ],
         "device_screenshot": [
             NextStep(tool: "launch_app_device", description: "Launch a different screen"),
@@ -254,14 +254,14 @@ public struct NextStepResolver: Sendable {
 
         // XCResult Inspection
         "inspect_xcresult": [
-            NextStep(tool: "build_sim", description: "Rebuild after fixing issues"),
-            NextStep(tool: "test_sim", description: "Re-run tests"),
+            NextStep(tool: "build_simulator", description: "Rebuild after fixing issues"),
+            NextStep(tool: "test_simulator", description: "Re-run tests"),
         ],
 
         // Crash Log Analysis
         "list_crash_logs": [
             NextStep(tool: "debug_attach", description: "Attach debugger to investigate"),
-            NextStep(tool: "build_sim", description: "Rebuild after fixing crash"),
+            NextStep(tool: "build_simulator", description: "Rebuild after fixing crash"),
         ],
     ]
 
@@ -297,21 +297,21 @@ public struct NextStepResolver: Sendable {
 
         let needsSimulator: Set<String> = [
             "boot_simulator", "shutdown_simulator", "erase_simulator",
-            "build_sim", "build_run_sim", "test_sim", "launch_app", "stop_app",
-            "screenshot", "snapshot_ui", "deep_link", "tap", "swipe", "type_text",
+            "build_simulator", "build_run_simulator", "test_simulator", "launch_app", "stop_app",
+            "screenshot", "inspect_ui", "deep_link", "tap", "swipe", "type_text",
             "key_press", "long_press", "start_log_capture", "debug_attach",
             "accessibility_audit", "open_simulator",
         ]
 
         let needsWorkspace: Set<String> = [
-            "list_schemes", "show_build_settings", "build_sim", "build_run_sim",
-            "test_sim", "clean_derived_data", "lint",
+            "list_schemes", "show_build_settings", "build_simulator", "build_run_simulator",
+            "test_simulator", "clean_derived_data", "lint",
             "swift_package_resolve", "swift_package_update", "swift_package_clean",
             "swift_package_show_deps", "swift_package_dump",
         ]
 
         let needsScheme: Set<String> = [
-            "build_sim", "build_run_sim", "test_sim",
+            "build_simulator", "build_run_simulator", "test_simulator",
         ]
 
         let needsBundleID: Set<String> = [
@@ -320,7 +320,7 @@ public struct NextStepResolver: Sendable {
         ]
 
         let needsDevice: Set<String> = [
-            "build_device", "build_run_device", "test_device",
+            "build_for_device", "build_run_device", "test_on_device",
             "install_app_device", "launch_app_device", "stop_app_device",
             "device_screenshot",
         ]

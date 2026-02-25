@@ -29,7 +29,7 @@ cancellation: "LLDB command abandoned"
 dependencies: []
 sessionDefaults: []
 nextSteps:
-  - tool: debug_lldb_command
+  - tool: debug_run_command
     description: "Run a custom LLDB command for deeper inspection"
-  - tool: debug_continue
+  - tool: debug_resume
     description: "Continue execution"

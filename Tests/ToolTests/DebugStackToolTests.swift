@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("debug_stack")
+@Suite("debug_backtrace")
 struct DebugStackToolTests {
 
     @Test("Returns backtrace for current thread")
@@ -29,7 +29,7 @@ struct DebugStackToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_stack",
+            name: "debug_backtrace",
             arguments: ["session_id": .string("dbg-stack")]
         )
 
@@ -57,7 +57,7 @@ struct DebugStackToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_stack",
+            name: "debug_backtrace",
             arguments: [
                 "session_id": .string("dbg-stack2"),
                 "thread_id": .int(3),
@@ -80,7 +80,7 @@ struct DebugStackToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_stack",
+            name: "debug_backtrace",
             arguments: [:]
         )
 

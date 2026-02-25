@@ -35,5 +35,5 @@ sessionDefaults:
   - workspace
   - project
 nextSteps:
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build after fixing lint issues"
