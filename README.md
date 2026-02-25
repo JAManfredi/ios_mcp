@@ -1,5 +1,6 @@
-<h1 align="center">ios-mcp</h1>
-<p align="center"><i>headless iOS dev, straight from the CLI</i></p>
+<p align="center">
+  <img src="assets/banner.svg" alt="ios-mcp — headless iOS dev, straight from the CLI" width="700">
+</p>
 
 <p align="center">
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-Compatible-blue?style=flat-square" alt="MCP Compatible"></a>
