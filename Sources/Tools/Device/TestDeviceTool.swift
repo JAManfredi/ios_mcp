@@ -19,7 +19,7 @@ func registerTestDeviceTool(
     progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
-        name: "test_device",
+        name: "test_on_device",
         description: "Run tests on a physical iOS device. Falls back to session defaults. Code signing must be configured.",
         inputSchema: JSONSchema(
             properties: [
@@ -66,7 +66,7 @@ func registerTestDeviceTool(
             else { configuration = await session.get(.configuration) ?? "Debug" }
 
             let lockKey = "build:\(workspace ?? project ?? "unknown")"
-            return await concurrency.withLock(key: lockKey, owner: "test_device") {
+            return await concurrency.withLock(key: lockKey, owner: "test_on_device") {
                 var xcodebuildArgs = [String]()
                 if let workspace { xcodebuildArgs += ["-workspace", workspace] }
                 else if let project { xcodebuildArgs += ["-project", project] }

@@ -9,7 +9,7 @@ import Foundation
 import Testing
 @testable import Core
 
-/// Integration tests for snapshot_ui tool behavior with and without axe.
+/// Integration tests for inspect_ui tool behavior with and without axe.
 /// Gated behind CI_INTEGRATION.
 @Suite("UI Snapshot Flow", .enabled(if: ProcessInfo.processInfo.environment["CI_INTEGRATION"] != nil))
 struct UISnapshotFlowTests {
@@ -18,7 +18,7 @@ struct UISnapshotFlowTests {
 
     // MARK: - Snapshot UI with axe Missing
 
-    @Test("snapshot_ui returns dependency_missing when axe not found")
+    @Test("inspect_ui returns dependency_missing when axe not found")
     func snapshotUIWithAxeMissing() async throws {
         // Attempt to run a nonexistent axe binary to verify the error path
         let result = try await executor.execute(
@@ -38,7 +38,7 @@ struct UISnapshotFlowTests {
     // MARK: - Snapshot UI with axe Present
 
     @Test(
-        "snapshot_ui returns accessibility tree when axe is available",
+        "inspect_ui returns accessibility tree when axe is available",
         .enabled(if: FileManager.default.fileExists(atPath: "/usr/local/bin/axe")
             || FileManager.default.fileExists(atPath: "/opt/homebrew/bin/axe"))
     )

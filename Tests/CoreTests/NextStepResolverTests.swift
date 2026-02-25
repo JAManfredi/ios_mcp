@@ -12,12 +12,12 @@ import Testing
 @Suite("NextStepResolver")
 struct NextStepResolverTests {
 
-    @Test("Resolves build_sim next steps")
+    @Test("Resolves build_simulator next steps")
     func resolvesBuildSimNextSteps() {
-        let steps = NextStepResolver.resolve(for: "build_sim")
+        let steps = NextStepResolver.resolve(for: "build_simulator")
         #expect(steps.count == 4)
-        #expect(steps[0].tool == "build_run_sim")
-        #expect(steps[1].tool == "test_sim")
+        #expect(steps[0].tool == "build_run_simulator")
+        #expect(steps[1].tool == "test_simulator")
         #expect(steps[2].tool == "launch_app")
         #expect(steps[3].tool == "inspect_xcresult")
     }
@@ -44,7 +44,7 @@ struct NextStepResolverTests {
         let steps = await NextStepResolver.resolve(for: "boot_simulator", session: session)
         #expect(steps.count == 3)
         #expect(steps[0].context["simulator_udid"] == "UDID-1234")
-        #expect(steps[0].tool == "build_sim")
+        #expect(steps[0].tool == "build_simulator")
     }
 
     @Test("Session-aware resolve populates workspace and scheme context")
@@ -58,7 +58,7 @@ struct NextStepResolverTests {
         #expect(steps.count == 2)
         // session_set_defaults doesn't need workspace context
         // build_sim needs workspace + scheme + simulator
-        let buildStep = steps.first { $0.tool == "build_sim" }!
+        let buildStep = steps.first { $0.tool == "build_simulator" }!
         #expect(buildStep.context["workspace"] == "/path/to/App.xcworkspace")
         #expect(buildStep.context["scheme"] == "App")
         #expect(buildStep.context["simulator_udid"] == "SIM-1")
@@ -67,7 +67,7 @@ struct NextStepResolverTests {
     @Test("Session-aware resolve returns empty context when no defaults set")
     func sessionAwareEmptySessionReturnsNoContext() async {
         let session = SessionStore()
-        let steps = await NextStepResolver.resolve(for: "build_sim", session: session)
+        let steps = await NextStepResolver.resolve(for: "build_simulator", session: session)
         #expect(steps.count == 4)
         #expect(steps[0].context.isEmpty)
     }
@@ -85,15 +85,15 @@ struct NextStepResolverTests {
             "discover_projects", "list_schemes", "show_build_settings",
             "list_simulators", "boot_simulator", "shutdown_simulator",
             "erase_simulator", "session_set_defaults",
-            "build_sim", "build_run_sim", "test_sim",
+            "build_simulator", "build_run_simulator", "test_simulator",
             "launch_app", "stop_app", "clean_derived_data",
-            "screenshot", "snapshot_ui", "deep_link",
+            "screenshot", "inspect_ui", "deep_link",
             "tap", "swipe", "type_text", "key_press", "long_press",
             "start_log_capture", "stop_log_capture",
             "debug_attach", "debug_detach",
-            "debug_breakpoint_add", "debug_breakpoint_remove",
-            "debug_continue", "debug_stack", "debug_variables",
-            "debug_lldb_command",
+            "debug_add_breakpoint", "debug_remove_breakpoint",
+            "debug_resume", "debug_backtrace", "debug_variables",
+            "debug_run_command",
             "read_user_defaults", "write_user_default",
             "accessibility_audit", "lint",
             "open_simulator",
@@ -101,8 +101,8 @@ struct NextStepResolverTests {
             "swift_package_init", "swift_package_clean",
             "swift_package_show_deps", "swift_package_dump",
             "start_recording", "stop_recording",
-            "list_devices", "build_device", "build_run_device",
-            "test_device", "install_app_device", "launch_app_device",
+            "list_devices", "build_for_device", "build_run_device",
+            "test_on_device", "install_app_device", "launch_app_device",
             "stop_app_device", "device_screenshot",
             "inspect_xcresult",
             "list_crash_logs",

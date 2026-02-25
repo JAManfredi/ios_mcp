@@ -11,15 +11,15 @@ steps:
     description: "Attach LLDB to the running app by PID or bundle ID."
     notes: "Returns session_id required by all subsequent debug tools."
 
-  - tool: debug_breakpoint_add
+  - tool: debug_add_breakpoint
     description: "Set a breakpoint by symbol name or file:line location."
     notes: "Use symbol for broad matching, file+line for precise locations."
 
-  - tool: debug_continue
+  - tool: debug_resume
     description: "Resume execution until a breakpoint is hit."
     notes: "Returns stop reason. Times out after 5 minutes if no breakpoint hit."
 
-  - tool: debug_stack
+  - tool: debug_backtrace
     description: "View the call stack at the breakpoint."
     notes: "Shows frame numbers, function names, and source locations."
 

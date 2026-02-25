@@ -81,15 +81,15 @@ Redaction is applied automatically by `CommandExecutor` to both stdout and stder
 
 Every successful `ToolResult` includes a `nextSteps` array of `NextStep(tool:description:)`. These are resolved by `NextStepResolver` based on natural workflow progression:
 - `discover_projects` → `list_schemes`, `session_set_defaults`
-- `build_sim` → `build_run_sim`, `test_sim`, `launch_app`
-- `build_run_sim` → `screenshot`, `snapshot_ui`, `start_log_capture`, `debug_attach`
-- `debug_attach` → `debug_breakpoint_add`, `debug_stack`, `debug_variables`
+- `build_simulator` → `build_run_simulator`, `test_simulator`, `launch_app`
+- `build_run_simulator` → `screenshot`, `inspect_ui`, `start_log_capture`, `debug_attach`
+- `debug_attach` → `debug_add_breakpoint`, `debug_backtrace`, `debug_variables`
 
 All 55 tools have next-step mappings.
 
 ### LLDB Denylist
 
-`debug_lldb_command` checks commands against a denylist before execution. Denied commands and their safe alternatives:
+`debug_run_command` checks commands against a denylist before execution. Denied commands and their safe alternatives:
 
 | Command Pattern | Reason | Alternative |
 |----------------|--------|-------------|
@@ -101,7 +101,7 @@ All 55 tools have next-step mappings.
 | `memory write` | Memory mutation | Read-only inspection |
 | `register write` | Register mutation | Read-only inspection |
 | `expression @import` | Load frameworks | `expression` without `@import` |
-| `settings set target.run-args` | Modify launch args | Use `build_run_sim` |
+| `settings set target.run-args` | Modify launch args | Use `build_run_simulator` |
 | `target delete` | Remove debug target | Use `debug_detach` |
 
 Set `allow_unsafe: true` to bypass — response is marked `[UNSAFE]` and audit-logged. **Never set `allow_unsafe: true` without explicit user confirmation.** The denylist exists to prevent accidental damage.
@@ -151,14 +151,14 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 |----------|-----------|-------|-------|
 | Project Discovery | `Tools/ProjectDiscovery/` | 3 | `discover_projects`, `list_schemes`, `show_build_settings` |
 | Simulator | `Tools/Simulator/` | 5 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `session_set_defaults` |
-| Build | `Tools/Build/` | 8 | `build_sim`, `build_run_sim`, `test_sim`, `launch_app`, `stop_app`, `clean_derived_data`, `inspect_xcresult`, `list_crash_logs` |
+| Build | `Tools/Build/` | 8 | `build_simulator`, `build_run_simulator`, `test_simulator`, `launch_app`, `stop_app`, `clean_derived_data`, `inspect_xcresult`, `list_crash_logs` |
 | Logging | `Tools/Logging/` | 2 | `start_log_capture`, `stop_log_capture` |
-| UI Automation | `Tools/UIAutomation/` | 10 | `screenshot`, `snapshot_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press`, `start_recording`, `stop_recording` |
-| Debugging | `Tools/Debugging/` | 8 | `debug_attach`, `debug_detach`, `debug_breakpoint_add`, `debug_breakpoint_remove`, `debug_continue`, `debug_stack`, `debug_variables`, `debug_lldb_command` |
+| UI Automation | `Tools/UIAutomation/` | 10 | `screenshot`, `inspect_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press`, `start_recording`, `stop_recording` |
+| Debugging | `Tools/Debugging/` | 8 | `debug_attach`, `debug_detach`, `debug_add_breakpoint`, `debug_remove_breakpoint`, `debug_resume`, `debug_backtrace`, `debug_variables`, `debug_run_command` |
 | Inspection | `Tools/Inspection/` | 2 | `read_user_defaults`, `write_user_default` |
 | Quality | `Tools/Quality/` | 2 | `lint`, `accessibility_audit` |
 | Swift Package | `Tools/SwiftPackage/` | 6 | `swift_package_resolve`, `swift_package_update`, `swift_package_init`, `swift_package_clean`, `swift_package_show_deps`, `swift_package_dump` |
-| Device | `Tools/Device/` | 8 | `list_devices`, `build_device`, `build_run_device`, `test_device`, `install_app_device`, `launch_app_device`, `stop_app_device`, `device_screenshot` |
+| Device | `Tools/Device/` | 8 | `list_devices`, `build_for_device`, `build_run_device`, `test_on_device`, `install_app_device`, `launch_app_device`, `stop_app_device`, `device_screenshot` |
 | Extras | `Tools/Extras/` | 1 | `open_simulator` |
 
 ## Workflow Examples
@@ -166,7 +166,7 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 ### Build & Test
 
 ```
-discover_projects → list_schemes → session_set_defaults → build_sim → test_sim → lint
+discover_projects → list_schemes → session_set_defaults → build_simulator → test_simulator → lint
 ```
 
 1. Discover workspaces/projects in a directory
@@ -179,7 +179,7 @@ discover_projects → list_schemes → session_set_defaults → build_sim → te
 ### UI Exploration
 
 ```
-build_run_sim → screenshot → snapshot_ui → tap → type_text → screenshot
+build_run_simulator → screenshot → inspect_ui → tap → type_text → screenshot
 ```
 
 1. Build, install, and launch the app on simulator
@@ -192,7 +192,7 @@ build_run_sim → screenshot → snapshot_ui → tap → type_text → screensho
 ### Debug Session
 
 ```
-debug_attach → debug_breakpoint_add → debug_continue → debug_stack → debug_variables → debug_detach
+debug_attach → debug_add_breakpoint → debug_resume → debug_backtrace → debug_variables → debug_detach
 ```
 
 1. Attach LLDB to the running app (returns session ID)
@@ -215,7 +215,7 @@ start_log_capture → [interact with app] → stop_log_capture
 ### Device Workflow
 
 ```
-list_devices → session_set_defaults → build_device → install_app_device → launch_app_device → device_screenshot
+list_devices → session_set_defaults → build_for_device → install_app_device → launch_app_device → device_screenshot
 ```
 
 1. List connected physical devices (auto-sets session device UDID if exactly one)

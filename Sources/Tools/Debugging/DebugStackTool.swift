@@ -13,7 +13,7 @@ func registerDebugStackTool(
     debugSession: any DebugSessionManaging
 ) async {
     let manifest = ToolManifest(
-        name: "debug_stack",
+        name: "debug_backtrace",
         description: "Fetch the backtrace (stack trace) from the attached LLDB session.",
         inputSchema: JSONSchema(
             properties: [

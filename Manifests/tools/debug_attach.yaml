@@ -36,9 +36,9 @@ dependencies: []
 sessionDefaults:
   - simulator_udid
 nextSteps:
-  - tool: debug_breakpoint_add
+  - tool: debug_add_breakpoint
     description: "Set a breakpoint"
-  - tool: debug_stack
+  - tool: debug_backtrace
     description: "View the call stack"
   - tool: debug_variables
     description: "Inspect frame variables"

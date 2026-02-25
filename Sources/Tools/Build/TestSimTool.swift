@@ -19,7 +19,7 @@ func registerTestSimTool(
     progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
-        name: "test_sim",
+        name: "test_simulator",
         description: "Run tests for an Xcode project on the iOS Simulator. Falls back to session defaults for workspace, project, scheme, configuration, udid, and derived_data_path. Returns pass/fail/skip counts and failing test names.",
         inputSchema: JSONSchema(
             properties: [
@@ -77,7 +77,7 @@ func registerTestSimTool(
 
         return await concurrency.withLock(
             key: resolved.lockKey,
-            owner: "test_sim"
+            owner: "test_simulator"
         ) {
             do {
                 let timestamp = Int(Date().timeIntervalSince1970)

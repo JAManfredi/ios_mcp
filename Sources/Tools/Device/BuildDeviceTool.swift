@@ -19,7 +19,7 @@ func registerBuildDeviceTool(
     progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
-        name: "build_device",
+        name: "build_for_device",
         description: "Build an Xcode project for a physical iOS device. Falls back to session defaults for workspace, project, scheme, configuration, device_udid, and derived_data_path. Code signing must be configured in the project.",
         inputSchema: JSONSchema(
             properties: [
@@ -76,7 +76,7 @@ func registerBuildDeviceTool(
             }
 
             let lockKey = "build:\(workspace ?? project ?? "unknown")"
-            return await concurrency.withLock(key: lockKey, owner: "build_device") {
+            return await concurrency.withLock(key: lockKey, owner: "build_for_device") {
                 var xcodebuildArgs = [String]()
                 if let workspace {
                     xcodebuildArgs += ["-workspace", workspace]

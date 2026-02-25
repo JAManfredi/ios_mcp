@@ -1,4 +1,4 @@
-name: debug_stack
+name: debug_backtrace
 description: "Fetch the backtrace (stack trace) from the attached LLDB session."
 category: debugging
 input:
@@ -31,5 +31,5 @@ sessionDefaults: []
 nextSteps:
   - tool: debug_variables
     description: "Inspect variables in the current frame"
-  - tool: debug_lldb_command
+  - tool: debug_run_command
     description: "Run a custom LLDB command"

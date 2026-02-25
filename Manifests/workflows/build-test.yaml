@@ -19,11 +19,11 @@ steps:
     description: "Set simulator UDID, workspace, and scheme as session defaults."
     notes: "Required if multiple projects/schemes were found. Optional if auto-set."
 
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build the project for iOS Simulator."
     notes: "Returns error/warning counts and xcresult path."
 
-  - tool: test_sim
+  - tool: test_simulator
     description: "Run tests on the iOS Simulator."
     notes: "Returns pass/fail/skip counts with failing test names."
 

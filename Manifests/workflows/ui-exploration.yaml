@@ -7,7 +7,7 @@ name: ui-exploration
 description: "Build, launch, and interactively explore the app's UI."
 
 steps:
-  - tool: build_run_sim
+  - tool: build_run_simulator
     description: "Build, install, and launch the app on the simulator."
     notes: "Sets session bundle_id. Requires booted simulator."
 
@@ -15,13 +15,13 @@ steps:
     description: "Take a screenshot to see the current screen state."
     notes: "Returns PNG as MCP image content block."
 
-  - tool: snapshot_ui
+  - tool: inspect_ui
     description: "Capture the accessibility tree to identify UI elements."
     notes: "Requires axe CLI. Returns element types, labels, identifiers, frames."
 
   - tool: tap
     description: "Tap a UI element by accessibility identifier, label, or coordinates."
-    notes: "Use accessibility_id from snapshot_ui output for reliable targeting."
+    notes: "Use accessibility_id from inspect_ui output for reliable targeting."
 
   - tool: type_text
     description: "Type text into the focused field."

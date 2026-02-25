@@ -19,7 +19,7 @@ func registerBuildSimTool(
     progressReporter: ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
-        name: "build_sim",
+        name: "build_simulator",
         description: "Build an Xcode project for the iOS Simulator. Falls back to session defaults for workspace, project, scheme, configuration, udid, and derived_data_path. Returns error/warning counts and xcresult artifact path.",
         inputSchema: JSONSchema(
             properties: [
@@ -65,7 +65,7 @@ func registerBuildSimTool(
 
         return await concurrency.withLock(
             key: resolved.lockKey,
-            owner: "build_sim"
+            owner: "build_simulator"
         ) {
             do {
                 let timestamp = Int(Date().timeIntervalSince1970)

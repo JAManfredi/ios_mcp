@@ -34,5 +34,5 @@ sessionDefaults:
 nextSteps:
   - tool: session_set_defaults
     description: "Set scheme as session default"
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build the project for simulator"

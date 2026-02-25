@@ -34,7 +34,7 @@ dependencies: []
 sessionDefaults:
   - simulator_udid
 nextSteps:
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build an app for the booted simulator"
   - tool: launch_app
     description: "Launch an already-built app"

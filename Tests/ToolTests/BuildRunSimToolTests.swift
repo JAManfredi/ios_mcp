@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("build_run_sim")
+@Suite("build_run_simulator")
 struct BuildRunSimToolTests {
 
     private let buildSettingsOutput = """
@@ -56,7 +56,7 @@ struct BuildRunSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_run_simulator", arguments: [:])
 
         if case .success(let result) = response {
             #expect(result.content.contains("Build, install, and launch succeeded"))
@@ -98,7 +98,7 @@ struct BuildRunSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_run_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
@@ -132,7 +132,7 @@ struct BuildRunSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_run_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_run_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
@@ -165,7 +165,7 @@ struct BuildRunSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        _ = try await registry.callTool(name: "build_run_sim", arguments: [:])
+        _ = try await registry.callTool(name: "build_run_simulator", arguments: [:])
 
         let bundleID = await session.get(.bundleID)
         #expect(bundleID == "com.example.MyApp")
@@ -199,7 +199,7 @@ struct BuildRunSimToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         _ = try await registry.callTool(
-            name: "build_run_sim",
+            name: "build_run_simulator",
             arguments: ["bundle_id": .string("com.custom.id")]
         )
 

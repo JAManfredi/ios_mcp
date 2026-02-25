@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("debug_breakpoint_add")
+@Suite("debug_add_breakpoint")
 struct DebugBreakpointAddToolTests {
 
     @Test("Adds breakpoint by symbol name")
@@ -30,7 +30,7 @@ struct DebugBreakpointAddToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_add",
+            name: "debug_add_breakpoint",
             arguments: [
                 "session_id": .string("dbg-bp1"),
                 "symbol": .string("viewDidLoad"),
@@ -60,7 +60,7 @@ struct DebugBreakpointAddToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_add",
+            name: "debug_add_breakpoint",
             arguments: [
                 "session_id": .string("dbg-bp2"),
                 "file": .string("ViewController.swift"),
@@ -84,7 +84,7 @@ struct DebugBreakpointAddToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_add",
+            name: "debug_add_breakpoint",
             arguments: ["session_id": .string("any")]
         )
 
@@ -104,7 +104,7 @@ struct DebugBreakpointAddToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_add",
+            name: "debug_add_breakpoint",
             arguments: ["symbol": .string("viewDidLoad")]
         )
 

@@ -15,6 +15,18 @@
 
 ---
 
+## 💡 Why ios-mcp
+
+- **Single native binary** — one `make install` and you're running. No runtimes, no interpreters, no background daemons. Optional tools (axe, SwiftLint) enhance specific features but aren't required.
+- **Interactive debugging** — attach to processes, set breakpoints, inspect stacks and variables, execute LLDB commands — all through MCP. Go beyond build-and-test into real debugging workflows.
+- **Deep UI automation** — tap, swipe, type, long press, screenshot, record video, read the full accessibility tree. Drive the simulator the way a user would.
+- **Security by default** — secrets are automatically redacted from all output (tokens, keys, signing identities). Dangerous debugger commands are blocked. All subprocesses use argument arrays — never shell execution. No telemetry. No network access.
+- **Post-mortem analysis** — parse crash logs with symbolicated backtraces, inspect xcresult bundles for diagnostics, test failures, code coverage, and build timelines. Understand *what went wrong* without leaving the terminal.
+- **Session intelligence** — tools auto-discover context (workspace, scheme, simulator, device) and validate it before use. Stale defaults are caught, not silently reused. Every response includes suggested next steps for natural workflow progression.
+- **Full lifecycle coverage** — 55 tools spanning project discovery, simulator and device management, building, testing, UI automation, debugging, logging, Swift packages, crash analysis, and quality checks.
+
+---
+
 ## ⚡ Quick Start
 
 ```bash
@@ -36,11 +48,11 @@ ios-mcp doctor
 |----------|:-----:|-------|
 | 🔍 **Project Discovery** | 3 | `discover_projects` · `list_schemes` · `show_build_settings` |
 | 📱 **Simulator** | 5 | `list_simulators` · `boot_simulator` · `shutdown_simulator` · `erase_simulator` · `session_set_defaults` |
-| 🔨 **Build** | 8 | `build_sim` · `build_run_sim` · `test_sim` · `launch_app` · `stop_app` · `clean_derived_data` · `inspect_xcresult` · `list_crash_logs` |
-| 📲 **Device** | 8 | `list_devices` · `build_device` · `build_run_device` · `test_device` · `install_app_device` · `launch_app_device` · `stop_app_device` · `device_screenshot` |
+| 🔨 **Build** | 8 | `build_simulator` · `build_run_simulator` · `test_simulator` · `launch_app` · `stop_app` · `clean_derived_data` · `inspect_xcresult` · `list_crash_logs` |
+| 📲 **Device** | 8 | `list_devices` · `build_for_device` · `build_run_device` · `test_on_device` · `install_app_device` · `launch_app_device` · `stop_app_device` · `device_screenshot` |
 | 📋 **Logging** | 2 | `start_log_capture` · `stop_log_capture` |
-| 👆 **UI Automation** | 10 | `screenshot` · `snapshot_ui` · `deep_link` · `tap` · `swipe` · `type_text` · `key_press` · `long_press` · `start_recording` · `stop_recording` |
-| 🐛 **Debugging** | 8 | `debug_attach` · `debug_detach` · `debug_breakpoint_add` · `debug_breakpoint_remove` · `debug_continue` · `debug_stack` · `debug_variables` · `debug_lldb_command` |
+| 👆 **UI Automation** | 10 | `screenshot` · `inspect_ui` · `deep_link` · `tap` · `swipe` · `type_text` · `key_press` · `long_press` · `start_recording` · `stop_recording` |
+| 🐛 **Debugging** | 8 | `debug_attach` · `debug_detach` · `debug_add_breakpoint` · `debug_remove_breakpoint` · `debug_resume` · `debug_backtrace` · `debug_variables` · `debug_run_command` |
 | 📦 **Swift Package** | 6 | `swift_package_resolve` · `swift_package_update` · `swift_package_init` · `swift_package_clean` · `swift_package_show_deps` · `swift_package_dump` |
 | 🔎 **Inspection** | 2 | `read_user_defaults` · `write_user_default` |
 | ✅ **Quality** | 2 | `lint` · `accessibility_audit` |
@@ -53,7 +65,7 @@ ios-mcp doctor
 ### Build & Test
 
 ```
-discover_projects → list_schemes → session_set_defaults → build_sim → test_sim → lint
+discover_projects → list_schemes → session_set_defaults → build_simulator → test_simulator → lint
 ```
 
 > Discover projects, pick a scheme, build for simulator, run tests, lint for style issues.
@@ -61,7 +73,7 @@ discover_projects → list_schemes → session_set_defaults → build_sim → te
 ### UI Exploration
 
 ```
-build_run_sim → screenshot → snapshot_ui → tap → type_text → screenshot
+build_run_simulator → screenshot → inspect_ui → tap → type_text → screenshot
 ```
 
 > Build and launch, screenshot the screen, inspect the accessibility tree, interact with elements, verify the result.
@@ -69,7 +81,7 @@ build_run_sim → screenshot → snapshot_ui → tap → type_text → screensho
 ### Debug Session
 
 ```
-debug_attach → debug_breakpoint_add → debug_continue → debug_stack → debug_variables → debug_detach
+debug_attach → debug_add_breakpoint → debug_resume → debug_backtrace → debug_variables → debug_detach
 ```
 
 > Attach LLDB, set breakpoints, hit them, inspect the stack and variables, detach cleanly.
@@ -77,7 +89,7 @@ debug_attach → debug_breakpoint_add → debug_continue → debug_stack → deb
 ### Physical Device
 
 ```
-list_devices → session_set_defaults → build_device → install_app_device → launch_app_device → device_screenshot
+list_devices → session_set_defaults → build_for_device → install_app_device → launch_app_device → device_screenshot
 ```
 
 > List connected devices, build with code signing, install and launch on hardware, capture a screenshot.
@@ -165,7 +177,7 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 - **bundle_id** — app bundle identifier
 - **configuration** — Debug / Release
 
-A typical session starts with `discover_projects → list_schemes → session_set_defaults`, after which tools like `build_sim`, `test_sim`, and `launch_app` pick up the context automatically.
+A typical session starts with `discover_projects → list_schemes → session_set_defaults`, after which tools like `build_simulator`, `test_simulator`, and `launch_app` pick up the context automatically.
 
 Some tools auto-set defaults as a side effect:
 - `show_build_settings` → `bundle_id`

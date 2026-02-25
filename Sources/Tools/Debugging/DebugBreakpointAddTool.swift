@@ -13,7 +13,7 @@ func registerDebugBreakpointAddTool(
     debugSession: any DebugSessionManaging
 ) async {
     let manifest = ToolManifest(
-        name: "debug_breakpoint_add",
+        name: "debug_add_breakpoint",
         description: "Add a breakpoint by symbol name or file:line location in the attached LLDB session.",
         inputSchema: JSONSchema(
             properties: [

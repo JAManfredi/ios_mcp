@@ -1,4 +1,4 @@
-name: debug_breakpoint_add
+name: debug_add_breakpoint
 description: "Add a breakpoint by symbol name or file:line location in the attached LLDB session."
 category: debugging
 input:
@@ -37,7 +37,7 @@ cancellation: "LLDB command abandoned"
 dependencies: []
 sessionDefaults: []
 nextSteps:
-  - tool: debug_continue
+  - tool: debug_resume
     description: "Continue execution to hit the breakpoint"
-  - tool: debug_breakpoint_remove
+  - tool: debug_remove_breakpoint
     description: "Remove a breakpoint"

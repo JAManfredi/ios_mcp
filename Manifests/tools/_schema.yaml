@@ -4,7 +4,7 @@
 # for one MCP tool. Fields are defined below.
 #
 # name: string (required)
-#   The MCP tool name (e.g., "build_sim"). Must match the ToolManifest.name in code.
+#   The MCP tool name (e.g., "build_simulator"). Must match the ToolManifest.name in code.
 #
 # description: string (required)
 #   Human-readable description of what the tool does.

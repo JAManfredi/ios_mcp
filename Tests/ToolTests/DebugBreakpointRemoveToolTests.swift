@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("debug_breakpoint_remove")
+@Suite("debug_remove_breakpoint")
 struct DebugBreakpointRemoveToolTests {
 
     @Test("Removes breakpoint by ID")
@@ -29,7 +29,7 @@ struct DebugBreakpointRemoveToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_remove",
+            name: "debug_remove_breakpoint",
             arguments: [
                 "session_id": .string("dbg-rm1"),
                 "breakpoint_id": .int(3),
@@ -52,7 +52,7 @@ struct DebugBreakpointRemoveToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_remove",
+            name: "debug_remove_breakpoint",
             arguments: ["session_id": .string("any")]
         )
 
@@ -72,7 +72,7 @@ struct DebugBreakpointRemoveToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_breakpoint_remove",
+            name: "debug_remove_breakpoint",
             arguments: ["breakpoint_id": .int(1)]
         )
 

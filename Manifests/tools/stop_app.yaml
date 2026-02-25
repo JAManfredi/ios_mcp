@@ -36,5 +36,5 @@ sessionDefaults:
 nextSteps:
   - tool: launch_app
     description: "Relaunch the app"
-  - tool: build_sim
+  - tool: build_simulator
     description: "Rebuild the app"

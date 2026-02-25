@@ -42,7 +42,7 @@ sessionDefaults:
   - scheme
   - configuration
 nextSteps:
-  - tool: build_sim
+  - tool: build_simulator
     description: "Build the project for simulator"
   - tool: session_set_defaults
     description: "Update session defaults based on settings"

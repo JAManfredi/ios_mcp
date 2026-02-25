@@ -57,7 +57,7 @@ struct ConcurrencyPolicyTests {
     func withLockReleasesOnError() async {
         let policy = ConcurrencyPolicy()
 
-        let response = await policy.withLock(key: "build:test", owner: "build_sim") {
+        let response = await policy.withLock(key: "build:test", owner: "build_simulator") {
             .error(ToolError(code: .commandFailed, message: "Build failed"))
         }
 

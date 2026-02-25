@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("build_sim")
+@Suite("build_simulator")
 struct BuildSimToolTests {
 
     private let xcresultJSON = """
@@ -50,7 +50,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .success(let result) = response {
             #expect(result.content.contains("Build succeeded"))
@@ -89,7 +89,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        _ = try await registry.callTool(name: "build_sim", arguments: [:])
+        _ = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         let capturedArgs = await capture.lastArgs
         #expect(capturedArgs.contains("-project"))
@@ -109,7 +109,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -130,7 +130,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -151,7 +151,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .invalidInput)
@@ -195,7 +195,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
@@ -240,7 +240,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .commandFailed)
@@ -269,7 +269,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .success(let result) = response {
             #expect(result.content.contains("Build succeeded"))
@@ -295,7 +295,7 @@ struct BuildSimToolTests {
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
-        let response = try await registry.callTool(name: "build_sim", arguments: [:])
+        let response = try await registry.callTool(name: "build_simulator", arguments: [:])
 
         if case .error(let error) = response {
             #expect(error.code == .resourceBusy)

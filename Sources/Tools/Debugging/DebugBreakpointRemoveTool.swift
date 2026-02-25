@@ -13,7 +13,7 @@ func registerDebugBreakpointRemoveTool(
     debugSession: any DebugSessionManaging
 ) async {
     let manifest = ToolManifest(
-        name: "debug_breakpoint_remove",
+        name: "debug_remove_breakpoint",
         description: "Remove a breakpoint by its ID from the attached LLDB session.",
         inputSchema: JSONSchema(
             properties: [

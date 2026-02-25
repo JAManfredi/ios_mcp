@@ -13,7 +13,7 @@ func registerDebugContinueTool(
     debugSession: any DebugSessionManaging
 ) async {
     let manifest = ToolManifest(
-        name: "debug_continue",
+        name: "debug_resume",
         description: "Resume execution in the attached LLDB session. Returns stop reason if a breakpoint is hit.",
         inputSchema: JSONSchema(
             properties: [

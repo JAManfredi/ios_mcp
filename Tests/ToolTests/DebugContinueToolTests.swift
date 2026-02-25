@@ -10,7 +10,7 @@ import Testing
 @testable import Core
 @testable import Tools
 
-@Suite("debug_continue")
+@Suite("debug_resume")
 struct DebugContinueToolTests {
 
     @Test("Sends continue and returns output")
@@ -29,7 +29,7 @@ struct DebugContinueToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: mockDebug, validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_continue",
+            name: "debug_resume",
             arguments: ["session_id": .string("dbg-cont")]
         )
 
@@ -49,7 +49,7 @@ struct DebugContinueToolTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let response = try await registry.callTool(
-            name: "debug_continue",
+            name: "debug_resume",
             arguments: [:]
         )
 

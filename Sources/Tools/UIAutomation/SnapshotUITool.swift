@@ -16,7 +16,7 @@ func registerSnapshotUITool(
     validator: DefaultsValidator
 ) async {
     let manifest = ToolManifest(
-        name: "snapshot_ui",
+        name: "inspect_ui",
         description: "Capture the accessibility tree of the current iOS simulator screen. Returns a structured representation of all UI elements. Use this before tap/swipe/type_text to discover element identifiers, labels, and coordinates. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
