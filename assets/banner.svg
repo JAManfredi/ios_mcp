@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="50%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#007AFF"/>
+      <stop offset="100%" style="stop-color:#5856D6"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#E0E0E0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03" stroke="#ffffff" stroke-width="0.5">
+    <line x1="0" y1="40" x2="800" y2="40"/>
+    <line x1="0" y1="80" x2="800" y2="80"/>
+    <line x1="0" y1="120" x2="800" y2="120"/>
+    <line x1="0" y1="160" x2="800" y2="160"/>
+    <line x1="160" y1="0" x2="160" y2="200"/>
+    <line x1="320" y1="0" x2="320" y2="200"/>
+    <line x1="480" y1="0" x2="480" y2="200"/>
+    <line x1="640" y1="0" x2="640" y2="200"/>
+  </g>
+
+  <!-- Accent line -->
+  <rect x="0" y="188" width="800" height="4" rx="0" fill="url(#accent)" opacity="0.8"/>
+
+  <!-- iOS icon -->
+  <g transform="translate(240, 45)">
+    <!-- Phone outline -->
+    <rect x="0" y="0" width="40" height="70" rx="8" stroke="url(#accent)" stroke-width="2" fill="none" opacity="0.9"/>
+    <!-- Screen -->
+    <rect x="4" y="10" width="32" height="46" rx="2" fill="url(#accent)" opacity="0.15"/>
+    <!-- Notch -->
+    <rect x="12" y="3" width="16" height="4" rx="2" fill="url(#accent)" opacity="0.5"/>
+    <!-- Home indicator -->
+    <rect x="12" y="62" width="16" height="3" rx="1.5" fill="url(#accent)" opacity="0.4"/>
+    <!-- Code brackets on screen -->
+    <text x="20" y="40" font-family="SF Mono, Menlo, monospace" font-size="18" fill="url(#accent)" text-anchor="middle" opacity="0.9">&lt;/&gt;</text>
+  </g>
+
+  <!-- Title -->
+  <text x="300" y="88" font-family="SF Pro Display, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="48" font-weight="700" fill="url(#textGrad)" letter-spacing="-1">ios-mcp</text>
+
+  <!-- Tagline -->
+  <text x="300" y="118" font-family="SF Pro Text, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="16" fill="#8892b0" letter-spacing="0.5">headless iOS dev, straight from the CLI</text>
+
+  <!-- Tool count badge -->
+  <g transform="translate(300, 135)">
+    <rect width="70" height="22" rx="11" fill="url(#accent)" opacity="0.2"/>
+    <rect width="70" height="22" rx="11" stroke="url(#accent)" stroke-width="1" fill="none" opacity="0.4"/>
+    <text x="35" y="15" font-family="SF Mono, Menlo, monospace" font-size="11" fill="#007AFF" text-anchor="middle" font-weight="600">55 tools</text>
+  </g>
+
+  <!-- MCP badge -->
+  <g transform="translate(380, 135)">
+    <rect width="50" height="22" rx="11" fill="url(#accent)" opacity="0.2"/>
+    <rect width="50" height="22" rx="11" stroke="url(#accent)" stroke-width="1" fill="none" opacity="0.4"/>
+    <text x="25" y="15" font-family="SF Mono, Menlo, monospace" font-size="11" fill="#5856D6" text-anchor="middle" font-weight="600">MCP</text>
+  </g>
+
+  <!-- Swift badge -->
+  <g transform="translate(440, 135)">
+    <rect width="58" height="22" rx="11" fill="#F05138" opacity="0.15"/>
+    <rect width="58" height="22" rx="11" stroke="#F05138" stroke-width="1" fill="none" opacity="0.3"/>
+    <text x="29" y="15" font-family="SF Mono, Menlo, monospace" font-size="11" fill="#F05138" text-anchor="middle" font-weight="600">Swift</text>
+  </g>
+</svg>
