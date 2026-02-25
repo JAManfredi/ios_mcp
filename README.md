@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  An <a href="https://modelcontextprotocol.io/">MCP</a> server that gives Claude Code full control over the iOS development lifecycle — <b>55 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, package management, and quality checks.
+  An <a href="https://modelcontextprotocol.io/">MCP</a> server for the iOS development lifecycle — <b>55 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, package management, and quality checks. Works with any MCP-compatible client.
 </p>
 
 ---
@@ -21,9 +21,6 @@
 # Install
 git clone https://github.com/JAManfredi/ios_mcp.git && cd ios_mcp
 make install
-
-# Register with Claude Code
-claude mcp add -s user ios-mcp /usr/local/bin/ios-mcp
 
 # Verify
 ios-mcp doctor
@@ -125,15 +122,21 @@ cp .build/release/ios-mcp /usr/local/bin/
 
 ---
 
-## ⚙️ Claude Code Configuration
+## ⚙️ MCP Client Configuration
 
-Register as an MCP server:
+Register as an MCP server with your client. For example:
 
-```bash
-claude mcp add -s user ios-mcp /usr/local/bin/ios-mcp
+```json
+{
+  "mcpServers": {
+    "ios-mcp": {
+      "command": "/usr/local/bin/ios-mcp"
+    }
+  }
+}
 ```
 
-This adds ios-mcp as a user-scoped MCP server available in all projects. Restart Claude Code to connect.
+ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontextprotocol.io/). It works with any MCP-compatible client — add the binary path to your client's server configuration and restart.
 
 ---
 
