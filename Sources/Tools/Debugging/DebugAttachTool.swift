@@ -17,7 +17,7 @@ func registerDebugAttachTool(
 ) async {
     let manifest = ToolManifest(
         name: "debug_attach",
-        description: "Attach LLDB to a running process by PID or bundle ID. Returns a session ID for use with other debug tools. Falls back to session default for udid.",
+        description: "Attach LLDB to a running process by PID or bundle ID. Returns a session ID for use with other debug tools. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "pid": .init(

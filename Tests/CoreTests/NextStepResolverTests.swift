@@ -42,7 +42,7 @@ struct NextStepResolverTests {
         await session.set(.simulatorUDID, value: "UDID-1234")
 
         let steps = await NextStepResolver.resolve(for: "boot_simulator", session: session)
-        #expect(steps.count == 3)
+        #expect(steps.count == 4)
         #expect(steps[0].context["simulator_udid"] == "UDID-1234")
         #expect(steps[0].tool == "build_simulator")
     }
@@ -106,6 +106,16 @@ struct NextStepResolverTests {
             "stop_app_device", "device_screenshot",
             "inspect_xcresult",
             "list_crash_logs",
+            "simulate_location",
+            "clear_location",
+            "set_appearance",
+            "override_status_bar",
+            "show_session",
+            "clear_session",
+            "manage_privacy",
+            "send_push_notification",
+            "get_app_container",
+            "uninstall_app",
         ]
 
         for toolName in allToolNames {

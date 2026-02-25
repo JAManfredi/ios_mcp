@@ -21,7 +21,7 @@ struct ToolRegistrationTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 55)
+        #expect(tools.count == 65)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -79,5 +79,15 @@ struct ToolRegistrationTests {
         #expect(names.contains("device_screenshot"))
         #expect(names.contains("inspect_xcresult"))
         #expect(names.contains("list_crash_logs"))
+        #expect(names.contains("simulate_location"))
+        #expect(names.contains("clear_location"))
+        #expect(names.contains("set_appearance"))
+        #expect(names.contains("override_status_bar"))
+        #expect(names.contains("show_session"))
+        #expect(names.contains("clear_session"))
+        #expect(names.contains("manage_privacy"))
+        #expect(names.contains("send_push_notification"))
+        #expect(names.contains("get_app_container"))
+        #expect(names.contains("uninstall_app"))
     }
 }
