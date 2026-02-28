@@ -47,6 +47,7 @@ public enum ToolCategory: String, Sendable, CaseIterable {
     case extras
     case swiftPackage = "swift_package"
     case device
+    case navigation
 }
 
 // MARK: - JSONSchema
