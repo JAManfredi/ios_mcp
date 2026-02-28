@@ -18,10 +18,10 @@ struct ToolRegistrationTests {
         let session = SessionStore()
         let executor = MockCommandExecutor.succeedingWith("")
 
-        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording())
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 65)
+        #expect(tools.count == 71)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -89,5 +89,11 @@ struct ToolRegistrationTests {
         #expect(names.contains("send_push_notification"))
         #expect(names.contains("get_app_container"))
         #expect(names.contains("uninstall_app"))
+        #expect(names.contains("load_nav_graph"))
+        #expect(names.contains("get_nav_graph"))
+        #expect(names.contains("navigate_to"))
+        #expect(names.contains("where_am_i"))
+        #expect(names.contains("tag_screen"))
+        #expect(names.contains("save_nav_graph"))
     }
 }

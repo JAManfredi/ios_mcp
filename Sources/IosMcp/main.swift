@@ -46,6 +46,7 @@ private func startServer() async throws {
 
     let pathPolicy = PathPolicy()
     let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
+    let navGraph = NavGraphStore()
 
     let server = Server(
         name: "ios-mcp",
@@ -64,7 +65,7 @@ private func startServer() async throws {
     }
 
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, progressReporter: progressReporter)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, navGraph: navGraph, progressReporter: progressReporter)
 
     await server.withMethodHandler(ListTools.self) { _ in
         let manifests = await registry.listTools()

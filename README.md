@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  An <a href="https://modelcontextprotocol.io/">MCP</a> server for the iOS development lifecycle — <b>65 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, package management, and quality checks. Works with any MCP-compatible client.
+  An <a href="https://modelcontextprotocol.io/">MCP</a> server for the iOS development lifecycle — <b>71 tools</b> for project discovery, simulator &amp; device management, building, testing, UI automation, debugging, navigation, package management, and quality checks. Works with any MCP-compatible client.
 </p>
 
 ---
@@ -23,7 +23,8 @@
 - **Security by default** — secrets are automatically redacted from all output (tokens, keys, signing identities). Dangerous debugger commands are blocked. All subprocesses use argument arrays — never shell execution. No telemetry. No network access.
 - **Post-mortem analysis** — parse crash logs with symbolicated backtraces, inspect xcresult bundles for diagnostics, test failures, code coverage, and build timelines. Understand *what went wrong* without leaving the terminal.
 - **Session intelligence** — tools auto-discover context (workspace, scheme, simulator, device) and validate it before use. Stale defaults are caught, not silently reused. Every response includes suggested next steps for natural workflow progression.
-- **Full lifecycle coverage** — 65 tools spanning project discovery, simulator and device management, building, testing, UI automation, debugging, logging, Swift packages, crash analysis, and quality checks.
+- **Graph-based navigation** — load a navigation graph describing your app's screens and transitions, then navigate deterministically via BFS pathfinding. Supports deeplinks, taps, swipes, text input, and key presses. Works without a graph too — tools gracefully fall back to direct UI automation.
+- **Full lifecycle coverage** — 71 tools spanning project discovery, simulator and device management, building, testing, UI automation, debugging, navigation, logging, Swift packages, crash analysis, and quality checks.
 
 ---
 
@@ -42,7 +43,7 @@ ios-mcp doctor
 
 ## 🛠 What's Included
 
-**65 tools** across **12 categories**:
+**71 tools** across **13 categories**:
 
 | Category | Count | Tools |
 |----------|:-----:|-------|
@@ -52,6 +53,7 @@ ios-mcp doctor
 | 📲 **Device** | 8 | `list_devices` · `build_for_device` · `build_run_device` · `test_on_device` · `install_app_device` · `launch_app_device` · `stop_app_device` · `device_screenshot` |
 | 📋 **Logging** | 2 | `start_log_capture` · `stop_log_capture` |
 | 👆 **UI Automation** | 10 | `screenshot` · `inspect_ui` · `deep_link` · `tap` · `swipe` · `type_text` · `key_press` · `long_press` · `start_recording` · `stop_recording` |
+| 🧭 **Navigation** | 6 | `load_nav_graph` · `get_nav_graph` · `navigate_to` · `where_am_i` · `tag_screen` · `save_nav_graph` |
 | 🐛 **Debugging** | 8 | `debug_attach` · `debug_detach` · `debug_add_breakpoint` · `debug_remove_breakpoint` · `debug_resume` · `debug_backtrace` · `debug_variables` · `debug_run_command` |
 | 📦 **Swift Package** | 6 | `swift_package_resolve` · `swift_package_update` · `swift_package_init` · `swift_package_clean` · `swift_package_show_deps` · `swift_package_dump` |
 | 🔎 **Inspection** | 2 | `read_user_defaults` · `write_user_default` |
@@ -85,6 +87,14 @@ debug_attach → debug_add_breakpoint → debug_resume → debug_backtrace → d
 ```
 
 > Attach LLDB, set breakpoints, hit them, inspect the stack and variables, detach cleanly.
+
+### Navigation
+
+```
+load_nav_graph → get_nav_graph → where_am_i → navigate_to → where_am_i
+```
+
+> Load the app's navigation graph, inspect its structure, identify the current screen, navigate to a target, verify arrival. See [docs/navigation.md](docs/navigation.md) for the full graph schema and authoring guide.
 
 ### Physical Device
 
@@ -234,8 +244,8 @@ Verdict: SUPPORTED — all checks passed.
 
 | Module | Role |
 |--------|------|
-| **Core** | Tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, log capture, LLDB sessions, video recording |
-| **Tools** | 65 tool implementations across 12 categories |
+| **Core** | Tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, log capture, LLDB sessions, video recording, navigation graph store |
+| **Tools** | 71 tool implementations across 13 categories |
 | **IosMcp** | Executable entry point — MCP server, ArgumentParser routing, `doctor` |
 
 See [AGENTS.md](AGENTS.md) for contributor guidance including coding conventions, error handling patterns, and detailed type documentation.

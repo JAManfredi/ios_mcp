@@ -19,6 +19,7 @@ public func registerAllTools(
     debugSession: any DebugSessionManaging,
     validator: DefaultsValidator,
     videoRecording: any VideoRecording,
+    navGraph: NavGraphStore,
     progressReporter: ProgressReporter? = nil
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
@@ -32,4 +33,5 @@ public func registerAllTools(
     await registerExtrasTools(with: registry, session: session, executor: executor, validator: validator)
     await registerSwiftPackageTools(with: registry, session: session, executor: executor, validator: validator)
     await registerDeviceTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
+    await registerNavigationTools(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
 }

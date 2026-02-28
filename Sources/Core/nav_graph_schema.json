@@ -1,0 +1,294 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://ios-mcp.local/nav-graph-schema.json",
+    "title": "ios-mcp Navigation Graph",
+    "description": "Describes the screen topology, navigation edges, and available commands for an iOS application. Consumed by the ios-mcp navigation tools (navigate_to, next_steps, etc.) to plan and execute multi-step navigation sequences in the simulator.",
+    "type": "object",
+    "required": ["version", "app", "nodes", "edges"],
+    "additionalProperties": false,
+    "properties": {
+        "version": {
+            "type": "string",
+            "description": "Semantic version of the navigation graph (e.g. \"1.0.0\")."
+        },
+        "app": {
+            "type": "string",
+            "description": "Human-readable application name this graph describes (e.g. \"Sportsbook\")."
+        },
+        "nodes": {
+            "type": "object",
+            "description": "Map of node IDs to NavNode objects. Each node represents a distinct screen or state in the app.",
+            "additionalProperties": {
+                "$ref": "#/$defs/NavNode"
+            }
+        },
+        "edges": {
+            "type": "array",
+            "description": "Ordered list of navigation edges connecting nodes. Each edge describes how to transition between screens.",
+            "items": {
+                "$ref": "#/$defs/NavEdge"
+            }
+        },
+        "commands": {
+            "type": "array",
+            "description": "Optional list of named navigation commands (shortcuts) that can be invoked by ID.",
+            "items": {
+                "$ref": "#/$defs/NavCommand"
+            }
+        }
+    },
+    "$defs": {
+        "NavNode": {
+            "type": "object",
+            "description": "A screen or distinct navigable state within the application.",
+            "required": ["id", "name", "isTabRoot"],
+            "additionalProperties": false,
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Unique identifier for this node, used as the key in the nodes map and referenced by edges."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Human-readable display name for this screen."
+                },
+                "isTabRoot": {
+                    "type": "boolean",
+                    "description": "Whether this node is the root screen of a tab bar item."
+                },
+                "supportedTabs": {
+                    "type": "array",
+                    "description": "Tab identifiers where this node can appear. Relevant for tab-based navigation.",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "isCMSDriven": {
+                    "type": "boolean",
+                    "description": "Whether the content of this screen is driven by a CMS and may vary between sessions."
+                },
+                "deeplinkTemplate": {
+                    "type": "string",
+                    "description": "URL template for deep-linking directly to this screen. Parameters are enclosed in braces (e.g. \"sportsbook://event/{eventId}\")."
+                },
+                "subTabs": {
+                    "type": "array",
+                    "description": "Sub-tab destinations available within this screen (e.g. segment controls, secondary tab bars).",
+                    "items": {
+                        "$ref": "#/$defs/SubTab"
+                    }
+                },
+                "fingerprint": {
+                    "$ref": "#/$defs/NodeFingerprint",
+                    "description": "Optional UI fingerprint used to verify the simulator is on the expected screen."
+                },
+                "validated": {
+                    "type": "boolean",
+                    "description": "Whether this node has been validated against a live simulator session."
+                }
+            }
+        },
+        "SubTab": {
+            "type": "object",
+            "description": "A sub-tab or segment within a parent screen.",
+            "required": ["id", "name", "deeplinkTemplate"],
+            "additionalProperties": false,
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Unique identifier for this sub-tab."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name of the sub-tab."
+                },
+                "deeplinkTemplate": {
+                    "type": "string",
+                    "description": "Deep-link URL template that navigates directly to this sub-tab."
+                },
+                "parameters": {
+                    "type": "array",
+                    "description": "Parameters required or accepted by the deep-link template.",
+                    "items": {
+                        "$ref": "#/$defs/EdgeParameter"
+                    }
+                }
+            }
+        },
+        "NodeFingerprint": {
+            "type": "object",
+            "description": "Heuristic identifiers used to confirm the simulator is displaying the expected screen.",
+            "additionalProperties": false,
+            "properties": {
+                "accessibilityId": {
+                    "type": "string",
+                    "description": "An accessibility identifier expected to be present on this screen."
+                },
+                "hierarchyHash": {
+                    "type": "string",
+                    "description": "Hash of the accessibility hierarchy structure for fuzzy matching."
+                },
+                "dominantStaticText": {
+                    "type": "string",
+                    "description": "A prominent static text string expected to appear on this screen (e.g. a page title)."
+                }
+            }
+        },
+        "NavEdge": {
+            "type": "object",
+            "description": "A directed edge representing a navigation transition between two nodes.",
+            "required": ["from", "actions"],
+            "additionalProperties": false,
+            "properties": {
+                "from": {
+                    "type": "string",
+                    "description": "ID of the source node where this transition begins."
+                },
+                "to": {
+                    "type": ["string", "null"],
+                    "description": "ID of the destination node. Null or omitted when the destination is dynamic or context-dependent."
+                },
+                "actions": {
+                    "type": "array",
+                    "description": "Ordered sequence of actions to execute to perform this navigation. Actions run in order.",
+                    "items": {
+                        "$ref": "#/$defs/EdgeAction"
+                    }
+                },
+                "parameters": {
+                    "type": "array",
+                    "description": "Parameters that must be supplied at runtime to execute this edge (e.g. an event ID for a deep link).",
+                    "items": {
+                        "$ref": "#/$defs/EdgeParameter"
+                    }
+                },
+                "reversible": {
+                    "type": "boolean",
+                    "description": "Whether this edge can be traversed in reverse (destination back to source)."
+                },
+                "reverseActions": {
+                    "type": "array",
+                    "description": "Actions to execute when traversing this edge in reverse. Only meaningful when reversible is true.",
+                    "items": {
+                        "$ref": "#/$defs/EdgeAction"
+                    }
+                },
+                "preconditions": {
+                    "type": "array",
+                    "description": "List of precondition identifiers that must be satisfied before this edge can be traversed (e.g. \"logged_in\").",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validated": {
+                    "type": "boolean",
+                    "description": "Whether this edge has been validated against a live simulator session."
+                }
+            }
+        },
+        "EdgeAction": {
+            "type": "object",
+            "description": "A single simulator interaction step within a navigation edge.",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["deeplink", "tap", "swipe", "type_text", "key_press"],
+                    "description": "The kind of simulator interaction to perform."
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Deep-link URL to open. Used when type is \"deeplink\"."
+                },
+                "target": {
+                    "$ref": "#/$defs/ElementTarget",
+                    "description": "UI element to interact with. Used when type is \"tap\" or \"swipe\"."
+                },
+                "direction": {
+                    "type": "string",
+                    "description": "Swipe direction. Used when type is \"swipe\". One of: up, down, left, right."
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Text to type into the focused field. Used when type is \"type_text\"."
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Key to press (e.g. \"return\", \"escape\"). Used when type is \"key_press\"."
+                }
+            }
+        },
+        "ElementTarget": {
+            "type": "object",
+            "description": "Identifies a UI element by accessibility properties or screen coordinates.",
+            "additionalProperties": false,
+            "properties": {
+                "accessibilityId": {
+                    "type": "string",
+                    "description": "Accessibility identifier of the target element (preferred targeting method)."
+                },
+                "accessibilityLabel": {
+                    "type": "string",
+                    "description": "Accessibility label of the target element."
+                },
+                "x": {
+                    "type": "number",
+                    "description": "X coordinate in points. Used with y as a fallback when no accessibility target is available."
+                },
+                "y": {
+                    "type": "number",
+                    "description": "Y coordinate in points. Used with x as a fallback when no accessibility target is available."
+                }
+            }
+        },
+        "EdgeParameter": {
+            "type": "object",
+            "description": "A parameter that must be supplied at runtime to execute a navigation action or deep link.",
+            "required": ["name", "type", "required"],
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Parameter name as it appears in the URL template (e.g. \"eventId\")."
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Data type of the parameter (e.g. \"string\", \"int\", \"bool\")."
+                },
+                "required": {
+                    "type": "boolean",
+                    "description": "Whether this parameter must be provided for the action to succeed."
+                },
+                "exampleValue": {
+                    "type": "string",
+                    "description": "An example value for documentation and testing purposes."
+                }
+            }
+        },
+        "NavCommand": {
+            "type": "object",
+            "description": "A named navigation shortcut that can be invoked by ID, typically backed by a deep link.",
+            "required": ["id", "description", "deeplinkTemplate", "behavior"],
+            "additionalProperties": false,
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Unique command identifier used to invoke this command."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description of what this command does."
+                },
+                "deeplinkTemplate": {
+                    "type": "string",
+                    "description": "Deep-link URL template executed when this command is invoked."
+                },
+                "behavior": {
+                    "type": "string",
+                    "description": "Describes how the command behaves (e.g. \"navigate\", \"reset\", \"open_modal\")."
+                }
+            }
+        }
+    }
+}
