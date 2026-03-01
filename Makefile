@@ -1,6 +1,6 @@
 PREFIX ?= /usr/local
 
-.PHONY: build install clean release
+.PHONY: build install clean release setup
 
 build:
 	swift build -c release --disable-sandbox
@@ -8,6 +8,9 @@ build:
 install: build
 	install -d $(PREFIX)/bin
 	install .build/release/ios-mcp $(PREFIX)/bin/
+
+setup:
+	brew bundle --file=Brewfile
 
 clean:
 	swift package clean
