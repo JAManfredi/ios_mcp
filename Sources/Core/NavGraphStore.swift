@@ -23,6 +23,7 @@ public actor NavGraphStore {
         public var nodes: [String: NavNode]
         public let edges: [NavEdge]
         public let commands: [NavCommand]?
+        public let references: [NavReference]?
     }
 
     public struct NavNode: Codable, Sendable {
@@ -129,6 +130,12 @@ public actor NavGraphStore {
         public let description: String
         public let deeplinkTemplate: String
         public let behavior: String
+    }
+
+    public struct NavReference: Codable, Sendable {
+        public let file: String
+        public let description: String
+        public let usedByNodes: [String]?
     }
 
     // MARK: - State

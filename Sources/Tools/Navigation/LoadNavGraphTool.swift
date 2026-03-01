@@ -93,6 +93,17 @@ func registerLoadNavGraphTool(
             summary += "  \(nodeCount) nodes, \(edgeCount) edges, \(commandCount) commands\n"
             summary += "  Tab roots: \(tabRoots.joined(separator: ", "))"
 
+            // Surface reference files so the agent knows where to look up parameter values
+            let graphDir = (path as NSString).deletingLastPathComponent
+            if let refs = graph.references, !refs.isEmpty {
+                summary += "\n\n  Reference files (for parameter lookup):"
+                for ref in refs {
+                    let absPath = (graphDir as NSString).appendingPathComponent(ref.file)
+                    summary += "\n    \(absPath)"
+                    summary += "\n      \(ref.description)"
+                }
+            }
+
             return .success(ToolResult(
                 content: summary,
                 nextSteps: [
