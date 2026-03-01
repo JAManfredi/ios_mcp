@@ -47,7 +47,8 @@ A navigation graph is a single JSON file with the following top-level structure:
   "app": "my-app",
   "nodes": { ... },
   "edges": [ ... ],
-  "commands": [ ... ]
+  "commands": [ ... ],
+  "references": [ ... ]
 }
 ```
 
@@ -98,9 +99,9 @@ Matching priority: `accessibilityId` (high confidence) > `dominantStaticText` (m
 
 ```json
 {
-  "id": "nfl",
-  "name": "NFL",
-  "deeplinkTemplate": "myapp://sports/nfl",
+  "id": "trending",
+  "name": "Trending",
+  "deeplinkTemplate": "myapp://home/trending",
   "parameters": [...]
 }
 ```
@@ -174,12 +175,35 @@ Optional convenience shortcuts for common deeplink-based operations.
 
 ```json
 {
-  "id": "open_bet_slip",
-  "description": "Open the bet slip overlay",
-  "deeplinkTemplate": "myapp://betslip",
-  "behavior": "overlay"
+  "id": "dismiss_modal",
+  "description": "Dismiss the topmost modal",
+  "deeplinkTemplate": "myapp://nav/dismiss",
+  "behavior": "dismiss"
 }
 ```
+
+### References
+
+Optional array of supplemental files that provide lookup data for edge parameters. When `load_nav_graph` runs, it resolves each reference file's path relative to the graph file and surfaces it in the output — so the agent knows exactly where to find parameter values.
+
+```json
+{
+  "file": "category_ids.json",
+  "description": "Category ID lookup table. Maps human-readable names to numeric IDs required by parameterized edges.",
+  "usedByNodes": ["category_detail", "item_detail"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `file` | string | yes | Filename relative to the graph file's directory |
+| `description` | string | yes | What the file contains and when to use it |
+| `usedByNodes` | [string] | no | Node IDs whose edges require values from this file |
+
+The agent workflow with references:
+1. `load_nav_graph` → output includes absolute paths to reference files with descriptions
+2. Agent reads the reference file to resolve human-readable names to IDs
+3. Agent passes resolved IDs as parameters to `navigate_to`
 
 ---
 
@@ -191,7 +215,7 @@ For simple apps, write the JSON directly. Start with tab roots as nodes and use 
 
 ### Option 2: Extract from Source Code
 
-For apps with deeplink handlers, write an extraction script that parses route definitions and generates the graph. The [DraftKings extraction script](https://github.com/JAManfredi/gaming-native-ios/blob/develop/nav-graph/extract_nav_graph.py) is an example of this approach — it parses Swift deeplink handler source files and generates a graph with 18 nodes and 44 edges.
+For apps with deeplink handlers, write an extraction script that parses route definitions and generates the graph automatically. For example, a Python script that walks Swift deeplink handler source files can produce a complete graph with nodes, edges, and parameter definitions.
 
 ### Option 3: Crawl at Runtime
 

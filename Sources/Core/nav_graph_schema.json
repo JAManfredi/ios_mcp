@@ -13,7 +13,7 @@
         },
         "app": {
             "type": "string",
-            "description": "Human-readable application name this graph describes (e.g. \"Sportsbook\")."
+            "description": "Human-readable application name this graph describes (e.g. \"my-app\")."
         },
         "nodes": {
             "type": "object",
@@ -34,6 +34,13 @@
             "description": "Optional list of named navigation commands (shortcuts) that can be invoked by ID.",
             "items": {
                 "$ref": "#/$defs/NavCommand"
+            }
+        },
+        "references": {
+            "type": "array",
+            "description": "Optional list of supplemental reference files that provide lookup data for edge parameters (e.g., sport/league ID mappings).",
+            "items": {
+                "$ref": "#/$defs/NavReference"
             }
         }
     },
@@ -69,7 +76,7 @@
                 },
                 "deeplinkTemplate": {
                     "type": "string",
-                    "description": "URL template for deep-linking directly to this screen. Parameters are enclosed in braces (e.g. \"sportsbook://event/{eventId}\")."
+                    "description": "URL template for deep-linking directly to this screen. Parameters are enclosed in braces (e.g. \"myapp://screen/{itemId}\")."
                 },
                 "subTabs": {
                     "type": "array",
@@ -287,6 +294,29 @@
                 "behavior": {
                     "type": "string",
                     "description": "Describes how the command behaves (e.g. \"navigate\", \"reset\", \"open_modal\")."
+                }
+            }
+        },
+        "NavReference": {
+            "type": "object",
+            "description": "A supplemental reference file that provides lookup data for edge parameters.",
+            "required": ["file", "description"],
+            "additionalProperties": false,
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "description": "Filename relative to the graph file's directory."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What the file contains and when to consult it."
+                },
+                "usedByNodes": {
+                    "type": "array",
+                    "description": "Node IDs whose edges require values from this file.",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         }
