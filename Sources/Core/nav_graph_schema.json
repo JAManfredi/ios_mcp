@@ -35,6 +35,13 @@
             "items": {
                 "$ref": "#/$defs/NavCommand"
             }
+        },
+        "references": {
+            "type": "array",
+            "description": "Optional list of supplemental reference files that provide lookup data for edge parameters (e.g., sport/league ID mappings).",
+            "items": {
+                "$ref": "#/$defs/NavReference"
+            }
         }
     },
     "$defs": {
@@ -287,6 +294,29 @@
                 "behavior": {
                     "type": "string",
                     "description": "Describes how the command behaves (e.g. \"navigate\", \"reset\", \"open_modal\")."
+                }
+            }
+        },
+        "NavReference": {
+            "type": "object",
+            "description": "A supplemental reference file that provides lookup data for edge parameters.",
+            "required": ["file", "description"],
+            "additionalProperties": false,
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "description": "Filename relative to the graph file's directory."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What the file contains and when to consult it."
+                },
+                "usedByNodes": {
+                    "type": "array",
+                    "description": "Node IDs whose edges require values from this file.",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         }
