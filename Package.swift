@@ -33,7 +33,8 @@ let package = Package(
             dependencies: [
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "Logging", package: "swift-log"),
-            ]
+            ],
+            exclude: ["nav_graph_schema.json"]
         ),
         .target(
             name: "Tools",
