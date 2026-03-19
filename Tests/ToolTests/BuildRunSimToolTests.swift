@@ -22,7 +22,7 @@ struct BuildRunSimToolTests {
     """
 
     private let xcresultJSON = """
-    { "actions": [] }
+    { "errors": [], "warnings": [], "analyzerWarnings": [] }
     """
 
     @Test("Builds, installs, and launches app")

@@ -15,18 +15,13 @@ struct BuildSimToolTests {
 
     private let xcresultJSON = """
     {
-      "actions": [
-        {
-          "buildResult": {
-            "issues": {
-              "errorSummaries": [],
-              "warningSummaries": [
-                { "message": "Unused variable 'x'" }
-              ]
-            }
-          }
-        }
-      ]
+      "errors": [],
+      "warnings": [
+        { "issueType": "Swift Compiler Warning", "message": "Unused variable 'x'" }
+      ],
+      "analyzerWarnings": [],
+      "warningCount": 1,
+      "errorCount": 0
     }
     """
 
