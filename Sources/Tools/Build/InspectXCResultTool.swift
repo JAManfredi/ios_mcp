@@ -223,7 +223,7 @@ private func fetchBuildResults(
 ) async -> [String: Any]? {
     guard let result = try? await executor.execute(
         executable: "/usr/bin/xcrun",
-        arguments: ["xcresulttool", "get", "build-results", "--path", path, "--format", "json"],
+        arguments: ["xcresulttool", "get", "build-results", "--path", path],
         timeout: 30,
         environment: nil
     ), result.succeeded,

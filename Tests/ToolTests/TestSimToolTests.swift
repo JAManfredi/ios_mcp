@@ -13,30 +13,30 @@ import Testing
 @Suite("test_simulator")
 struct TestSimToolTests {
 
-    private let testResultJSON = """
+    private let buildResultJSON = """
+    { "errors": [], "warnings": [], "analyzerWarnings": [] }
+    """
+
+    private let testSummaryJSON = """
     {
-      "actions": [
+      "title": "Test Scheme Action",
+      "environmentDescription": "Test Plan",
+      "topInsights": [],
+      "result": "Failed",
+      "totalTestCount": 10,
+      "passedTests": 8,
+      "failedTests": 1,
+      "skippedTests": 1,
+      "expectedFailures": 0,
+      "statistics": [],
+      "devicesAndConfigurations": {},
+      "testFailures": [
         {
-          "testResult": {
-            "summary": {
-              "totalCount": 10,
-              "passedCount": 8,
-              "failedCount": 1,
-              "skippedCount": 1
-            },
-            "failures": [
-              {
-                "testName": "MyTests/testBroken",
-                "message": "Expected true, got false"
-              }
-            ]
-          },
-          "buildResult": {
-            "issues": {
-              "errorSummaries": [],
-              "warningSummaries": []
-            }
-          }
+          "testName": "testBroken()",
+          "targetName": "MyTests",
+          "failureText": "Expected true, got false",
+          "testIdentifier": 0,
+          "testIdentifierString": "MyTests/testBroken()"
         }
       ]
     }
@@ -56,7 +56,10 @@ struct TestSimToolTests {
                 await capture.capture(args)
                 return CommandResult(stdout: "", stderr: "", exitCode: 0)
             }
-            return CommandResult(stdout: self.testResultJSON, stderr: "", exitCode: 0)
+            if args.contains("test-results") {
+                return CommandResult(stdout: self.testSummaryJSON, stderr: "", exitCode: 0)
+            }
+            return CommandResult(stdout: self.buildResultJSON, stderr: "", exitCode: 0)
         }
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
@@ -93,7 +96,10 @@ struct TestSimToolTests {
             if exec.contains("xcodebuild") && args.contains("test") {
                 await capture.capture(args)
             }
-            return CommandResult(stdout: self.testResultJSON, stderr: "", exitCode: 0)
+            if args.contains("test-results") {
+                return CommandResult(stdout: self.testSummaryJSON, stderr: "", exitCode: 0)
+            }
+            return CommandResult(stdout: self.buildResultJSON, stderr: "", exitCode: 0)
         }
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
@@ -151,7 +157,10 @@ struct TestSimToolTests {
             if exec.contains("xcodebuild") && args.contains("test") {
                 return CommandResult(stdout: "", stderr: "Testing failed", exitCode: 65)
             }
-            return CommandResult(stdout: self.testResultJSON, stderr: "", exitCode: 0)
+            if args.contains("test-results") {
+                return CommandResult(stdout: self.testSummaryJSON, stderr: "", exitCode: 0)
+            }
+            return CommandResult(stdout: self.buildResultJSON, stderr: "", exitCode: 0)
         }
 
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
@@ -162,7 +171,7 @@ struct TestSimToolTests {
             #expect(error.code == .commandFailed)
             #expect(error.message.contains("Tests failed"))
             #expect(error.message.contains("Elapsed:"))
-            #expect(error.message.contains("MyTests/testBroken"))
+            #expect(error.message.contains("testBroken()"))
         } else {
             Issue.record("Expected error response")
         }

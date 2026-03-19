@@ -116,13 +116,13 @@ func registerBuildSimTool(
 
                 for error in diagnostics.errors {
                     var errorLine = "  error: \(error.message)"
-                    if let file = error.file { errorLine += " (\(file):\(error.line ?? 0))" }
+                    if let url = error.sourceURL { errorLine += " (\(url))" }
                     lines.append(errorLine)
                 }
 
                 for warning in diagnostics.warnings.prefix(10) {
                     var warnLine = "  warning: \(warning.message)"
-                    if let file = warning.file { warnLine += " (\(file):\(warning.line ?? 0))" }
+                    if let url = warning.sourceURL { warnLine += " (\(url))" }
                     lines.append(warnLine)
                 }
 
