@@ -68,7 +68,14 @@ func registerInspectXCResultTool(
                             for entry in errors.prefix(50) {
                                 let message = entry["message"] as? String ?? "Unknown error"
                                 let issueType = entry["issueType"] as? String
-                                var line = "  - \(message)"
+                                let where_ = DiagnosticEntry(
+                                    message: message,
+                                    issueType: issueType,
+                                    sourceURL: entry["sourceURL"] as? String
+                                ).location
+                                var line = "  - "
+                                if let where_ { line += "\(where_): " }
+                                line += message
                                 if let t = issueType { line += " [\(t)]" }
                                 output.append(line)
                             }

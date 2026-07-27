@@ -53,7 +53,6 @@ func registerListDevicesTool(
             var lines: [String] = ["Connected devices (\(devices.count)):"]
 
             for device in devices {
-                let identifier = device["identifier"] as? String ?? "?"
                 let deviceProps = device["deviceProperties"] as? [String: Any]
                 let name = deviceProps?["name"] as? String ?? "Unknown"
                 let osVersion = deviceProps?["osVersionNumber"] as? String ?? "?"
@@ -64,11 +63,18 @@ func registerListDevicesTool(
                 let connectionProps = device["connectionProperties"] as? [String: Any]
                 let transportType = connectionProps?["transportType"] as? String ?? "?"
 
-                lines.append("  \(identifier) — \(name) (\(model), iOS \(osVersion), \(transportType))")
+                let identifier = DeviceIdentity.destinationUDID(for: device) ?? "unidentified"
+                lines.append(
+                    "  \(identifier) — \(name) (\(model), iOS \(osVersion), \(transportType))"
+                )
             }
 
-            // Auto-set session default if exactly one device
-            if devices.count == 1, let udid = devices.first?["identifier"] as? String {
+            // Auto-set session default if exactly one device, and only when it
+            // actually has an identifier — storing a placeholder would fail
+            // every later device call with a confusing "not found".
+            if devices.count == 1,
+               let device = devices.first,
+               let udid = DeviceIdentity.destinationUDID(for: device) {
                 await session.set(.deviceUDID, value: udid)
                 lines.append("\nSession default set: device_udid = \(udid)")
             }
@@ -81,4 +87,5 @@ func registerListDevicesTool(
             ))
         }
     }
+
 }

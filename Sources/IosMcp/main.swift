@@ -275,13 +275,18 @@ struct Doctor: AsyncParsableCommand {
                 if result.succeeded {
                     let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                     let checksumStatus = verifyAxeChecksum(binaryPath: path)
-                    print("[ok] axe: \(version)\(checksumStatus)")
+                    if let upgrade = axeVersionWarning(reported: version) {
+                        print("[--] axe: \(version)\(checksumStatus) — \(upgrade)")
+                        optionalFailed = true
+                    } else {
+                        print("[ok] axe: \(version)\(checksumStatus)")
+                    }
                 } else {
-                    print("[--] axe: found at \(path) but --version failed")
+                    print("[--] axe: \(axeFailureDetail(binaryPath: path, failure: result.stderr))")
                     optionalFailed = true
                 }
             } catch {
-                print("[--] axe: check failed — \(error)")
+                print("[--] axe: \(axeFailureDetail(binaryPath: path, failure: "\(error)")) (\(error))")
                 optionalFailed = true
             }
         case .failure:
