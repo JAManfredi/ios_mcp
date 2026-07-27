@@ -62,6 +62,6 @@ public func resolveAxePath() -> Result<String, ToolError> {
 
     return .failure(ToolError(
         code: .dependencyMissing,
-        message: "axe CLI not found. Install axe to use UI automation tools. See: https://github.com/nicklama/axe"
+        message: "axe CLI not found. UI automation tools require it. Install with: brew install cameroncooke/axe/axe (needs 1.8.0 or newer). Source: https://github.com/cameroncooke/AXe"
     ))
 }
