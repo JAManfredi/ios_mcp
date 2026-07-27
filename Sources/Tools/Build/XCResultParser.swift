@@ -19,6 +19,35 @@ struct DiagnosticEntry: Sendable {
     let message: String
     let issueType: String?
     let sourceURL: String?
+
+    /// `File.swift:229:25`, extracted from the `sourceURL` blob.
+    ///
+    /// xcresult reports locations as
+    /// `file:///long/path/File.swift#EndingColumnNumber=25&StartingLineNumber=229&…`,
+    /// which is unreadable inline and forces a re-run of `xcodebuild | grep`
+    /// just to find out which line failed. This is the only part of a
+    /// diagnostic that says where to look, so it belongs next to the message.
+    var location: String? {
+        guard let sourceURL else { return nil }
+
+        let parts = sourceURL.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let path = parts.first else { return nil }
+        let file = path.split(separator: "/").last.map(String.init) ?? String(path)
+
+        guard parts.count == 2 else { return file }
+
+        var fields: [String: String] = [:]
+        for pair in parts[1].split(separator: "&") {
+            let kv = pair.split(separator: "=", maxSplits: 1)
+            if kv.count == 2 { fields[String(kv[0])] = String(kv[1]) }
+        }
+
+        guard let line = fields["StartingLineNumber"] else { return file }
+        if let column = fields["StartingColumnNumber"] {
+            return "\(file):\(line):\(column)"
+        }
+        return "\(file):\(line)"
+    }
 }
 
 struct TestResults: Sendable {

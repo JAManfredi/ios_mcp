@@ -29,11 +29,9 @@ func resolveDeviceUDID(
         ))
     }
 
-    if let error = await validator.validateDeviceUDID(udid) {
-        return .failure(error)
-    }
-
-    return .success(udid)
+    // Canonicalize rather than just validate: the caller may hold a CoreDevice
+    // UUID, which names the right device but is rejected by `-destination`.
+    return await validator.canonicalDeviceUDID(udid)
 }
 
 /// Builds xcodebuild destination string for a physical device.
