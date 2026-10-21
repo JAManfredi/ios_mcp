@@ -358,8 +358,13 @@ struct Doctor: AsyncParsableCommand {
             optionalFailed = true
         }
 
+        // Native servers are optional candidates, not dependencies of our current tools.
+        for line in try await NativeMCPDiagnostics.run(executor: executor) {
+            print(line)
+        }
+
         // Version
-        print("[ok] ios-mcp version: 0.2.0")
+        print("[ok] ios-mcp version: \(IosMcpCommand.configuration.version)")
 
         // Verdict
         if requiredFailed {
@@ -367,7 +372,7 @@ struct Doctor: AsyncParsableCommand {
         } else if optionalFailed {
             print("\nVerdict: WARNING — optional dependencies are missing. Some tools will be unavailable.")
         } else {
-            print("\nVerdict: SUPPORTED — all checks passed.")
+            print("\nVerdict: SUPPORTED — required and optional dependencies are available.")
         }
     }
 }

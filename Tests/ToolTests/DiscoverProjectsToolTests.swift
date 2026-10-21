@@ -62,6 +62,22 @@ struct DiscoverProjectsToolTests {
         #expect(entries[1].type == .project)
     }
 
+    @Test("Discovers project bundles with either configuration file format", arguments: ["project.pbxproj", "project.xcproj"])
+    func discoversConfigurationFormats(configurationFile: String) throws {
+        let tmp = try createTempDir()
+        defer { cleanup(tmp) }
+        try createDir(at: tmp, name: "MyApp.xcodeproj/project.xcworkspace")
+        let project = tmp.appendingPathComponent("MyApp.xcodeproj")
+        // Discovery must not parse or depend on the internal configuration format.
+        try Data("{}".utf8).write(to: project.appendingPathComponent(configurationFile))
+
+        let entries = try scanForProjects(in: tmp.path)
+        #expect(entries.count == 1)
+        let entry = try #require(entries.first)
+        #expect(URL(fileURLWithPath: entry.path).resolvingSymlinksInPath() == project.resolvingSymlinksInPath())
+        #expect(entry.type == .project)
+    }
+
     // MARK: - Skipped Directories
 
     @Test("Skips DerivedData, .build, Pods, etc.")

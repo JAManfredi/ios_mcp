@@ -181,7 +181,8 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 - `set_orientation`, `reboot_simulator`, and `debug_task_tree` need Xcode 27. `swift_package_test`'s `repeat_until` needs the Swift 6.4 toolchain.
 - Device tools read devicectl's JSON v5 `properties` dictionary, with fallback to the fields Xcode 27 deprecated.
 - axe below 1.8.0 can't load SimulatorKit under Xcode 27, so `doctor` treats it as a required failure there.
-- Xcode 27 also ships its own MCP servers (`xcrun mcp-server`, `lldb-mcp`). ios-mcp runs without an open Xcode workspace, and it adds output redaction, an LLDB denylist, nav graphs, and xcresult and crash parsing.
+- Xcode 27 also supports headless native MCP. `xcrun mcpbridge` is the stdio connection; `xcrun mcp-server` manages the service and permissions. `lldb-mcp` provides a separate debugger connection. ios-mcp currently keeps its existing backends, output redaction, LLDB command policy, nav graphs, and artifact handling.
+- `ios-mcp doctor` discovers native binaries in the effective toolchain (including `DEVELOPER_DIR`) and queries service/permission status without connecting, opening a workspace, or granting access. These optional diagnostics do not affect the dependency verdict. Installed binaries and enabled headless mode do not establish agent authorization or backend compatibility. See [native MCP compatibility checks](docs/native-mcp-compatibility.md) for the observed tool schemas, runtime results, and adoption gaps.
 
 ---
 
