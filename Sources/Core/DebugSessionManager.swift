@@ -217,24 +217,50 @@ actor LLDBSession {
                 buffer.append(text)
             }
         }
+
+        do {
+            try enableAutoConfirm()
+        } catch {
+            terminate()
+            throw error
+        }
     }
 
     func sendCommand(_ command: String, timeout: TimeInterval) throws -> String {
-        guard !command.contains("\n"), !command.contains("\r") else {
-            throw ToolError(code: .invalidInput, message: "Send one LLDB command per request; multiline interactive input is not supported.")
+        if let error = lldbSessionProtocolError(command) { throw error }
+        return try send(command, timeout: timeout)
+    }
+
+    func terminate() {
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        if let proc = process, proc.isRunning {
+            proc.terminate()
         }
-        // Confirmation input cannot share the command/marker stream: LLDB can
-        // consume subsequent commands as answers. Require an explicit deletion
-        // target (or LLDB's explicit --force form) instead of answering prompts.
-        let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
-        if let first = words.first, ["q", "qu", "qui", "quit", "exit"].contains(first) {
-            throw ToolError(code: .invalidInput, message: "Use debug_detach to close a debug session; interactive quit is not supported.")
+        process = nil
+        stdinPipe = nil
+        stdoutPipe = nil
+    }
+
+    // MARK: - Private
+
+    /// LLDB reads confirmation answers ("kill it and restart?", "delete all
+    /// breakpoints?") from stdin, where they would consume the completion
+    /// marker and every later command. With auto-confirm, LLDB takes each
+    /// prompt's default instead; commands whose default is destructive are
+    /// on the denylist.
+    private func enableAutoConfirm() throws {
+        _ = try send("settings set auto-confirm true", timeout: 10)
+        let setting = try send("settings show auto-confirm", timeout: 10)
+        guard setting.contains("auto-confirm (boolean) = true") else {
+            throw ToolError(
+                code: .internalError,
+                message: "Could not enable LLDB auto-confirm; refusing to start a session that could block on a prompt.",
+                details: setting.isEmpty ? nil : setting
+            )
         }
-        if words.count >= 2, words[0].count >= 2,
-           ["breakpoint", "watchpoint"].contains(where: { $0.hasPrefix(words[0]) }),
-           "delete".hasPrefix(words[1]), words.dropFirst(2).allSatisfy({ $0 == "--" }) {
-            throw ToolError(code: .invalidInput, message: "Deleting all breakpoints or watchpoints requires confirmation. Supply explicit IDs or an explicit --force option; interactive confirmation is not supported.")
-        }
+    }
+
+    private func send(_ command: String, timeout: TimeInterval) throws -> String {
         guard let stdinPipe, let process, process.isRunning else {
             throw ToolError(
                 code: .internalError,
@@ -255,18 +281,6 @@ actor LLDBSession {
             .replacingOccurrences(of: Self.prompt + command + "\n", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines))
     }
-
-    func terminate() {
-        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
-        if let proc = process, proc.isRunning {
-            proc.terminate()
-        }
-        process = nil
-        stdinPipe = nil
-        stdoutPipe = nil
-    }
-
-    // MARK: - Private
 
     private func waitForCompletion(marker: String, timeout: TimeInterval) throws -> String {
         let deadline = Date().addingTimeInterval(timeout)

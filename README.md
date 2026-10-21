@@ -88,10 +88,13 @@ debug_attach → debug_add_breakpoint → debug_resume → debug_backtrace → d
 
 > Attach LLDB, set breakpoints, hit them, inspect the stack and variables, detach cleanly.
 
-`debug_run_command` accepts one noninteractive command. Supply explicit IDs when
-deleting breakpoints or watchpoints (or explicitly use LLDB's `--force` option).
-Bare bulk-deletion commands are rejected instead of answering a confirmation
-prompt. Use `debug_detach` to close the session rather than `quit`.
+`debug_run_command` accepts one command per request. Debug sessions run with LLDB's
+`auto-confirm` enabled, so confirmation prompts (such as deleting all breakpoints)
+take their default answer instead of waiting for input; commands that would turn
+it off are rejected. Commands whose default answer kills, relaunches, or replaces
+the target (`run`, `process launch`, `attach`, `process connect`) are on the
+denylist, including their aliases and abbreviations. Use `debug_detach` to close
+the session rather than `quit`.
 
 ### Navigation
 
