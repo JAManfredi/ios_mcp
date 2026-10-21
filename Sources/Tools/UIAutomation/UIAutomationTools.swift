@@ -16,12 +16,13 @@ func registerUIAutomationTools(
     executor: any CommandExecuting,
     artifacts: ArtifactStore,
     validator: DefaultsValidator,
-    videoRecording: any VideoRecording
+    videoRecording: any VideoRecording,
+    nativeUI: (any NativeUIAutomating)? = nil
 ) async {
     await registerScreenshotTool(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
     await registerDeepLinkTool(with: registry, session: session, executor: executor, validator: validator)
-    await registerSnapshotUITool(with: registry, session: session, executor: executor, validator: validator)
-    await registerTapTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerSnapshotUITool(with: registry, session: session, executor: executor, validator: validator, nativeUI: nativeUI)
+    await registerTapTool(with: registry, session: session, executor: executor, validator: validator, nativeUI: nativeUI)
     await registerSwipeTool(with: registry, session: session, executor: executor, validator: validator)
     await registerTypeTextTool(with: registry, session: session, executor: executor, validator: validator)
     await registerKeyPressTool(with: registry, session: session, executor: executor, validator: validator)

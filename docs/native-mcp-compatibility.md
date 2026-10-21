@@ -4,7 +4,9 @@ Author: Jared Manfredi
 
 Checked October 21, 2026 with Xcode 27.1 (27A9275), macOS 26.7,
 LLDB 2103.0.34.103, and the native `xcode-tools` server version 25320.
-This is a compatibility assessment, not an enabled replacement backend.
+This records the initial compatibility assessment. The subsequent opt-in
+`inspect_ui`/`tap` implementation and its separate acceptance results are in
+[native UI pilot](native-ui-pilot.md); the default backends remain unchanged.
 
 ## Diagnostics
 
@@ -112,10 +114,11 @@ The JSON `.xcproj` configuration lives inside the existing `.xcodeproj` bundle,
 so the project scanner needs no new top-level extension. The retained discovery
 test intentionally does not parse the configuration contents.
 
-## Next acceptance step
+## Follow-up acceptance
 
-Use an explicitly approved agent and a disposable project/device to verify the
-UI behaviors above, including session cleanup on failure and cancellation.
+The [native UI pilot](native-ui-pilot.md) implements the first follow-up using
+a disposable project/device. Its report distinguishes completed checks from
+remaining live authorization and behavior checks.
 Recheck the LLDB launcher against the installed version's catalog and explicit
 session-selection behavior before choosing a transport. These checks are
 opt-in because connecting can start services and requesting project access can

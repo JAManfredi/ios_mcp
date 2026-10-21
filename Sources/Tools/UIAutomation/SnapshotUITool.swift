@@ -13,7 +13,8 @@ func registerSnapshotUITool(
     session: SessionStore,
     executor: any CommandExecuting,
     axePath: String? = nil,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    nativeUI: (any NativeUIAutomating)? = nil
 ) async {
     let manifest = ToolManifest(
         name: "inspect_ui",
@@ -31,16 +32,6 @@ func registerSnapshotUITool(
     )
 
     await registry.register(manifest: manifest) { args in
-        let resolvedAxe: String
-        if let axePath {
-            resolvedAxe = axePath
-        } else {
-            switch resolveAxePath() {
-            case .success(let path): resolvedAxe = path
-            case .failure(let error): return .error(error)
-            }
-        }
-
         var udid: String?
         if case .string(let u) = args["udid"] {
             udid = u
@@ -57,6 +48,26 @@ func registerSnapshotUITool(
 
         if let error = await validator.validateSimulatorUDID(resolvedUDID) {
             return .error(error)
+        }
+
+        if let nativeUI {
+            do {
+                return .success(try await nativeUI.inspect(udid: resolvedUDID))
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(code: .commandFailed, message: "Native UI operation failed or was cancelled. Inspect the screen before retrying a tap."))
+            }
+        }
+
+        let resolvedAxe: String
+        if let axePath {
+            resolvedAxe = axePath
+        } else {
+            switch resolveAxePath() {
+            case .success(let path): resolvedAxe = path
+            case .failure(let error): return .error(error)
+            }
         }
 
         do {

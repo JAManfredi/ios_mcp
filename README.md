@@ -162,6 +162,39 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 
 ---
 
+### Native UI pilot (opt-in)
+
+To try Xcode's native simulator inspection and taps, add an approved project to
+this server's arguments:
+
+```json
+{
+  "mcpServers": {
+    "ios-mcp": {
+      "command": "/usr/local/bin/ios-mcp",
+      "args": ["--native-ui-workspace", "/absolute/path/YourApp.xcodeproj"]
+    }
+  }
+}
+```
+
+This opens the project through `mcpbridge` and may prompt for agent/project
+approval in Xcode. No permissions are granted automatically. Use an exact
+simulator UDID and launch the intended app first. Only `inspect_ui` and `tap`
+use the pilot; other UI and navigation tools still require compatible AXe.
+Omit the option to use the existing backend for every tool.
+
+Native inspection returns Apple's text hierarchy plus managed screenshot and
+hierarchy paths. Tap resolves a unique accessibility identifier or label against
+a fresh capture, or accepts coordinates in **screen points**, not screenshot
+pixels. Ambiguous, missing, disabled, or out-of-bounds targets fail before input.
+Each operation ends its owned session and closes its bridge. A failed native
+tap never retries or falls back to AXe; inspect the screen before deciding
+whether to repeat it.
+
+This is an experimental compatibility pilot, not a performance optimization.
+See [pilot validation and limits](docs/native-ui-pilot.md) before enabling it.
+
 ## 📋 Requirements
 
 | Dependency | Version | Required |
@@ -181,7 +214,7 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 - `set_orientation`, `reboot_simulator`, and `debug_task_tree` need Xcode 27. `swift_package_test`'s `repeat_until` needs the Swift 6.4 toolchain.
 - Device tools read devicectl's JSON v5 `properties` dictionary, with fallback to the fields Xcode 27 deprecated.
 - axe below 1.8.0 can't load SimulatorKit under Xcode 27, so `doctor` treats it as a required failure there.
-- Xcode 27 also supports headless native MCP. `xcrun mcpbridge` is the stdio connection; `xcrun mcp-server` manages the service and permissions. `lldb-mcp` provides a separate debugger connection. ios-mcp currently keeps its existing backends, output redaction, LLDB command policy, nav graphs, and artifact handling.
+- Xcode 27 also supports headless native MCP. `xcrun mcpbridge` is the stdio connection; `xcrun mcp-server` manages the service and permissions. `lldb-mcp` provides a separate debugger connection. ios-mcp keeps its existing backends by default. An opt-in native UI pilot is available for `inspect_ui` and `tap`; LLDB, other gestures, and navigation tools keep their existing backends.
 - `ios-mcp doctor` discovers native binaries in the effective toolchain (including `DEVELOPER_DIR`) and queries service/permission status without connecting, opening a workspace, or granting access. These optional diagnostics do not affect the dependency verdict. Installed binaries and enabled headless mode do not establish agent authorization or backend compatibility. See [native MCP compatibility checks](docs/native-mcp-compatibility.md) for the observed tool schemas, runtime results, and adoption gaps.
 
 ---
