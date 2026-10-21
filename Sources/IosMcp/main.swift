@@ -22,14 +22,17 @@ struct IosMcpCommand: AsyncParsableCommand {
         defaultSubcommand: nil
     )
 
+    @Option(name: .long, help: "Opt in to native Xcode inspect_ui and tap using this absolute .xcodeproj/.xcworkspace path. Requires Xcode agent approval; other UI tools still use AXe.")
+    var nativeUIWorkspace: String?
+
     func run() async throws {
-        try await startServer()
+        try await startServer(nativeUIWorkspace: nativeUIWorkspace)
     }
 }
 
 // MARK: - MCP Server
 
-private func startServer() async throws {
+private func startServer(nativeUIWorkspace: String?) async throws {
     LoggingConfiguration.bootstrap(level: .info)
     let logger = Logger(label: "ios-mcp")
 
@@ -39,6 +42,14 @@ private func startServer() async throws {
     let artifacts = ArtifactStore(
         baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ios-mcp-artifacts")
     )
+    let nativeUI: NativeUIController?
+    do {
+        nativeUI = try nativeUIWorkspace.map {
+            try NativeUIController(workspace: $0, artifacts: artifacts, concurrency: concurrency)
+        }
+    } catch let error as ToolError {
+        throw ValidationError(error.message)
+    }
     let logCapture = LogCaptureManager()
     let debugSession = LLDBSessionManager()
     let videoRecording = VideoRecordingManager()
@@ -65,7 +76,7 @@ private func startServer() async throws {
     }
 
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, navGraph: navGraph, progressReporter: progressReporter)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, navGraph: navGraph, progressReporter: progressReporter, nativeUI: nativeUI)
 
     await server.withMethodHandler(ListTools.self) { _ in
         let manifests = await registry.listTools()
@@ -146,6 +157,7 @@ private func startServer() async throws {
     await server.waitUntilCompleted()
 
     // Cleanup: tear down active sessions, log captures, and locks
+    await nativeUI?.shutdown()
     await debugSession.teardownAll()
     await logCapture.stopAll()
     await videoRecording.stopAll()
