@@ -66,10 +66,13 @@ func registerTapTool(
             return .error(error)
         }
 
+        var backendReason: String?
         if let nativeUI {
             do {
                 let target = try nativeTapTarget(args)
                 return .success(try await nativeUI.tap(udid: resolvedUDID, target: target))
+            } catch let unavailable as NativeUIUnavailable {
+                backendReason = unavailable.reason
             } catch let error as ToolError {
                 return .error(error)
             } catch {
@@ -77,43 +80,46 @@ func registerTapTool(
             }
         }
 
-        let resolvedAxe: String
-        if let axePath {
-            resolvedAxe = axePath
-        } else {
-            switch resolveAxePath() {
-            case .success(let path): resolvedAxe = path
+        let response: ToolResponse = await {
+            let resolvedAxe: String
+            if let axePath {
+                resolvedAxe = axePath
+            } else {
+                switch resolveAxePath() {
+                case .success(let path): resolvedAxe = path
+                case .failure(let error): return .error(error)
+                }
+            }
+
+            let targetArgs: [String]
+            switch resolveAxeTarget(from: args) {
+            case .success(let t): targetArgs = t
             case .failure(let error): return .error(error)
             }
-        }
 
-        let targetArgs: [String]
-        switch resolveAxeTarget(from: args) {
-        case .success(let t): targetArgs = t
-        case .failure(let error): return .error(error)
-        }
+            do {
+                let result = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["tap", "--udid", resolvedUDID] + targetArgs,
+                    timeout: 120,
+                    environment: nil
+                )
 
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["tap", "--udid", resolvedUDID] + targetArgs,
-                timeout: 120,
-                environment: nil
-            )
+                guard result.succeeded else {
+                    return .error(axeCommandError("axe tap failed", stderr: result.stderr))
+                }
 
-            guard result.succeeded else {
-                return .error(axeCommandError("axe tap failed", stderr: result.stderr))
+                return .success(ToolResult(content: "Tapped element on simulator \(resolvedUDID)."))
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(
+                    code: .internalError,
+                    message: "Failed to tap element: \(error.localizedDescription)"
+                ))
             }
-
-            return .success(ToolResult(content: "Tapped element on simulator \(resolvedUDID)."))
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to tap element: \(error.localizedDescription)"
-            ))
-        }
+        }()
+        return backendReason.map { uiBackendResponse(response, reason: $0) } ?? response
     }
 }
 

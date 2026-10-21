@@ -11,7 +11,10 @@ public protocol NativeUIAutomating: Sendable {
 /// Opt-in pilot. One operation owns one bridge and one device interaction session.
 /// No action is retried or sent to AXe after a native failure.
 public actor NativeUIController: NativeUIAutomating {
-    private let workspace: String
+    private let workspace: String?
+    private let mode: UIBackendMode
+    private let session: SessionStore?
+    private let executor: any CommandExecuting
     private let artifacts: ArtifactStore
     private let concurrency: ConcurrencyPolicy
     private let makeClient: @Sendable () -> any NativeMCPCalling
@@ -19,22 +22,34 @@ public actor NativeUIController: NativeUIAutomating {
     private var active: Task<ToolResult, Error>?
     private var stopping = false
 
-    public init(workspace: String, artifacts: ArtifactStore, concurrency: ConcurrencyPolicy) throws {
+    private static func validatedWorkspace(_ workspace: String) throws -> String {
         let url = URL(fileURLWithPath: workspace).standardizedFileURL
         guard workspace.hasPrefix("/"), ["xcodeproj", "xcworkspace"].contains(url.pathExtension),
               FileManager.default.fileExists(atPath: url.path) else {
-            throw ToolError(code: .invalidInput, message: "--native-ui-workspace requires an existing absolute .xcodeproj or .xcworkspace path.")
+            throw ToolError(code: .invalidInput, message: "Native UI requires an existing absolute .xcodeproj or .xcworkspace path. Check --native-ui-workspace or session workspace/project defaults.")
         }
-        self.workspace = url.path
+        return url.path
+    }
+
+    public init(workspace: String? = nil, mode: UIBackendMode = .native, session: SessionStore? = nil,
+                executor: any CommandExecuting = CommandExecutor(), artifacts: ArtifactStore, concurrency: ConcurrencyPolicy) throws {
+        self.workspace = try workspace.map(Self.validatedWorkspace)
+        self.mode = mode
+        self.session = session
+        self.executor = executor
         self.artifacts = artifacts
         self.concurrency = concurrency
         self.makeClient = { NativeMCPClient() }
         self.artifactRoot = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ActionArtifacts")
     }
 
-    init(workspace: String, artifacts: ArtifactStore, concurrency: ConcurrencyPolicy,
-         artifactRoot: URL, makeClient: @escaping @Sendable () -> any NativeMCPCalling) {
+    init(workspace: String?, artifacts: ArtifactStore, concurrency: ConcurrencyPolicy,
+         artifactRoot: URL, mode: UIBackendMode = .native, session: SessionStore? = nil,
+         executor: any CommandExecuting = CommandExecutor(), makeClient: @escaping @Sendable () -> any NativeMCPCalling) {
         self.workspace = workspace
+        self.mode = mode
+        self.session = session
+        self.executor = executor
         self.artifacts = artifacts
         self.concurrency = concurrency
         self.artifactRoot = artifactRoot
@@ -60,11 +75,27 @@ public actor NativeUIController: NativeUIAutomating {
         guard !stopping, active == nil else {
             throw ToolError(code: .resourceBusy, message: "Native UI is busy or shutting down. Wait for the current operation to finish.")
         }
+        if mode == .axe { throw NativeUIUnavailable("axe mode") }
+        // Take one snapshot: an operation must not combine workspace/project
+        // defaults from different session updates.
+        let defaults = await session?.allDefaults() ?? [:]
+        try Task.checkCancellation()
+        // The defaults snapshot awaited another actor; recheck ownership before
+        // publishing this task so concurrent calls cannot replace active work.
+        guard !stopping, active == nil else {
+            throw ToolError(code: .resourceBusy, message: "Native UI is busy or shutting down.")
+        }
+        let selectedWorkspace = workspace ?? defaults[.workspace] ?? defaults[.project]
+        guard let selectedWorkspace else {
+            if mode == .auto { throw NativeUIUnavailable("auto: no workspace/project configured") }
+            throw ToolError(code: .invalidInput, message: "Native UI needs --native-ui-workspace or a session workspace/project default.")
+        }
+        let selectedPath = try Self.validatedWorkspace(selectedWorkspace)
         guard let uuid = UUID(uuidString: udid) else {
             throw ToolError(code: .invalidInput, message: "Native UI requires an exact simulator UUID, not a device name or partial identifier.")
         }
-        let task = Task { [workspace, artifacts, concurrency, artifactRoot, makeClient] in
-            try await Self.run(udid: uuid.uuidString, target: target, workspace: workspace,
+        let task = Task { [mode, executor, artifacts, concurrency, artifactRoot, makeClient] in
+            try await Self.run(udid: uuid.uuidString, target: target, workspace: selectedPath, mode: mode, executor: executor,
                                artifacts: artifacts, concurrency: concurrency,
                                artifactRoot: artifactRoot, client: makeClient())
         }
@@ -75,17 +106,41 @@ public actor NativeUIController: NativeUIAutomating {
         } onCancel: { task.cancel() }
     }
 
-    private static func run(udid: String, target: NativeUITarget?, workspace: String,
+    private static func run(udid: String, target: NativeUITarget?, workspace: String, mode: UIBackendMode, executor: any CommandExecuting,
                             artifacts: ArtifactStore, concurrency: ConcurrencyPolicy,
                             artifactRoot: URL, client: any NativeMCPCalling) async throws -> ToolResult {
         let lock = "simulator:\(udid)"
         if let error = await concurrency.acquire(key: lock, owner: "native_ui") { throw error }
+        // This is the only fallback boundary. Catalog discovery performs no
+        // workspace, permission, device-session, or input tool calls.
+        do {
+            if mode == .auto {
+                let found = try await executor.execute(executable: "/usr/bin/xcrun", arguments: ["--find", "mcpbridge"], timeout: 5, environment: nil)
+                try Task.checkCancellation()
+                if !found.succeeded && found.stderr.contains("unable to find utility \"mcpbridge\"") {
+                    throw NativeUIUnavailable("auto: mcpbridge is unavailable in the selected Xcode")
+                }
+                let path = found.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard found.succeeded, path.hasPrefix("/"), !path.contains("\n") else {
+                    throw ToolError(code: .commandFailed, message: "Native UI capability lookup failed; availability is unknown. No AXe fallback was attempted.")
+                }
+            }
+            do { try await client.connect() }
+            catch let error as ToolError where mode == .auto && error.code == .dependencyMissing {
+                throw NativeUIUnavailable("auto: the selected Xcode lacks the required native UI tool schemas")
+            }
+            try Task.checkCancellation()
+        } catch {
+            await client.close()
+            await concurrency.release(key: lock)
+            try Task.checkCancellation()
+            throw error
+        }
         var sessionKey: String?
         var startRequested = false
         var tapRequested = false
         var outcome: Result<ToolResult, Error>
         do {
-            try await client.connect()
             _ = try await client.call("XcodeOpenWorkspace", arguments: ["path": .string(workspace)], timeout: 120)
             try Task.checkCancellation()
             startRequested = true
@@ -121,7 +176,7 @@ public actor NativeUIController: NativeUIAutomating {
             }
             try Task.checkCancellation()
             outcome = .success(ToolResult(
-                content: "Native Xcode UI\(target == nil ? " inspection" : " tap completed"). Coordinates are screen points.\nScreenshot: \(screenshot.path)\nHierarchy: \(tree.path)\n\n\(text)",
+                content: "UI backend: native (\(mode == .auto ? "auto: required schemas available and project access succeeded" : "explicit native mode")).\nNative Xcode UI\(target == nil ? " inspection" : " tap completed"). Coordinates are screen points.\nScreenshot: \(screenshot.path)\nHierarchy: \(tree.path)\n\n\(text)",
                 artifacts: [screenshot, tree], inlineArtifacts: false
             ))
         } catch {

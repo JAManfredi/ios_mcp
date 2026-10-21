@@ -40,6 +40,171 @@ private struct CaptureFixture: Sendable {
     func remove() { try? FileManager.default.removeItem(at: root) }
 }
 
+private struct BackendLookup: CommandExecuting {
+    var stderr = ""
+    var code: ErrorCode?
+    func execute(executable: String, arguments: [String], timeout: TimeInterval?, environment: [String: String]?) async throws -> CommandResult {
+        #expect(executable == "/usr/bin/xcrun" && arguments == ["--find", "mcpbridge"])
+        if let code { throw ToolError(code: code, message: "Lookup failed") }
+        return CommandResult(stdout: stderr.isEmpty ? "/Xcode/usr/bin/mcpbridge\n" : "", stderr: stderr, exitCode: stderr.isEmpty ? 0 : 1)
+    }
+}
+
+@Suite("UI backend selection")
+struct UIBackendSelectionTests {
+    @Test func preservesExplicitAndLegacyConfiguration() throws {
+        #expect(try UIBackendMode.resolve(nil, workspace: nil) == .axe)
+        #expect(try UIBackendMode.resolve(nil, workspace: "/App.xcodeproj") == .native)
+        for mode in UIBackendMode.allCases {
+            #expect(try UIBackendMode.resolve(mode.rawValue, workspace: nil) == mode)
+        }
+        #expect(throws: ToolError.self) { try UIBackendMode.resolve("unknown", workspace: nil) }
+        #expect(throws: ToolError.self) { try UIBackendMode.resolve("axe", workspace: "/App.xcodeproj") }
+    }
+
+    private func project(_ fixture: CaptureFixture, name: String = "Pilot.xcodeproj") throws -> String {
+        let url = fixture.root.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url.path
+    }
+
+    private func controller(_ fixture: CaptureFixture, client: PilotClient, session: SessionStore,
+                            mode: UIBackendMode = .auto, workspace: String? = nil,
+                            lookup: BackendLookup = BackendLookup(), locks: ConcurrencyPolicy = ConcurrencyPolicy()) -> NativeUIController {
+        NativeUIController(workspace: workspace, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                           concurrency: locks, artifactRoot: fixture.artifactRoot, mode: mode, session: session,
+                           executor: lookup, makeClient: { client })
+    }
+
+    @Test func missingContextFallsBackButForcedNativeErrors() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture)
+        for mode in [UIBackendMode.auto, .axe] {
+            await #expect(throws: NativeUIUnavailable.self) {
+                try await controller(fixture, client: client, session: SessionStore(), mode: mode).inspect(udid: pilotUDID)
+            }
+        }
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: SessionStore(), mode: .native).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test(arguments: ["binary", "schema"])
+    func unsupportedNativeFallsBackBeforeAnyToolCall(kind: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, connectFailure: kind == "schema" ? .dependencyMissing : nil)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        let lookup = BackendLookup(stderr: kind == "binary" ? "xcrun: error: unable to find utility \"mcpbridge\", not a developer tool or in PATH" : "")
+        let locks = ConcurrencyPolicy()
+        await #expect(throws: NativeUIUnavailable.self) {
+            try await controller(fixture, client: client, session: session, lookup: lookup, locks: locks).tap(udid: pilotUDID, target: .label("Increment"))
+        }
+        #expect(await client.calls.isEmpty)
+        #expect(await client.closed)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+    }
+
+    @Test(arguments: [ErrorCode.commandDenied, .timeout, .commandFailed])
+    func unknownOrDeniedPreflightNeverFallsBack(code: ErrorCode) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        await session.set(.workspace, value: try project(fixture, name: "Pilot.xcworkspace"))
+        let client = PilotClient(fixture: fixture, connectFailure: code)
+        do {
+            _ = try await controller(fixture, client: client, session: session).inspect(udid: pilotUDID)
+            Issue.record("Expected preflight error")
+        } catch let error as ToolError { #expect(error.code == code) }
+        #expect(await client.calls.isEmpty)
+        #expect(await client.closed)
+    }
+
+    @Test func lookupErrorsAndInvalidPathsDoNotBecomeFallback() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        let client = PilotClient(fixture: fixture)
+        await session.set(.project, value: try project(fixture))
+        for lookup in [BackendLookup(stderr: "license agreement required"), BackendLookup(code: .timeout)] {
+            await #expect(throws: ToolError.self) {
+                try await controller(fixture, client: client, session: session, lookup: lookup).inspect(udid: pilotUDID)
+            }
+        }
+        await session.set(.workspace, value: "/missing/Invalid.xcworkspace")
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test func sessionChangesAndWorkspaceOverrideAreRespected() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        let client = PilotClient(fixture: fixture)
+        let project = try project(fixture)
+        let workspace = try self.project(fixture, name: "Pilot.xcworkspace")
+        let controller = controller(fixture, client: client, session: session)
+        await session.set(.project, value: project)
+        let first = try await controller.inspect(udid: pilotUDID)
+        #expect(first.content.contains("UI backend: native (auto:"))
+        await session.set(.workspace, value: workspace)
+        _ = try await controller.inspect(udid: pilotUDID)
+        _ = try await self.controller(fixture, client: client, session: session, workspace: project).inspect(udid: pilotUDID)
+        #expect(await client.calls.filter { $0.0 == "XcodeOpenWorkspace" }.map { $0.1["path"] } == [.string(project), .string(workspace), .string(project)])
+        await session.reset()
+        await #expect(throws: NativeUIUnavailable.self) { try await controller.inspect(udid: pilotUDID) }
+    }
+
+    @Test(arguments: ["XcodeOpenWorkspace", "DeviceInteractionStartSession", "tap", "DeviceInteractionEndSession"])
+    func dependencyErrorsAfterSelectionNeverBecomeFallback(stage: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, failure: stage, failureCode: .dependencyMissing)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session).tap(udid: pilotUDID, target: .label("Increment"))
+        }
+        #expect(await client.calls.filter { $0.1["interactionCommand"] != nil }.count <= 1)
+        #expect(await client.closed)
+    }
+
+    @Test func forcedNativeRejectsIncompatibleSchemas() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, connectFailure: .dependencyMissing)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session, mode: .native).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test func autoShutdownAndBusyStateCannotSelectFallback() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        let client = PilotClient(fixture: fixture, suspendCapture: true)
+        let controller = controller(fixture, client: client, session: session)
+        let task = Task { try await controller.inspect(udid: pilotUDID) }
+        try await client.waitForCapture()
+        await session.reset()
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }
+        await controller.shutdown()
+        await #expect(throws: ToolError.self) { try await task.value }
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }
+        #expect(await client.calls.last?.0 == "DeviceInteractionEndSession")
+        #expect(await client.closed)
+    }
+}
+
 @Suite("Native UI hierarchy")
 struct NativeUIHierarchyTests {
     @Test func usesNativeHitPoint() throws {
@@ -124,20 +289,26 @@ private actor PilotClient: NativeMCPCalling {
     let wrongDevice: Bool
     let failure: String?
     let suspendCapture: Bool
+    let connectFailure: ErrorCode?
+    let failureCode: ErrorCode
     private(set) var calls: [(String, [String: Value])] = []
     private(set) var closed = false
-    init(fixture: CaptureFixture, wrongDevice: Bool = false, failure: String? = nil, suspendCapture: Bool = false) {
+    init(fixture: CaptureFixture, wrongDevice: Bool = false, failure: String? = nil, suspendCapture: Bool = false, connectFailure: ErrorCode? = nil, failureCode: ErrorCode = .timeout) {
         self.fixture = fixture
         self.wrongDevice = wrongDevice
         self.failure = failure
         self.suspendCapture = suspendCapture
+        self.connectFailure = connectFailure
+        self.failureCode = failureCode
     }
-    func connect() {}
+    func connect() throws {
+        if let connectFailure { throw ToolError(code: connectFailure, message: "Preflight failure") }
+    }
     func close() { closed = true }
     func call(_ name: String, arguments: [String: Value], timeout: TimeInterval) async throws -> [String: Value] {
         calls.append((name, arguments))
         if failure == name || (failure == "tap" && arguments["interactionCommand"] != nil) {
-            throw ToolError(code: .timeout, message: name == "DeviceInteractionStartSession" ? "Native start failed" : "failure including \(pilotKey)")
+            throw ToolError(code: failureCode, message: name == "DeviceInteractionStartSession" ? "Native start failed" : "failure including \(pilotKey)")
         }
         switch name {
         case "DeviceInteractionStartSession":
@@ -161,8 +332,10 @@ private actor PilotClient: NativeMCPCalling {
 
 @Suite("Native UI lifecycle")
 struct NativeUIControllerTests {
-    private func controller(_ fixture: CaptureFixture, _ client: PilotClient, _ locks: ConcurrencyPolicy) -> NativeUIController {
-        NativeUIController(workspace: "/test/Pilot.xcodeproj", artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+    private func controller(_ fixture: CaptureFixture, _ client: PilotClient, _ locks: ConcurrencyPolicy) throws -> NativeUIController {
+        let project = fixture.root.appendingPathComponent("Pilot.xcodeproj")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        return NativeUIController(workspace: project.path, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
                            concurrency: locks, artifactRoot: fixture.artifactRoot, makeClient: { client })
     }
 
@@ -227,7 +400,7 @@ struct NativeUIControllerTests {
         defer { fixture.remove() }
         let client = PilotClient(fixture: fixture, suspendCapture: true)
         let locks = ConcurrencyPolicy()
-        let controller = controller(fixture, client, locks)
+        let controller = try controller(fixture, client, locks)
         let task = Task { try await controller.inspect(udid: pilotUDID) }
         try await client.waitForCapture()
         await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }

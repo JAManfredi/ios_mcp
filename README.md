@@ -162,65 +162,71 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 
 ---
 
-### Native UI pilot (opt-in)
+### Native UI backend selection (opt-in)
 
-Opt-in is a server startup setting in the agent's MCP configuration. The agent
-continues calling the same `inspect_ui` and `tap` tools; it does not need a
-different tool name or a backend argument on each call.
+The agent continues calling `inspect_ui` and `tap`. Select their backend when
+starting ios-mcp with `--ui-backend auto|native|axe`. The default remains AXe.
+The native path has been verified with Xcode 27.1; selection checks actual tool
+availability and schemas rather than relying on a version number.
 
-First, build/install a version of ios-mcp whose `--help` includes
-`--native-ui-workspace`. The pilot has been verified with Xcode 27.1. Run
-`ios-mcp doctor` to inspect the selected Xcode and native MCP availability;
-these diagnostics do not grant access or prove agent authorization.
-
-Add the option and an existing absolute `.xcodeproj` or `.xcworkspace` path to
-the server's arguments (adjust `command` to your installed binary):
+Build/install a binary whose `--help` includes `--ui-backend`, then configure
+your MCP client (adjust `command` to your installed binary):
 
 ```json
 {
   "mcpServers": {
     "ios-mcp": {
       "command": "/usr/local/bin/ios-mcp",
-      "args": ["--native-ui-workspace", "/absolute/path/YourApp.xcodeproj"]
+      "args": ["--ui-backend", "auto"]
     }
   }
 }
 ```
 
-After saving the configuration:
+After restarting the MCP connection, have the agent set `workspace` or `project`
+with `session_set_defaults`. Alternatively, add
+`"--native-ui-workspace", "/absolute/path/YourApp.xcodeproj"` to `args` to pin
+an existing absolute `.xcodeproj` or `.xcworkspace` path. The pinned path takes
+precedence; otherwise the current session's `workspace`, then `project`, is used
+for each operation. Clearing the defaults also clears this project context.
 
-1. Restart the MCP server/connection in your agent client so it uses the new
-   arguments. Changing session defaults does not enable the pilot.
-2. Boot the intended simulator and launch your app. Supply its exact simulator
-   UUID through `udid` or the `simulator_udid` session default.
-3. Ask the agent to call `inspect_ui`. This opens the configured project through
-   `mcpbridge` and requests normal Xcode agent/project approval. Keep the Mac
-   unlocked and approve the request in Xcode, then retry inspection if it
-   returned a permission error. Xcode may require approval again after the
-   executable changes. No permissions are granted automatically.
+| Mode | Behavior of `inspect_ui` and `tap` |
+|------|-----------------------------------|
+| `axe` (default) | Use the existing AXe backend without connecting to native Xcode MCP. |
+| `native` | Require a project context and native APIs. Missing capabilities and permission failures are errors. |
+| `auto` | Prefer native when a project is configured and the required native schemas are available. Select AXe if no project is configured, `mcpbridge` is confirmed missing, or the native catalog is incompatible. |
 
-Only `inspect_ui` and `tap` use the native pilot. Other gestures and navigation
-tools retain their existing backends and may still require compatible AXe.
+For backward compatibility, `--native-ui-workspace` alone still selects strict
+`native` mode. Combining that option with explicit `axe` mode is a configuration
+error. To opt out, remove the workspace option and use `--ui-backend axe` (or
+omit both options), then restart the MCP connection.
 
-| Configuration | Behavior of `inspect_ui` and `tap` |
-|---------------|-----------------------------------|
-| Option omitted | Use AXe, including on older supported Xcode versions. |
-| Option present and native APIs available/authorized | Use Xcode's native tools. |
-| Option present but native APIs unavailable or access denied | Return an error; there is no automatic AXe fallback. |
+Boot the intended simulator and launch your app before calling `inspect_ui`.
+Supply its exact UUID through `udid` or the `simulator_udid` session default.
+When native is selected, Xcode opens the configured project and requests normal
+agent/project approval. Keep the Mac unlocked and approve the request in Xcode;
+retry inspection if it returned a permission error. An updated executable may
+need fresh approval. No permissions are granted automatically.
 
-To disable native UI, remove `--native-ui-workspace` and its path, then restart
-the MCP connection. Keep AXe installed if you need the existing UI tools.
+Automatic selection occurs **before any native workspace, device session, or
+input tool call**. Successful native captures and AXe responses in `auto` identify
+the selected backend and reason, including when AXe itself fails. Permission denials, malformed project paths,
+unknown lookup/connection failures, timeouts, and native action errors do not
+trigger AXe fallback. A tap may have happened before an error was returned:
+inspect the screen before deciding whether to repeat it. No tap is automatically
+retried through another backend.
 
-Native inspection returns Apple's text hierarchy plus managed screenshot and
-hierarchy paths. Tap resolves a unique accessibility identifier or label against
-a fresh capture, or accepts coordinates in **screen points**, not screenshot
-pixels. Ambiguous, missing, disabled, or out-of-bounds targets fail before input.
-Each operation ends its owned session and closes its bridge. A failed native
-tap never retries or falls back to AXe; inspect the screen before deciding
-whether to repeat it.
+Only inspection and taps participate in this selection. Other gestures and
+navigation tools retain their existing backends and may still require AXe
+(1.8.0+ under Xcode 27). Native inspection returns Apple's text hierarchy and
+managed capture paths. Native taps use a fresh hierarchy's hit point or explicit
+coordinates in **screen points**, not screenshot pixels. Ambiguous, missing,
+disabled, and out-of-bounds targets fail before input.
 
-This is an experimental compatibility pilot, not a performance optimization.
-See [pilot validation and limits](docs/native-ui-pilot.md) before enabling it.
+`ios-mcp doctor` reports toolchain/dependency diagnostics without connecting or
+granting access; it does not select a backend or establish authorization.
+Automatic selection is experimental and does not imply a performance advantage.
+See [validation and limits](docs/native-ui-pilot.md) before enabling it.
 
 ## 📋 Requirements
 
