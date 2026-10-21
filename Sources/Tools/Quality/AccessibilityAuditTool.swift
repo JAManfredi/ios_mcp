@@ -70,11 +70,7 @@ func registerAccessibilityAuditTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe describe-ui failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: result.stdout))

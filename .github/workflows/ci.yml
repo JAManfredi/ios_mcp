@@ -37,3 +37,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: swift test
+
+  # Xcode 27 ships Swift 6.4 and needs macOS Tahoe 26.6+. Building and testing
+  # here catches compiler changes the macos-15 (Xcode 16) jobs never see.
+  test-xcode-27:
+    name: Test (Xcode 27)
+    runs-on: macos-26
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No Xcode 27 on this runner image"
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      - name: Test
+        run: swift test

@@ -196,6 +196,7 @@ struct Doctor: AsyncParsableCommand {
         }
 
         // Xcode version (required: 16+)
+        var xcodeVersion: String?
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcodebuild",
@@ -208,6 +209,7 @@ struct Doctor: AsyncParsableCommand {
                 let parts = firstLine.components(separatedBy: " ")
                 if parts.count >= 2,
                    let majorVersion = Int(parts[1].components(separatedBy: ".").first ?? "") {
+                    xcodeVersion = parts[1]
                     if majorVersion >= 16 {
                         print("[ok] Xcode version: \(parts[1])")
                     } else {
@@ -276,8 +278,15 @@ struct Doctor: AsyncParsableCommand {
                     let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                     let checksumStatus = verifyAxeChecksum(binaryPath: path)
                     if let upgrade = axeVersionWarning(reported: version) {
-                        print("[--] axe: \(version)\(checksumStatus) — \(upgrade)")
-                        optionalFailed = true
+                        // Under Xcode 27 an old axe can't load SimulatorKit at
+                        // all, so every UI tool fails: that's not optional.
+                        if let xcodeVersion, !isVersion(xcodeVersion, olderThan: "27") {
+                            print("[!!] axe: \(version)\(checksumStatus) — \(upgrade)")
+                            requiredFailed = true
+                        } else {
+                            print("[--] axe: \(version)\(checksumStatus) — \(upgrade)")
+                            optionalFailed = true
+                        }
                     } else {
                         print("[ok] axe: \(version)\(checksumStatus)")
                     }
@@ -310,6 +319,24 @@ struct Doctor: AsyncParsableCommand {
         } catch {
             print("[--] devicectl: check failed — \(error)")
             optionalFailed = true
+        }
+
+        // Xcode 27 toolchain features, so a missing tool reads as a version gap
+        // rather than a bug.
+        if let xcodeVersion {
+            let has27 = !isVersion(xcodeVersion, olderThan: "27")
+            let has266 = !isVersion(xcodeVersion, olderThan: "26.6")
+            func feature(_ name: String, _ available: Bool, _ needs: String) {
+                print(available ? "[ok] \(name)" : "[--] \(name): needs Xcode \(needs)")
+            }
+            feature("Device Hub (open_simulator)", has27, "27+; falls back to Simulator.app")
+            feature("devicectl capture (device_screenshot, device recording)", has266, "26.6+")
+            feature("Simulator orientation (set_orientation)", has27, "27+")
+            feature("simctl reboot (reboot_simulator)", has27, "27+")
+            if has27 && osVersion.majorVersion < 26 {
+                print("[!!] macOS: Xcode 27 requires macOS Tahoe 26.6 or later")
+                requiredFailed = true
+            }
         }
 
         // SwiftLint (optional)
