@@ -8,7 +8,8 @@
 import Core
 
 /// Registers all device tools: list_devices, build_device, build_run_device,
-/// test_device, install_app_device, launch_app_device, stop_app_device, device_screenshot.
+/// test_device, install_app_device, launch_app_device, stop_app_device, device_screenshot,
+/// record_device_screen.
 func registerDeviceTools(
     with registry: ToolRegistry,
     session: SessionStore,
@@ -26,4 +27,5 @@ func registerDeviceTools(
     await registerLaunchAppDeviceTool(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
     await registerStopAppDeviceTool(with: registry, session: session, executor: executor, validator: validator)
     await registerDeviceScreenshotTool(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
+    await registerRecordDeviceScreenTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator)
 }

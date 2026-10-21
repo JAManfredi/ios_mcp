@@ -63,6 +63,22 @@ func registerTestSimTool(
                     type: "string",
                     description: "Skip specified tests (e.g., 'MyTests/testSlow'). Comma-separated for multiple."
                 ),
+                "collect_coverage": .init(
+                    type: "boolean",
+                    description: "Enable code coverage (read it afterwards with inspect_xcresult sections=coverage)."
+                ),
+                "test_iterations": .init(
+                    type: "number",
+                    description: "Run each test this many times (2–100). Combine with retry_on_failure or run_until_failure to chase flaky tests."
+                ),
+                "retry_on_failure": .init(
+                    type: "boolean",
+                    description: "Re-run failing tests, up to test_iterations times, and pass if any run passes."
+                ),
+                "run_until_failure": .init(
+                    type: "boolean",
+                    description: "Repeat tests until one fails, up to test_iterations times (default 100). Use to reproduce a flaky failure."
+                ),
             ]
         ),
         category: .build
@@ -104,6 +120,11 @@ func registerTestSimTool(
                         let trimmed = target.trimmingCharacters(in: .whitespaces)
                         if !trimmed.isEmpty { testArgs += ["-skip-testing:\(trimmed)"] }
                     }
+                }
+
+                switch xcodebuildTestRepetitionArgs(args) {
+                case .success(let extra): testArgs += extra
+                case .failure(let error): return .error(error)
                 }
 
                 let timeout: TimeInterval = min(
@@ -182,4 +203,42 @@ func registerTestSimTool(
             }
         }
     }
+}
+
+/// Coverage and repetition flags for `xcodebuild test`.
+func xcodebuildTestRepetitionArgs(_ args: [String: Value]) -> Result<[String], ToolError> {
+    var result: [String] = []
+    if case .bool(true) = args["collect_coverage"] {
+        result += ["-enableCodeCoverage", "YES"]
+    }
+
+    var retry = false
+    if case .bool(true) = args["retry_on_failure"] { retry = true }
+    var untilFailure = false
+    if case .bool(true) = args["run_until_failure"] { untilFailure = true }
+    guard !(retry && untilFailure) else {
+        return .failure(ToolError(
+            code: .invalidInput,
+            message: "retry_on_failure and run_until_failure are mutually exclusive."
+        ))
+    }
+
+    var iterations: Int?
+    switch args["test_iterations"] {
+    case .some(.int(let i)): iterations = i
+    case .some(.double(let d)): iterations = Int(d)
+    default: break
+    }
+    if let iterations, !(2...100).contains(iterations) {
+        return .failure(ToolError(code: .invalidInput, message: "test_iterations must be between 2 and 100."))
+    }
+
+    if retry {
+        result += ["-retry-tests-on-failure", "-test-iterations", String(iterations ?? 3)]
+    } else if untilFailure {
+        result += ["-run-tests-until-failure", "-test-iterations", String(iterations ?? 100)]
+    } else if let iterations {
+        result += ["-test-iterations", String(iterations)]
+    }
+    return .success(result)
 }

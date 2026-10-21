@@ -23,4 +23,5 @@ func registerDebuggingTools(
     await registerDebugStackTool(with: registry, debugSession: debugSession)
     await registerDebugVariablesTool(with: registry, debugSession: debugSession)
     await registerDebugLLDBCommandTool(with: registry, debugSession: debugSession)
+    await registerDebugTaskTreeTool(with: registry, debugSession: debugSession)
 }
