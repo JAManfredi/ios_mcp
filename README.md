@@ -164,8 +164,17 @@ ios-mcp communicates over **stdio** using the [MCP protocol](https://modelcontex
 
 ### Native UI pilot (opt-in)
 
-To try Xcode's native simulator inspection and taps, add an approved project to
-this server's arguments:
+Opt-in is a server startup setting in the agent's MCP configuration. The agent
+continues calling the same `inspect_ui` and `tap` tools; it does not need a
+different tool name or a backend argument on each call.
+
+First, build/install a version of ios-mcp whose `--help` includes
+`--native-ui-workspace`. The pilot has been verified with Xcode 27.1. Run
+`ios-mcp doctor` to inspect the selected Xcode and native MCP availability;
+these diagnostics do not grant access or prove agent authorization.
+
+Add the option and an existing absolute `.xcodeproj` or `.xcworkspace` path to
+the server's arguments (adjust `command` to your installed binary):
 
 ```json
 {
@@ -178,11 +187,29 @@ this server's arguments:
 }
 ```
 
-This opens the project through `mcpbridge` and may prompt for agent/project
-approval in Xcode. No permissions are granted automatically. Use an exact
-simulator UDID and launch the intended app first. Only `inspect_ui` and `tap`
-use the pilot; other UI and navigation tools still require compatible AXe.
-Omit the option to use the existing backend for every tool.
+After saving the configuration:
+
+1. Restart the MCP server/connection in your agent client so it uses the new
+   arguments. Changing session defaults does not enable the pilot.
+2. Boot the intended simulator and launch your app. Supply its exact simulator
+   UUID through `udid` or the `simulator_udid` session default.
+3. Ask the agent to call `inspect_ui`. This opens the configured project through
+   `mcpbridge` and requests normal Xcode agent/project approval. Keep the Mac
+   unlocked and approve the request in Xcode, then retry inspection if it
+   returned a permission error. Xcode may require approval again after the
+   executable changes. No permissions are granted automatically.
+
+Only `inspect_ui` and `tap` use the native pilot. Other gestures and navigation
+tools retain their existing backends and may still require compatible AXe.
+
+| Configuration | Behavior of `inspect_ui` and `tap` |
+|---------------|-----------------------------------|
+| Option omitted | Use AXe, including on older supported Xcode versions. |
+| Option present and native APIs available/authorized | Use Xcode's native tools. |
+| Option present but native APIs unavailable or access denied | Return an error; there is no automatic AXe fallback. |
+
+To disable native UI, remove `--native-ui-workspace` and its path, then restart
+the MCP connection. Keep AXe installed if you need the existing UI tools.
 
 Native inspection returns Apple's text hierarchy plus managed screenshot and
 hierarchy paths. Tap resolves a unique accessibility identifier or label against
