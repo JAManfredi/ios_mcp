@@ -132,7 +132,7 @@ public actor LLDBSessionManager: DebugSessionManaging {
 
 /// Thread-safe output buffer using a lock instead of actor isolation.
 /// This avoids deadlocking when the actor's synchronous `waitForCompletion`
-/// spin loop needs to read output written by a detached read task.
+/// spin loop needs to read output written by the pipe's readability handler.
 final class LLDBOutputBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: String = ""
@@ -178,7 +178,6 @@ actor LLDBSession {
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
     private let outputBuffer = LLDBOutputBuffer()
-    private var readTask: Task<Void, Never>?
 
     private static let prompt = "(lldb) "
 
@@ -205,15 +204,19 @@ actor LLDBSession {
         self.stdinPipe = stdin
         self.stdoutPipe = stdout
 
-        let fileHandle = stdout.fileHandleForReading
+        // Read on Foundation's dispatch queue, not a Swift concurrency task. A
+        // blocking read inside a task holds a cooperative-pool thread, and while
+        // `waitForCompletion` spins on another one, a small pool (CI runners have
+        // three cores) can leave the reader unscheduled until the command times out.
         let buffer = outputBuffer
-        readTask = Task.detached {
-            while !Task.isCancelled {
-                let data = fileHandle.availableData
-                guard !data.isEmpty else { break }
-                if let text = String(data: data, encoding: .utf8) {
-                    buffer.append(text)
-                }
+        stdout.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
+            if let text = String(data: data, encoding: .utf8) {
+                buffer.append(text)
             }
         }
     }
@@ -241,14 +244,13 @@ actor LLDBSession {
     }
 
     func terminate() {
-        readTask?.cancel()
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         if let proc = process, proc.isRunning {
             proc.terminate()
         }
         process = nil
         stdinPipe = nil
         stdoutPipe = nil
-        readTask = nil
     }
 
     // MARK: - Private
