@@ -1,13 +1,17 @@
 PREFIX ?= /usr/local
 
-.PHONY: build install clean release setup
+.PHONY: build install install-dependencies clean release setup
 
 build:
 	swift build -c release --disable-sandbox
 
-install: build
-	install -d $(PREFIX)/bin
-	install .build/release/ios-mcp $(PREFIX)/bin/
+install: install-dependencies build
+	install -d "$(PREFIX)/bin"
+	bin_path="$$(swift build -c release --show-bin-path)" && \
+		install "$$bin_path/ios-mcp" "$(PREFIX)/bin/"
+
+install-dependencies:
+	brew install cameroncooke/axe/axe
 
 setup:
 	brew bundle --file=Brewfile
@@ -16,5 +20,4 @@ clean:
 	swift package clean
 
 release: build
-	@echo "Binary at .build/release/ios-mcp"
-	@ls -lh .build/release/ios-mcp
+	@bin_path="$$(swift build -c release --show-bin-path)" && ls -lh "$$bin_path/ios-mcp"

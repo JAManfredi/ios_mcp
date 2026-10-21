@@ -251,12 +251,14 @@ swift_package_show_deps → swift_package_resolve → swift_package_update
 ### Homebrew (build from source)
 
 ```bash
-brew install --build-from-source Formula/ios-mcp.rb
+brew tap JAManfredi/ios-mcp https://github.com/JAManfredi/ios_mcp.git
+brew trust --formula cameroncooke/axe/axe  # Homebrew 6+: trust this dependency
+brew install --HEAD JAManfredi/ios-mcp/ios-mcp
 ```
 
 ### Manual
 
 ```bash
 make build
-make install  # installs to /usr/local/bin
+make install  # installs/upgrades AXe, then installs ios-mcp to /usr/local/bin
 ```

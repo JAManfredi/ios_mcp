@@ -20,6 +20,8 @@ jobs:
         run: pip3 install pyyaml
       - name: Validate manifest schemas
         run: bash Scripts/validate-manifests.sh
+      - name: Check installation workflow
+        run: python3 Scripts/test-install.py
 
   build:
     name: Build
