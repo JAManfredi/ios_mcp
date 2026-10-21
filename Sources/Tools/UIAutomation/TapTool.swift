@@ -14,11 +14,12 @@ func registerTapTool(
     session: SessionStore,
     executor: any CommandExecuting,
     axePath: String? = nil,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    nativeUI: (any NativeUIAutomating)? = nil
 ) async {
     let manifest = ToolManifest(
         name: "tap",
-        description: "Tap a UI element in the iOS simulator by accessibility identifier, label, or coordinates. Not all elements appear in the accessibility tree (e.g. UITabBar items). Use snapshot_ui to inspect available elements, or fall back to coordinates. Falls back to session default simulator_udid.",
+        description: "Tap a UI element in the iOS simulator by accessibility identifier, label, or coordinates. Not all elements appear in the accessibility tree (e.g. UITabBar items). Use inspect_ui to inspect available elements, or fall back to coordinates. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(
@@ -47,16 +48,6 @@ func registerTapTool(
     )
 
     await registry.register(manifest: manifest) { args in
-        let resolvedAxe: String
-        if let axePath {
-            resolvedAxe = axePath
-        } else {
-            switch resolveAxePath() {
-            case .success(let path): resolvedAxe = path
-            case .failure(let error): return .error(error)
-            }
-        }
-
         var udid: String?
         if case .string(let u) = args["udid"] {
             udid = u
@@ -75,36 +66,76 @@ func registerTapTool(
             return .error(error)
         }
 
-        let targetArgs: [String]
-        switch resolveAxeTarget(from: args) {
-        case .success(let t): targetArgs = t
-        case .failure(let error): return .error(error)
+        var backendReason: String?
+        if let nativeUI {
+            do {
+                let target = try nativeTapTarget(args)
+                return .success(try await nativeUI.tap(udid: resolvedUDID, target: target))
+            } catch let unavailable as NativeUIUnavailable {
+                backendReason = unavailable.reason
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(code: .commandFailed, message: "Native UI operation failed or was cancelled. Inspect the screen before retrying a tap."))
+            }
         }
 
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["tap", "--udid", resolvedUDID] + targetArgs,
-                timeout: 120,
-                environment: nil
-            )
-
-            guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe tap failed",
-                    details: result.stderr
-                ))
+        let response: ToolResponse = await {
+            let resolvedAxe: String
+            if let axePath {
+                resolvedAxe = axePath
+            } else {
+                switch resolveAxePath() {
+                case .success(let path): resolvedAxe = path
+                case .failure(let error): return .error(error)
+                }
             }
 
-            return .success(ToolResult(content: "Tapped element on simulator \(resolvedUDID)."))
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to tap element: \(error.localizedDescription)"
-            ))
+            let targetArgs: [String]
+            switch resolveAxeTarget(from: args) {
+            case .success(let t): targetArgs = t
+            case .failure(let error): return .error(error)
+            }
+
+            do {
+                let result = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["tap", "--udid", resolvedUDID] + targetArgs,
+                    timeout: 120,
+                    environment: nil
+                )
+
+                guard result.succeeded else {
+                    return .error(axeCommandError("axe tap failed", stderr: result.stderr))
+                }
+
+                return .success(ToolResult(content: "Tapped element on simulator \(resolvedUDID)."))
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(
+                    code: .internalError,
+                    message: "Failed to tap element: \(error.localizedDescription)"
+                ))
+            }
+        }()
+        return backendReason.map { uiBackendResponse(response, reason: $0) } ?? response
+    }
+}
+
+/// Mirror target precedence without AXe's integer coordinate conversion.
+private func nativeTapTarget(_ args: [String: Value]) throws -> NativeUITarget {
+    if case .string(let id) = args["accessibility_id"], !id.isEmpty { return .identifier(id) }
+    if case .string(let label) = args["accessibility_label"], !label.isEmpty { return .label(label) }
+    func number(_ value: Value?) -> Double? {
+        switch value {
+        case .int(let value): return Double(value)
+        case .double(let value) where value.isFinite: return value
+        default: return nil
         }
     }
+    guard let x = number(args["x"]), let y = number(args["y"]), x >= 0, y >= 0 else {
+        throw ToolError(code: .invalidInput, message: "No target: provide an accessibility identifier, label, or finite nonnegative x and y in screen points.")
+    }
+    return .coordinates(x: x, y: y)
 }

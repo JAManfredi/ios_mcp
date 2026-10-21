@@ -81,7 +81,6 @@ public actor LLDBSessionManager: DebugSessionManaging {
         }
 
         _ = try? await session.sendCommand("detach", timeout: 10)
-        _ = try? await session.sendCommand("quit", timeout: 5)
         await session.terminate()
         sessions[sessionID] = nil
 
@@ -119,7 +118,6 @@ public actor LLDBSessionManager: DebugSessionManaging {
     public func teardownAll() async {
         for (id, session) in sessions {
             _ = try? await session.sendCommand("detach", timeout: 5)
-            _ = try? await session.sendCommand("quit", timeout: 3)
             await session.terminate()
             logger.info("Torn down session \(id)")
         }
@@ -131,8 +129,8 @@ public actor LLDBSessionManager: DebugSessionManaging {
 // MARK: - Output Buffer
 
 /// Thread-safe output buffer using a lock instead of actor isolation.
-/// This avoids deadlocking when the actor's synchronous `waitForPrompt`
-/// spin loop needs to read output written by a detached read task.
+/// This avoids deadlocking when the actor's synchronous `waitForCompletion`
+/// spin loop needs to read output written by the pipe's readability handler.
 final class LLDBOutputBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: String = ""
@@ -143,14 +141,14 @@ final class LLDBOutputBuffer: @unchecked Sendable {
         lock.unlock()
     }
 
-    func consumeIfPrompt(_ prompt: String) -> String? {
+    func consumeThroughMarker(_ marker: String) -> String? {
         lock.lock()
         defer { lock.unlock() }
-        guard storage.contains(prompt) else { return nil }
-        let result = storage
-            .replacingOccurrences(of: prompt, with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        storage = ""
+        guard let range = storage.range(of: marker + "\n") else { return nil }
+        // The marker is echoed on its own line, preceded by LLDB's prompt.
+        let prefix = storage[..<range.lowerBound]
+        let result = prefix.lastIndex(of: "\n").map { String(prefix[...$0]) } ?? ""
+        storage.removeSubrange(..<range.upperBound)
         return result
     }
 
@@ -178,7 +176,6 @@ actor LLDBSession {
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
     private let outputBuffer = LLDBOutputBuffer()
-    private var readTask: Task<Void, Never>?
 
     private static let prompt = "(lldb) "
 
@@ -189,14 +186,15 @@ actor LLDBSession {
     func launch() throws {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        proc.arguments = ["lldb"]
+        proc.arguments = ["lldb", "--no-use-colors"]
 
         let stdin = Pipe()
         let stdout = Pipe()
 
         proc.standardInput = stdin
         proc.standardOutput = stdout
-        proc.standardError = Pipe() // discard stderr
+        // One pipe preserves ordering between diagnostics and command completion.
+        proc.standardError = stdout
 
         try proc.run()
 
@@ -204,23 +202,65 @@ actor LLDBSession {
         self.stdinPipe = stdin
         self.stdoutPipe = stdout
 
-        let fileHandle = stdout.fileHandleForReading
+        // Read on Foundation's dispatch queue, not a Swift concurrency task. A
+        // blocking read inside a task holds a cooperative-pool thread, and while
+        // `waitForCompletion` spins on another one, a small pool (CI runners have
+        // three cores) can leave the reader unscheduled until the command times out.
         let buffer = outputBuffer
-        readTask = Task.detached {
-            while !Task.isCancelled {
-                let data = fileHandle.availableData
-                guard !data.isEmpty else { break }
-                if let text = String(data: data, encoding: .utf8) {
-                    buffer.append(text)
-                }
+        stdout.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
+            if let text = String(data: data, encoding: .utf8) {
+                buffer.append(text)
             }
         }
 
-        // Wait for initial prompt
-        _ = try? waitForPrompt(timeout: 10)
+        do {
+            try enableAutoConfirm()
+        } catch {
+            terminate()
+            throw error
+        }
     }
 
     func sendCommand(_ command: String, timeout: TimeInterval) throws -> String {
+        if let error = lldbSessionProtocolError(command) { throw error }
+        return try send(command, timeout: timeout)
+    }
+
+    func terminate() {
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        if let proc = process, proc.isRunning {
+            proc.terminate()
+        }
+        process = nil
+        stdinPipe = nil
+        stdoutPipe = nil
+    }
+
+    // MARK: - Private
+
+    /// LLDB reads confirmation answers ("kill it and restart?", "delete all
+    /// breakpoints?") from stdin, where they would consume the completion
+    /// marker and every later command. With auto-confirm, LLDB takes each
+    /// prompt's default instead; commands whose default is destructive are
+    /// on the denylist.
+    private func enableAutoConfirm() throws {
+        _ = try send("settings set auto-confirm true", timeout: 10)
+        let setting = try send("settings show auto-confirm", timeout: 10)
+        guard setting.contains("auto-confirm (boolean) = true") else {
+            throw ToolError(
+                code: .internalError,
+                message: "Could not enable LLDB auto-confirm; refusing to start a session that could block on a prompt.",
+                details: setting.isEmpty ? nil : setting
+            )
+        }
+    }
+
+    private func send(_ command: String, timeout: TimeInterval) throws -> String {
         guard let stdinPipe, let process, process.isRunning else {
             throw ToolError(
                 code: .internalError,
@@ -230,30 +270,23 @@ actor LLDBSession {
 
         outputBuffer.clear()
 
-        let commandData = Data((command + "\n").utf8)
+        // With piped stdin LLDB echoes the prompt BEFORE executing a command.
+        // An echoed trailing comment proves that the preceding command finished.
+        let marker = "# ios-mcp-command-end-\(UUID().uuidString)"
+        let commandData = Data((command + "\n" + marker + "\n").utf8)
         stdinPipe.fileHandleForWriting.write(commandData)
 
-        return try waitForPrompt(timeout: timeout)
+        let output = try waitForCompletion(marker: marker, timeout: timeout)
+        return Redactor.redact(output
+            .replacingOccurrences(of: Self.prompt + command + "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    func terminate() {
-        readTask?.cancel()
-        if let proc = process, proc.isRunning {
-            proc.terminate()
-        }
-        process = nil
-        stdinPipe = nil
-        stdoutPipe = nil
-        readTask = nil
-    }
-
-    // MARK: - Private
-
-    private func waitForPrompt(timeout: TimeInterval) throws -> String {
+    private func waitForCompletion(marker: String, timeout: TimeInterval) throws -> String {
         let deadline = Date().addingTimeInterval(timeout)
 
         while Date() < deadline {
-            if let result = outputBuffer.consumeIfPrompt(Self.prompt) {
+            if let result = outputBuffer.consumeThroughMarker(marker) {
                 return result
             }
             Thread.sleep(forTimeInterval: 0.05)
@@ -263,7 +296,7 @@ actor LLDBSession {
         throw ToolError(
             code: .timeout,
             message: "LLDB command timed out after \(Int(timeout))s",
-            details: partial.isEmpty ? nil : partial
+            details: partial.isEmpty ? nil : Redactor.redact(partial)
         )
     }
 }

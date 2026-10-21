@@ -28,6 +28,15 @@ func registerScreenshotTool(
                     type: "boolean",
                     description: "When true, inlines base64 image data. Defaults to false (metadata-only)."
                 ),
+                "display": .init(
+                    type: "string",
+                    description: "Display to capture on multi-display devices, e.g. 'primary-1' for the iPhone Duo inner screen (Xcode 27.1+). List names with `xcrun simctl io <udid> enumerate`. Defaults to the main display."
+                ),
+                "mask": .init(
+                    type: "string",
+                    description: "How to treat the area outside the screen's rounded corners and cutouts.",
+                    enumValues: ["ignored", "alpha", "black"]
+                ),
             ]
         ),
         category: .uiAutomation,
@@ -60,12 +69,27 @@ func registerScreenshotTool(
             return .error(error)
         }
 
+        var display: String?
+        if case .string(let d) = args["display"], !d.isEmpty {
+            guard !d.hasPrefix("-") else {
+                return .error(ToolError(code: .invalidInput, message: "display must be a display name, not a flag."))
+            }
+            display = d
+        }
+        var mask: String?
+        if case .string(let m) = args["mask"] {
+            guard ["ignored", "alpha", "black"].contains(m) else {
+                return .error(ToolError(code: .invalidInput, message: "mask must be 'ignored', 'alpha', or 'black'."))
+            }
+            mask = m
+        }
+
         let tempPath = NSTemporaryDirectory() + "ios-mcp-screenshot-\(UUID().uuidString).png"
 
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["simctl", "io", resolvedUDID, "screenshot", tempPath],
+                arguments: simctlScreenshotArgs(udid: resolvedUDID, path: tempPath, display: display, mask: mask),
                 timeout: 30,
                 environment: nil
             )
@@ -96,7 +120,7 @@ func registerScreenshotTool(
             )
 
             return .success(ToolResult(
-                content: "Screenshot captured for simulator \(resolvedUDID).\nStored at: \(ref.path)",
+                content: "Screenshot captured for simulator \(resolvedUDID)\(display.map { " (display \($0))" } ?? "").\nStored at: \(ref.path)",
                 artifacts: [ref],
                 inlineArtifacts: inlineImage
             ))
@@ -109,4 +133,12 @@ func registerScreenshotTool(
             ))
         }
     }
+}
+
+func simctlScreenshotArgs(udid: String, path: String, display: String?, mask: String?) -> [String] {
+    var args = ["simctl", "io", udid, "screenshot"]
+    if let display { args.append("--display=\(display)") }
+    if let mask { args.append("--mask=\(mask)") }
+    args.append(path)
+    return args
 }

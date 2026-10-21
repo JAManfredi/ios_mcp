@@ -26,7 +26,7 @@ func registerDebugLLDBCommandTool(
                 ),
                 "command": .init(
                     type: "string",
-                    description: "The LLDB command to execute."
+                    description: "One LLDB command. Confirmation prompts take LLDB's default answer; use debug_detach to close the session."
                 ),
                 "allow_unsafe": .init(
                     type: "boolean",

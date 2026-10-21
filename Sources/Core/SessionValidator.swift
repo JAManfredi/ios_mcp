@@ -102,7 +102,7 @@ public struct DefaultsValidator: Sendable {
         // to pass to a device tool.
         let candidates = devices.prefix(5).compactMap { device -> String? in
             guard let id = DeviceIdentity.destinationUDID(for: device) else { return nil }
-            let name = (device["deviceProperties"] as? [String: Any])?["name"] as? String ?? "Unknown"
+            let name = DeviceIdentity.name(for: device) ?? "Unknown"
             return "  \(id) — \(name)"
         }.joined(separator: "\n")
 
@@ -120,13 +120,9 @@ public struct DefaultsValidator: Sendable {
             arguments: ["devicectl", "list", "devices", "--json-output", "-"],
             timeout: 15,
             environment: nil
-        ), result.succeeded, let data = result.stdout.data(using: .utf8) else { return nil }
+        ), result.succeeded else { return nil }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let resultObj = json["result"] as? [String: Any],
-              let devices = resultObj["devices"] as? [[String: Any]] else { return nil }
-
-        return devices
+        return DeviceIdentity.physicalDevices(fromDevicectlJSON: result.stdout)
     }
 
     /// Validates that a filesystem path exists and is within allowed roots.

@@ -25,7 +25,7 @@ func registerInspectXCResultTool(
                 ),
                 "sections": .init(
                     type: "string",
-                    description: "Comma-separated list of sections to extract: diagnostics, tests, coverage, attachments, timeline. Default: all."
+                    description: "Comma-separated list of sections to extract: diagnostics, tests, coverage, attachments, timeline. Default: all. The attachments section retains up to 10 images in managed storage; other attachments remain in the source bundle."
                 ),
             ],
             required: ["path"]
@@ -47,6 +47,7 @@ func registerInspectXCResultTool(
         }
 
         var output: [String] = ["XCResult Inspection: \(path)", ""]
+        var attachmentRefs: [ArtifactReference] = []
 
         // MARK: Diagnostics & Timeline (from build-results)
         if requestedSections.contains("diagnostics") || requestedSections.contains("timeline") {
@@ -138,7 +139,8 @@ func registerInspectXCResultTool(
                     output.append("Failures:")
                     for failure in failures.prefix(20) {
                         let testName = failure["testName"] as? String ?? "?"
-                        let message = failure["message"] as? String ?? ""
+                        // `failureText` is the documented key; `message` kept for older bundles.
+                        let message = failure["failureText"] as? String ?? failure["message"] as? String ?? ""
                         output.append("  - \(testName): \(message)")
                     }
                 }
@@ -156,21 +158,33 @@ func registerInspectXCResultTool(
         if requestedSections.contains("coverage") {
             output.append("## Code Coverage")
 
+            // `xccov` is the supported coverage reader. The previous
+            // `xcresulttool get object --legacy --type codeCoverage` path relied
+            // on the legacy object API (deprecated since Xcode 16) and came back
+            // empty in practice.
             if let covResult = try? await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["xcresulttool", "get", "object", "--legacy", "--path", path, "--format", "json", "--type", "codeCoverage"],
-                timeout: 30,
+                arguments: ["xccov", "view", "--report", "--json", path],
+                timeout: 60,
                 environment: nil
             ), covResult.succeeded,
                let covData = covResult.stdout.data(using: .utf8),
                let covJSON = try? JSONSerialization.jsonObject(with: covData) as? [String: Any],
                let targets = covJSON["targets"] as? [[String: Any]] {
-                for target in targets {
+                if let overall = covJSON["lineCoverage"] as? Double {
+                    let covered = covJSON["coveredLines"] as? Int
+                    let executable = covJSON["executableLines"] as? Int
+                    var line = "Overall: \(String(format: "%.1f%%", overall * 100))"
+                    if let covered, let executable { line += " (\(covered)/\(executable) lines)" }
+                    output.append(line)
+                }
+                for target in targets.sorted(by: { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }) {
                     let name = target["name"] as? String ?? "Unknown"
                     let lineCoverage = target["lineCoverage"] as? Double ?? 0.0
                     output.append("  \(name): \(String(format: "%.1f%%", lineCoverage * 100))")
 
                     if let files = target["files"] as? [[String: Any]] {
+                        // Least-covered first: that's where the next test belongs.
                         let sorted = files.sorted { ($0["lineCoverage"] as? Double ?? 0) < ($1["lineCoverage"] as? Double ?? 0) }
                         for file in sorted.prefix(10) {
                             let fileName = file["name"] as? String ?? "?"
@@ -190,26 +204,37 @@ func registerInspectXCResultTool(
             output.append("## Attachments")
 
             let tempDir = NSTemporaryDirectory() + "ios-mcp-xcresult-attachments-\(UUID().uuidString)"
+            defer { try? FileManager.default.removeItem(atPath: tempDir) }
 
+            // `export attachments` (Xcode 16+) replaces the legacy
+            // `export --type file`, which needs an object `--id` and exported
+            // nothing when called without one.
             if let exportResult = try? await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["xcresulttool", "export", "--path", path, "--output-path", tempDir, "--type", "file"],
-                timeout: 60,
+                arguments: ["xcresulttool", "export", "attachments", "--path", path, "--output-path", tempDir],
+                timeout: 120,
                 environment: nil
             ), exportResult.succeeded {
                 let fm = FileManager.default
-                if let files = try? fm.contentsOfDirectory(atPath: tempDir) {
-                    let imageFiles = files.filter { $0.hasSuffix(".png") || $0.hasSuffix(".jpg") || $0.hasSuffix(".jpeg") }
-                    output.append("Exported \(files.count) files (\(imageFiles.count) images)")
-                    for file in imageFiles.prefix(10) {
-                        let filePath = (tempDir as NSString).appendingPathComponent(file)
-                        if let data = fm.contents(atPath: filePath) {
-                            _ = try? await artifacts.store(data: data, filename: file, mimeType: "image/png")
-                        }
-                        output.append("  - \(file)")
-                    }
+                let files = ((try? fm.contentsOfDirectory(atPath: tempDir)) ?? []).filter { $0 != "manifest.json" }
+                if files.isEmpty {
+                    output.append("No attachments in this result bundle.")
                 } else {
-                    output.append("No attachments exported.")
+                    let names = attachmentNames(manifestPath: (tempDir as NSString).appendingPathComponent("manifest.json"))
+                    let imageFiles = files.filter { imageMimeType(for: $0) != nil }.sorted()
+                    output.append("Exported \(files.count) files (\(imageFiles.count) images). Retaining up to 10 images; other attachments remain in the source bundle.")
+                    for file in imageFiles.prefix(10) {
+                        guard let mime = imageMimeType(for: file) else { continue }
+                        let filePath = (tempDir as NSString).appendingPathComponent(file)
+                        do {
+                            let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+                            let ref = try await artifacts.store(data: data, filename: file, mimeType: mime)
+                            attachmentRefs.append(ref)
+                            output.append("  - \(file)\(names[file].map { " — \($0)" } ?? "")\n    Stored at: \(ref.path)")
+                        } catch {
+                            output.append("  - Could not retain \(file): \(error.localizedDescription)")
+                        }
+                    }
                 }
             } else {
                 output.append("Attachment export not available or no attachments found.")
@@ -217,11 +242,42 @@ func registerInspectXCResultTool(
             output.append("")
         }
 
-        return .success(ToolResult(content: output.joined(separator: "\n")))
+        return .success(ToolResult(content: output.joined(separator: "\n"), artifacts: attachmentRefs, inlineArtifacts: false))
     }
 }
 
 // MARK: - xcresulttool Helpers
+
+/// Maps exported file names to "<test> · <human-readable name>" using the
+/// `manifest.json` that `xcresulttool export attachments` writes.
+func attachmentNames(manifestPath: String) -> [String: String] {
+    guard let data = FileManager.default.contents(atPath: manifestPath),
+          let tests = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+        return [:]
+    }
+    var names: [String: String] = [:]
+    for test in tests {
+        let testID = test["testIdentifier"] as? String
+        for attachment in test["attachments"] as? [[String: Any]] ?? [] {
+            guard let file = attachment["exportedFileName"] as? String else { continue }
+            var parts: [String] = []
+            if let testID { parts.append(testID) }
+            if let human = attachment["suggestedHumanReadableName"] as? String { parts.append(human) }
+            if attachment["isAssociatedWithFailure"] as? Bool == true { parts.append("failure") }
+            if !parts.isEmpty { names[file] = parts.joined(separator: " · ") }
+        }
+    }
+    return names
+}
+
+func imageMimeType(for filename: String) -> String? {
+    switch (filename as NSString).pathExtension.lowercased() {
+    case "png": "image/png"
+    case "jpg", "jpeg": "image/jpeg"
+    case "heic": "image/heic"
+    default: nil
+    }
+}
 
 /// Fetches build-results JSON from xcresulttool.
 private func fetchBuildResults(

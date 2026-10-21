@@ -40,6 +40,15 @@ func registerOverrideStatusBarTool(
                     type: "number",
                     description: "Number of Wi-Fi signal bars (0-3)."
                 ),
+                "operator_name": .init(
+                    type: "string",
+                    description: "Carrier name to display. Pass an empty string to hide it."
+                ),
+                "preset": .init(
+                    type: "string",
+                    description: "'screenshot' applies Apple's marketing look: 9:41, full charged battery, full Wi-Fi and cellular bars. Explicit parameters override preset values.",
+                    enumValues: ["screenshot"]
+                ),
                 "clear": .init(
                     type: "boolean",
                     description: "Set to true to clear all status bar overrides."
@@ -51,6 +60,23 @@ func registerOverrideStatusBarTool(
 
     await registry.register(manifest: manifest) { args in
         do {
+            for key in ["time", "operator_name", "preset"] {
+                guard let value = args[key] else { continue }
+                guard case .string = value else {
+                    return .error(ToolError(code: .invalidInput, message: "\(key) must be a string."))
+                }
+            }
+            if let value = args["clear"] {
+                guard case .bool = value else {
+                    return .error(ToolError(code: .invalidInput, message: "clear must be a boolean."))
+                }
+            }
+            var numbers: [String: Int] = [:]
+            for key in ["battery_level", "cellular_bars", "wifi_bars"] {
+                if let value = args[key] {
+                    numbers[key] = try integerArgument(value, named: key).get()
+                }
+            }
             let udid: String?
             if case .string(let u) = args["udid"] {
                 udid = u
@@ -99,21 +125,44 @@ func registerOverrideStatusBarTool(
 
             var overrideArgs: [String] = ["simctl", "status_bar", resolvedUDID, "override"]
 
+            var presetFlags: [(flag: String, value: String)] = []
+            if case .string(let preset) = args["preset"] {
+                guard preset == "screenshot" else {
+                    return .error(ToolError(code: .invalidInput, message: "preset must be 'screenshot'."))
+                }
+                presetFlags = screenshotStatusBarPreset
+            }
+            // Explicit arguments win over the preset's value for the same flag.
+            var explicitFlags = Set<String>()
+            for (key, flag) in [
+                ("time", "--time"), ("battery_level", "--batteryLevel"), ("cellular_bars", "--cellularBars"),
+                ("wifi_bars", "--wifiBars"), ("operator_name", "--operatorName"),
+            ] where args[key] != nil {
+                explicitFlags.insert(flag)
+            }
+            for (flag, value) in presetFlags where !explicitFlags.contains(flag) {
+                overrideArgs.append(contentsOf: [flag, value])
+            }
+
             if case .string(let time) = args["time"] {
                 overrideArgs.append(contentsOf: ["--time", time])
             }
 
-            if let batteryLevel = extractInt(from: args["battery_level"]) {
+            if case .string(let name) = args["operator_name"] {
+                overrideArgs.append(contentsOf: ["--operatorName", name])
+            }
+
+            if let batteryLevel = numbers["battery_level"] {
                 let clamped = min(max(batteryLevel, 0), 100)
                 overrideArgs.append(contentsOf: ["--batteryLevel", "\(clamped)"])
             }
 
-            if let cellularBars = extractInt(from: args["cellular_bars"]) {
+            if let cellularBars = numbers["cellular_bars"] {
                 let clamped = min(max(cellularBars, 0), 4)
                 overrideArgs.append(contentsOf: ["--cellularBars", "\(clamped)"])
             }
 
-            if let wifiBars = extractInt(from: args["wifi_bars"]) {
+            if let wifiBars = numbers["wifi_bars"] {
                 let clamped = min(max(wifiBars, 0), 3)
                 overrideArgs.append(contentsOf: ["--wifiBars", "\(clamped)"])
             }
@@ -122,7 +171,7 @@ func registerOverrideStatusBarTool(
             guard overrideArgs.count > 4 else {
                 return .error(ToolError(
                     code: .invalidInput,
-                    message: "At least one status bar override (time, battery_level, cellular_bars, wifi_bars) or clear: true is required."
+                    message: "At least one status bar override (time, battery_level, cellular_bars, wifi_bars, operator_name, preset) or clear: true is required."
                 ))
             }
 
@@ -155,11 +204,14 @@ func registerOverrideStatusBarTool(
     }
 }
 
-private func extractInt(from value: Value?) -> Int? {
-    guard let value else { return nil }
-    switch value {
-    case .int(let v): return v
-    case .double(let v): return Int(v)
-    default: return nil
-    }
-}
+/// Apple's marketing status bar, as used in App Store screenshots.
+let screenshotStatusBarPreset: [(flag: String, value: String)] = [
+    ("--time", "9:41"),
+    ("--dataNetwork", "wifi"),
+    ("--wifiMode", "active"),
+    ("--wifiBars", "3"),
+    ("--cellularMode", "active"),
+    ("--cellularBars", "4"),
+    ("--batteryState", "charged"),
+    ("--batteryLevel", "100"),
+]
