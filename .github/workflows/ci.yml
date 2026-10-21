@@ -37,6 +37,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: swift test
+      - name: Test LLDB with one concurrency worker
+        run: LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --skip-build --filter LLDBSessionTests
 
   # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
   # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image
