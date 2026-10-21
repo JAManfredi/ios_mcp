@@ -90,8 +90,8 @@ public struct CommandExecutor: CommandExecuting, Sendable {
 
         // Read pipes concurrently to prevent deadlock when output exceeds
         // the 64KB pipe buffer. Reads must start before the process runs.
-        let stdoutRead = Task.detached { stdoutPipe.fileHandleForReading.readDataToEndOfFile() }
-        let stderrRead = Task.detached { stderrPipe.fileHandleForReading.readDataToEndOfFile() }
+        let stdoutRead = Task { await Self.readToEnd(stdoutPipe.fileHandleForReading) }
+        let stderrRead = Task { await Self.readToEnd(stderrPipe.fileHandleForReading) }
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -116,8 +116,9 @@ public struct CommandExecutor: CommandExecuting, Sendable {
                 do {
                     try process.run()
                 } catch {
-                    stdoutRead.cancel()
-                    stderrRead.cancel()
+                    // Closing the write ends lets the pending reads reach EOF.
+                    try? stdoutPipe.fileHandleForWriting.close()
+                    try? stderrPipe.fileHandleForWriting.close()
                     continuation.resume(throwing: ToolError(
                         code: .commandFailed,
                         message: "Failed to launch \(executable): \(error.localizedDescription)"
@@ -128,6 +129,9 @@ public struct CommandExecutor: CommandExecuting, Sendable {
                 // Place the child in its own process group so we can kill the entire tree
                 let pid = process.processIdentifier
                 setpgid(pid, 0)
+
+                // Cancellation that landed before `run()` found nothing to stop.
+                if Task.isCancelled { Self.terminateProcessTree(process) }
 
                 if let timeout {
                     let deadline = DispatchTime.now() + timeout
@@ -175,18 +179,16 @@ public struct CommandExecutor: CommandExecuting, Sendable {
 
         // Read stderr concurrently to prevent deadlock when output exceeds
         // the 64KB pipe buffer. Must start before the process runs.
-        let stderrRead = Task.detached { stderrPipe.fileHandleForReading.readDataToEndOfFile() }
+        let stderrRead = Task { await Self.readToEnd(stderrPipe.fileHandleForReading) }
 
         return try await withTaskCancellationHandler {
-            // Start reading stdout in a detached task so lines stream in real time
-            let readTask = Task.detached {
-                let handle = stdoutPipe.fileHandleForReading
+            // Start reading stdout in a separate task so lines stream in real time
+            let chunks = Self.chunks(of: stdoutPipe.fileHandleForReading)
+            let readTask = Task {
                 var buffer = Data()
                 let newline = UInt8(ascii: "\n")
 
-                while true {
-                    let chunk = handle.availableData
-                    if chunk.isEmpty { break }
+                for await chunk in chunks {
                     await stdoutAccumulator.append(chunk)
                     buffer.append(chunk)
 
@@ -229,7 +231,9 @@ public struct CommandExecutor: CommandExecuting, Sendable {
                 do {
                     try process.run()
                 } catch {
-                    stderrRead.cancel()
+                    // Closing the write ends lets the pending reads reach EOF.
+                    try? stdoutPipe.fileHandleForWriting.close()
+                    try? stderrPipe.fileHandleForWriting.close()
                     continuation.resume(throwing: ToolError(
                         code: .commandFailed,
                         message: "Failed to launch \(executable): \(error.localizedDescription)"
@@ -239,6 +243,9 @@ public struct CommandExecutor: CommandExecuting, Sendable {
 
                 let pid = process.processIdentifier
                 setpgid(pid, 0)
+
+                // Cancellation that landed before `run()` found nothing to stop.
+                if Task.isCancelled { Self.terminateProcessTree(process) }
 
                 if let timeout {
                     let deadline = DispatchTime.now() + timeout
@@ -251,6 +258,32 @@ public struct CommandExecutor: CommandExecuting, Sendable {
             }
         } onCancel: {
             if process.isRunning { Self.terminateProcessTree(process) }
+        }
+    }
+
+    // Pipe reads block until the writer closes, so they run on Dispatch threads.
+    // Blocking inside a Swift task holds a cooperative-pool thread for the
+    // command's lifetime; a few concurrent commands on a small machine (CI
+    // runners have three cores) then starve every other task in the process.
+
+    private static func readToEnd(_ handle: FileHandle) async -> Data {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                continuation.resume(returning: handle.readDataToEndOfFile())
+            }
+        }
+    }
+
+    private static func chunks(of handle: FileHandle) -> AsyncStream<Data> {
+        AsyncStream { continuation in
+            DispatchQueue.global().async {
+                while true {
+                    let chunk = handle.availableData
+                    if chunk.isEmpty { break }
+                    continuation.yield(chunk)
+                }
+                continuation.finish()
+            }
         }
     }
 
