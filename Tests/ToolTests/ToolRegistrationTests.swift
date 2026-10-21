@@ -21,7 +21,7 @@ struct ToolRegistrationTests {
         await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
 
         let tools = await registry.listTools()
-        #expect(tools.count == 71)
+        #expect(tools.count == 76)
 
         let names = Set(tools.map(\.name))
         #expect(names.contains("discover_projects"))
@@ -78,6 +78,15 @@ struct ToolRegistrationTests {
         #expect(names.contains("stop_app_device"))
         #expect(names.contains("device_screenshot"))
         #expect(names.contains("inspect_xcresult"))
+        #expect(names.contains("reboot_simulator"))
+        #expect(names.contains("set_orientation"))
+        #expect(names.contains("record_device_screen"))
+        #expect(names.contains("swift_package_test"))
+        #expect(names.contains("debug_task_tree"))
+
+        // Every tool suggests where to go next.
+        let unmapped = names.subtracting(NextStepResolver.registeredToolNames)
+        #expect(unmapped.isEmpty, "Tools without next steps: \(unmapped.sorted())")
         #expect(names.contains("list_crash_logs"))
         #expect(names.contains("simulate_location"))
         #expect(names.contains("clear_location"))
