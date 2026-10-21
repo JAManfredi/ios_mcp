@@ -27,8 +27,8 @@ func registerRecordDeviceScreenTool(
             properties: [
                 "device_udid": .init(type: "string", description: "Device UDID. Falls back to session default."),
                 "duration": .init(
-                    type: "number",
-                    description: "Seconds to record (1–\(maxDeviceRecordingSeconds)). Default: 10."
+                    type: "integer",
+                    description: "Whole seconds to record (1–\(maxDeviceRecordingSeconds)). Default: 10."
                 ),
             ]
         ),
@@ -38,12 +38,13 @@ func registerRecordDeviceScreenTool(
 
     await registry.register(manifest: manifest) { args in
         let duration: Int
-        switch args["duration"] {
-        case .some(.int(let value)): duration = value
-        case .some(.double(let value)): duration = Int(value.rounded())
-        case nil: duration = 10
-        default:
-            return .error(ToolError(code: .invalidInput, message: "duration must be a number of seconds."))
+        if let value = args["duration"] {
+            switch integerArgument(value, named: "duration") {
+            case .success(let integer): duration = integer
+            case .failure(let error): return .error(error)
+            }
+        } else {
+            duration = 10
         }
         guard (1...maxDeviceRecordingSeconds).contains(duration) else {
             return .error(ToolError(

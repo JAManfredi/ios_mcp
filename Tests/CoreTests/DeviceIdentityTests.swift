@@ -16,7 +16,7 @@ struct DeviceIdentityTests {
     private let device: [String: Any] = [
         "identifier": "7026A743-5667-5BAD-8820-9757B8F762A0",
         "hardwareProperties": ["udid": "00008140-00065DA40862201C", "marketingName": "iPhone 16 Pro"],
-        "deviceProperties": ["name": "JM iPhone"]
+        "deviceProperties": ["name": "JM iPhone", "osVersionNumber": "18.0"]
     ]
 
     @Test("Destination UDID prefers the hardware identifier xcodebuild needs")
@@ -50,14 +50,14 @@ struct DeviceIdentityTests {
 
     // MARK: - devicectl JSON v5 (Xcode 27)
 
-    /// Xcode 27 shape: the legacy dictionaries are gone and everything lives
-    /// under `properties`.
+    /// Reduced, sanitized Xcode 27.1 output with --omit-deprecated-fields-in-json.
     private let v5Device: [String: Any] = [
         "identifier": "7026A743-5667-5BAD-8820-9757B8F762A0",
         "properties": [
             "hardware": ["udid": "00008140-00065DA40862201C", "marketingName": "iPhone 17 Pro", "reality": "physical"],
-            "device": ["name": "JM iPhone", "osVersionNumber": "27.1"],
-            "connection": ["transportType": "wired"],
+            "state": ["name": "JM iPhone", "bootState": "booted"],
+            "software": ["osVersionNumber": ["components": [27, 1], "originalComponentsCount": 2, "stringValue": "27.1"]],
+            "connection": ["transportType": "localNetwork"],
         ],
     ]
 
@@ -72,16 +72,17 @@ struct DeviceIdentityTests {
         #expect(DeviceIdentity.name(for: v5Device) == "JM iPhone")
         #expect(DeviceIdentity.osVersion(for: v5Device) == "27.1")
         #expect(DeviceIdentity.model(for: v5Device) == "iPhone 17 Pro")
-        #expect(DeviceIdentity.transportType(for: v5Device) == "wired")
+        #expect(DeviceIdentity.transportType(for: v5Device) == "localNetwork")
     }
 
     @Test("Prefers v5 properties over deprecated fields when both are present")
     func v5WinsOverLegacy() {
         var both = v5Device
         both["hardwareProperties"] = ["udid": "LEGACY-UDID"]
-        both["deviceProperties"] = ["name": "Legacy Name"]
+        both["deviceProperties"] = ["name": "Legacy Name", "osVersionNumber": "18.0"]
         #expect(DeviceIdentity.destinationUDID(for: both) == "00008140-00065DA40862201C")
         #expect(DeviceIdentity.name(for: both) == "JM iPhone")
+        #expect(DeviceIdentity.osVersion(for: both) == "27.1")
     }
 
     @Test("Finds a UDID nested under an unexpected properties sub-dictionary")
@@ -96,6 +97,7 @@ struct DeviceIdentityTests {
     @Test("Legacy fields still resolve")
     func legacyDescriptive() {
         #expect(DeviceIdentity.name(for: device) == "JM iPhone")
+        #expect(DeviceIdentity.osVersion(for: device) == "18.0")
         #expect(DeviceIdentity.model(for: device) == "iPhone 16 Pro")
     }
 
@@ -104,7 +106,7 @@ struct DeviceIdentityTests {
         let json = """
         {"result":{"devices":[
           {"identifier":"PHYS","properties":{"hardware":{"udid":"HW-1","reality":"physical"}}},
-          {"identifier":"SIM","properties":{"hardware":{"udid":"SIM-1","reality":"simulator"}}},
+          {"identifier":"SIM","properties":{"hardware":{"udid":"SIM-1","reality":"simulated"}}},
           {"identifier":"OLD","hardwareProperties":{"udid":"HW-2"}}
         ]}}
         """

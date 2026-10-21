@@ -56,13 +56,25 @@ struct RebootSimulatorToolTests {
 @Suite("set_orientation")
 struct SetOrientationToolTests {
 
+    // Shape captured from Xcode 27.1's orientation get --json-output -.
+    private func orientationJSON(_ orientation: String, locked: Bool = false) -> String {
+        """
+        {"info":{"jsonVersion":5},"result":{
+          "deviceIdentifier":"AAAA-1111",
+          "deviceOrientation":"\(orientation)",
+          "deviceOrientationNonFlat":"portrait",
+          "deviceIsOrientationLocked":\(locked)
+        }}
+        """
+    }
+
     @Test("Sets orientation and confirms it by reading back")
     func setsAndVerifies() async throws {
         let calls = AllCallCapture()
         let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
             await calls.capture(args)
             if args.contains("get") {
-                return CommandResult(stdout: "deviceOrientation: landscapeLeft\ndeviceIsOrientationLocked: false", stderr: "", exitCode: 0)
+                return CommandResult(stdout: orientationJSON("landscapeLeft"), stderr: "", exitCode: 0)
             }
             return CommandResult(stdout: "outcome: success", stderr: "", exitCode: 0)
         })
@@ -76,14 +88,14 @@ struct SetOrientationToolTests {
         #expect(result.content.contains("rotated to landscapeLeft"))
         let all = await calls.allArgs
         #expect(all.first == ["devicectl", "device", "orientation", "set", "--device", "AAAA-1111", "landscapeLeft"])
-        #expect(all.last == ["devicectl", "device", "orientation", "get", "--device", "AAAA-1111"])
+        #expect(all.last == ["devicectl", "device", "orientation", "get", "--device", "AAAA-1111", "--json-output", "-"])
     }
 
     @Test("Reports when the device ignores the request")
     func readBackMismatch() async throws {
         let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
             if args.contains("get") {
-                return CommandResult(stdout: "deviceOrientation: portrait\ndeviceIsOrientationLocked: false", stderr: "", exitCode: 0)
+                return CommandResult(stdout: orientationJSON("portrait", locked: true), stderr: "", exitCode: 0)
             }
             return CommandResult(stdout: "outcome: success", stderr: "", exitCode: 0)
         })
@@ -95,6 +107,7 @@ struct SetOrientationToolTests {
 
         guard case .error(let error) = response else { Issue.record("Expected error"); return }
         #expect(error.message.contains("still reports portrait"))
+        #expect(error.message.contains("Orientation lock is on"))
     }
 
     @Test("Reads orientation when none is given")
@@ -102,7 +115,7 @@ struct SetOrientationToolTests {
         let calls = AllCallCapture()
         let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
             await calls.capture(args)
-            return CommandResult(stdout: "deviceOrientation: portrait", stderr: "", exitCode: 0)
+            return CommandResult(stdout: orientationJSON("portrait"), stderr: "", exitCode: 0)
         })
 
         let response = try await registry.callTool(name: "set_orientation", arguments: ["udid": .string("AAAA-1111")])
@@ -125,10 +138,41 @@ struct SetOrientationToolTests {
         #expect(error.code == .invalidInput)
     }
 
-    @Test("Parses the orientation line")
+    @Test("Parses orientation JSON")
     func parses() {
-        #expect(parseDeviceOrientation("outcome: success\n  deviceOrientation: landscapeLeft\n") == "landscapeLeft")
+        #expect(parseDeviceOrientation(orientationJSON("landscapeLeft"))?.deviceOrientation == "landscapeLeft")
         #expect(parseDeviceOrientation("nothing here") == nil)
+    }
+
+    @Test("Does not confirm rotation without usable read-back", arguments: [
+        "Current Device Orientation: portrait\n",
+        "{\"result\":{\"deviceIsOrientationLocked\":false}}",
+        "{\"result\":{\"deviceOrientation\":\"\",\"deviceIsOrientationLocked\":false}}",
+        "{\"result\":{\"deviceOrientation\":\"unknown\",\"deviceIsOrientationLocked\":false}}",
+    ])
+    func invalidReadBack(output: String) async throws {
+        let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
+            CommandResult(stdout: args.contains("get") ? output : "", stderr: "", exitCode: 0)
+        })
+        let response = try await registry.callTool(name: "set_orientation", arguments: [
+            "udid": .string("AAAA-1111"), "orientation": .string("landscapeLeft"),
+        ])
+        guard case .error(let error) = response else { Issue.record("Expected unverified rotation to fail"); return }
+        #expect(error.code == .commandFailed)
+    }
+
+    @Test("Reports a read-back command failure after setting orientation")
+    func failedReadBack() async throws {
+        let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
+            CommandResult(stdout: "", stderr: args.contains("get") ? "Device disconnected" : "", exitCode: args.contains("get") ? 1 : 0)
+        })
+        let response = try await registry.callTool(name: "set_orientation", arguments: [
+            "udid": .string("AAAA-1111"), "orientation": .string("landscapeLeft"),
+        ])
+        guard case .error(let error) = response else { Issue.record("Expected error"); return }
+        #expect(error.code == .commandFailed)
+        #expect(error.message.contains("could not verify"))
+        #expect(error.details == "Device disconnected")
     }
 }
 
@@ -307,5 +351,50 @@ struct Xcode27OptionTests {
         guard case .failure = xcodebuildTestRepetitionArgs([
             "run_until_failure": .bool(true), "retry_on_failure": .bool(true),
         ]) else { Issue.record("Expected conflict"); return }
+    }
+}
+
+@Suite("Xcode 27 numeric input validation")
+struct Xcode27NumericInputTests {
+    @Test("Invalid integer arguments return errors without launching commands", arguments: [
+        Value.double(1e100), .double(-1e100), .double(Double(Int.max)),
+        .double(.infinity), .double(-.infinity), .double(.nan),
+        .double(2.5), .string("5"), .null,
+    ])
+    func rejectsInvalidIntegers(value: Value) async throws {
+        let calls = AllCallCapture()
+        let registry = await makeRegistry(executor: MockCommandExecutor { _, args in
+            await calls.capture(args)
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        })
+        let cases: [(String, String, [String: Value])] = [
+            ("swift_package_test", "maximum_repetitions", ["path": .string("/tmp/pkg"), "repeat_until": .string("fail")]),
+            ("swift_package_test", "timeout", ["path": .string("/tmp/pkg")]),
+            ("record_device_screen", "duration", [:]),
+            ("test_simulator", "test_iterations", [
+                "workspace": .string("/tmp/App.xcworkspace"),
+                "scheme": .string("InputValidation-\(UUID())"), "udid": .string("AAAA-1111"),
+            ]),
+        ]
+        for (tool, key, defaults) in cases {
+            var args = defaults
+            args[key] = value
+            let response = try await registry.callTool(name: tool, arguments: args)
+            guard case .error(let error) = response else { Issue.record("Expected invalid_input for \(tool).\(key)"); continue }
+            #expect(error.code == .invalidInput)
+            #expect(error.message.contains(key))
+        }
+        #expect(await calls.allArgs.isEmpty)
+    }
+
+    @Test("Whole JSON doubles and boundary values retain their meaning")
+    func acceptsWholeDoubles() throws {
+        let options = try SwiftTestOptions.parse([
+            "repeat_until": .string("fail"), "maximum_repetitions": .double(1000), "timeout": .double(3600),
+        ]).get()
+        #expect(options.maximumRepetitions == 1000)
+        #expect(options.timeout == 3600)
+        #expect(try xcodebuildTestRepetitionArgs(["test_iterations": .double(100)]).get() == ["-test-iterations", "100"])
+        #expect(try SwiftTestOptions.parse(["timeout": .int(Int.max)]).get().timeout == 3600)
     }
 }

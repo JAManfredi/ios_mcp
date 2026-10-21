@@ -71,29 +71,38 @@ func registerSetOrientationTool(
             // device stays put (seen on the iPhone Duo under Xcode 27.1).
             let getResult = try await executor.execute(
                 executable: "/usr/bin/xcrun",
-                arguments: ["devicectl", "device", "orientation", "get", "--device", resolvedUDID],
+                arguments: ["devicectl", "device", "orientation", "get", "--device", resolvedUDID, "--json-output", "-"],
                 timeout: 30,
                 environment: nil
             )
             guard getResult.succeeded else {
                 if let target {
-                    return .success(ToolResult(
-                        content: "Requested \(target) on simulator \(resolvedUDID); read-back failed, so take a screenshot to confirm."
+                    return .error(ToolError(
+                        code: .commandFailed,
+                        message: "Requested \(target) on simulator \(resolvedUDID), but could not verify its orientation.",
+                        details: getResult.stderr
                     ))
                 }
                 return .error(orientationError("get", stderr: getResult.stderr))
             }
 
-            let current = parseDeviceOrientation(getResult.stdout)
-            let locked = getResult.stdout.contains("deviceIsOrientationLocked: true")
+            guard let state = parseDeviceOrientation(getResult.stdout) else {
+                return .error(ToolError(
+                    code: .commandFailed,
+                    message: "Could not verify simulator orientation: devicectl returned invalid orientation JSON.",
+                    details: getResult.stdout
+                ))
+            }
+            let current = state.deviceOrientation
+            let locked = state.deviceIsOrientationLocked
 
             guard let target else {
-                var content = "Simulator \(resolvedUDID) orientation: \(current ?? "unknown")"
+                var content = "Simulator \(resolvedUDID) orientation: \(current)"
                 if locked { content += " (orientation locked)" }
                 return .success(ToolResult(content: content))
             }
 
-            if let current, current != target {
+            if current != target {
                 var content = "devicectl accepted \(target), but simulator \(resolvedUDID) still reports \(current)."
                 if locked { content += " Orientation lock is on." }
                 content += " The app may not support \(target), or the device ignored the request."
@@ -112,15 +121,20 @@ func registerSetOrientationTool(
     }
 }
 
-/// Pulls the value out of the `deviceOrientation: landscapeLeft` line.
-func parseDeviceOrientation(_ output: String) -> String? {
-    for line in output.split(separator: "\n") {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("deviceOrientation:") else { continue }
-        let value = trimmed.dropFirst("deviceOrientation:".count).trimmingCharacters(in: .whitespaces)
-        return value.isEmpty ? nil : value
+struct DeviceOrientation: Decodable {
+    let deviceOrientation: String
+    let deviceIsOrientationLocked: Bool
+}
+
+/// Read the stable JSON envelope instead of devicectl's human-readable labels.
+func parseDeviceOrientation(_ output: String) -> DeviceOrientation? {
+    struct Envelope: Decodable {
+        let result: DeviceOrientation
     }
-    return nil
+    guard let data = output.data(using: .utf8),
+          let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+          !envelope.result.deviceOrientation.isEmpty else { return nil }
+    return envelope.result
 }
 
 private func orientationError(_ verb: String, stderr: String) -> ToolError {

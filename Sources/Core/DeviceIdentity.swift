@@ -50,19 +50,16 @@ public enum DeviceIdentity {
 
     public static func name(for device: [String: Any]) -> String? {
         string(in: device, paths: [
-            ["properties", "device", "name"],
-            ["properties", "name"],
+            ["properties", "state", "name"],
             ["deviceProperties", "name"],
         ])
     }
 
     public static func osVersion(for device: [String: Any]) -> String? {
         string(in: device, paths: [
-            ["properties", "device", "osVersionNumber"],
-            ["properties", "software", "osVersionNumber"],
-            ["properties", "osVersionNumber"],
+            ["properties", "software", "osVersionNumber", "stringValue"],
             ["deviceProperties", "osVersionNumber"],
-        ]) ?? deepString(in: device["properties"], key: "osVersionNumber")
+        ])
     }
 
     public static func model(for device: [String: Any]) -> String? {
@@ -81,7 +78,7 @@ public enum DeviceIdentity {
         ])
     }
 
-    /// `physical` or `simulator` on Xcode 27+ (`properties.hardware.reality`).
+    /// `physical` or `simulated` on Xcode 27+ (`properties.hardware.reality`).
     /// Nil on older Xcode, where `list devices` only reported physical devices.
     public static func reality(for device: [String: Any]) -> String? {
         string(in: device, paths: [
@@ -141,7 +138,7 @@ public enum DeviceIdentity {
     }
 
     /// Depth-first search for a uniquely named leaf key. Used only for keys
-    /// whose name is unambiguous (`udid`, `osVersionNumber`), so a reshuffle of
+    /// whose name is unambiguous (`udid`, `marketingName`), so a reshuffle of
     /// the `properties` sub-dictionaries in a later devicectl doesn't silently
     /// drop the value.
     private static func deepString(in object: Any?, key: String, depth: Int = 0) -> String? {
