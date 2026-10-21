@@ -52,7 +52,7 @@ jobs:
           fi
           LLDB_TEST_BINARY="$LLDB_TEST_BUNDLE/Contents/MacOS/$(basename "$LLDB_TEST_BUNDLE" .xctest)"
           test -f "$LLDB_TEST_BINARY"
-          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter 'LLDBSessionTests|CommandExecutorTests|NativeMCPClientTests'
+          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter 'LLDBSessionTests|CommandExecutorTests|NativeMCPClientTests|UIBackendSelectionTests'
 
   # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
   # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image

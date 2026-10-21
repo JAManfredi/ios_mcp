@@ -2,9 +2,21 @@
 
 Author: Jared Manfredi
 
-The `--native-ui-workspace /absolute/path/App.xcodeproj` option routes only
-`inspect_ui` and `tap` through Xcode's native MCP tools. `.xcworkspace` is also
-supported. Without this option, every tool uses its existing backend.
+`--ui-backend auto|native|axe` selects the backend for `inspect_ui` and `tap`.
+The default remains `axe`. The original `--native-ui-workspace` option alone
+still selects strict native mode. With `auto` or `native`, that path overrides
+session defaults; otherwise each operation snapshots `workspace`, then `project`.
+An absent context permits AXe selection only in `auto`; a malformed/stale path
+is an error. `.xcodeproj` and `.xcworkspace` are supported.
+
+In `auto`, an `xcrun --find mcpbridge` lookup and bounded native catalog check
+precede all native tool execution. Only a confirmed missing binary or incompatible
+catalog permits AXe selection. Unexpected lookup/connection errors, cancellation,
+permission denial, and every failure after catalog selection remain errors.
+There is no action replay. No capability decision is cached across operations:
+session project changes take effect on the next call, and the existing connection
+is reused from discovery through native execution. Automatic selection can start
+the native service and request normal project authorization; it never grants it.
 
 ## Behavior and ownership
 
@@ -41,7 +53,7 @@ session; a lost capture response can leave native temporary files. Those cases
 cannot be recovered safely by guessing session keys or deleting shared folders.
 Cleanup failures are reported, not silently relabeled as success. If a tap may
 have been sent, inspect before deciding whether to tap again. There is no action
-retry and no AXe fallback.
+retry or fallback after native execution begins.
 
 ## Scope and costs
 
@@ -93,6 +105,40 @@ were reproduced locally with one concurrency worker. Pipe reads now run on
 Dispatch threads, and CI retains a combined one-worker check for the command
 executor, native MCP transport, and LLDB. Output-draining and launch-failure
 checks cover both ordinary and streaming commands.
+
+## Automatic selection validation — October 21, 2026
+
+The selection update preserves the AXe default and adds explicit `auto`, `native`,
+and `axe` modes. It reuses the native connection after capability discovery;
+it does not add a second bridge or retry an action with another backend.
+
+- Local `swift test`: 547 enabled tests passed; 12 opt-in integration tests were
+  skipped. All 22 retained process I/O, native transport, LLDB, and backend
+  selection tests also passed together with one concurrency worker. Selection
+  tests cover missing binaries, incompatible catalogs, unknown/denied preflight,
+  project changes, forced modes, cancellation/shutdown, and post-selection errors.
+- On Xcode 27.1 and iOS 27.0, `auto` selected native using only the session's
+  project default. Three tap modes advanced the counter once each (0 → 1 → 2 → 3).
+  Invalid targets failed without mutation; sheet open/close and navigation/return
+  passed. A native capture confirmed text entered by AXe, and a native capture
+  confirmed AXe scrolling moved the scroll bar from 0% to 19%.
+- Clearing session defaults selected AXe and reported the missing project
+  context. Native inspection and taps also passed in landscape; portrait was
+  restored afterward. The workspace-only option still selected strict native
+  mode, while strict native without project context returned an error.
+- AXe 1.8.0 was tested from an isolated release download; the installed AXe was
+  not changed. Initial AXe inspection attempts timed out creating its remote
+  automation session. Later inspection, typing, and scrolling succeeded. In a
+  separate forced-AXe run after relaunching the fixture app, the first identifier
+  tap reported success but the counter remained 0. That comparison stopped at
+  the failed assertion; it was not relabeled as passing. A subsequent native tap
+  incremented the counter correctly. No automatic action retry was introduced.
+
+These checks exercise a broader disposable SwiftUI fixture, not a production
+app or a controlled latency benchmark. Missing-native compatibility was tested
+deterministically; only Xcode 27.1 is installed locally. The AXe no-op and startup
+timeouts remain observations to investigate, not problems hidden by fallback.
+Keep automatic selection opt-in while gathering real-app and older-Xcode evidence.
 
 ## Live acceptance recipe
 

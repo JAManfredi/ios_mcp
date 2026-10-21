@@ -25,14 +25,22 @@ struct IosMcpCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Opt in to native Xcode inspect_ui and tap using this absolute .xcodeproj/.xcworkspace path. Requires Xcode agent approval; other UI tools still use AXe.")
     var nativeUIWorkspace: String?
 
+    @Option(name: .long, help: "UI backend for inspect_ui/tap: auto, native, or axe. Default: axe; --native-ui-workspace alone preserves native opt-in.")
+    var uiBackend: String?
+
     func run() async throws {
-        try await startServer(nativeUIWorkspace: nativeUIWorkspace)
+        do {
+            let mode = try UIBackendMode.resolve(uiBackend, workspace: nativeUIWorkspace)
+            try await startServer(nativeUIWorkspace: nativeUIWorkspace, mode: mode)
+        } catch let error as ToolError {
+            throw ValidationError(error.message)
+        }
     }
 }
 
 // MARK: - MCP Server
 
-private func startServer(nativeUIWorkspace: String?) async throws {
+private func startServer(nativeUIWorkspace: String?, mode: UIBackendMode) async throws {
     LoggingConfiguration.bootstrap(level: .info)
     let logger = Logger(label: "ios-mcp")
 
@@ -44,9 +52,8 @@ private func startServer(nativeUIWorkspace: String?) async throws {
     )
     let nativeUI: NativeUIController?
     do {
-        nativeUI = try nativeUIWorkspace.map {
-            try NativeUIController(workspace: $0, artifacts: artifacts, concurrency: concurrency)
-        }
+        nativeUI = mode == .axe ? nil : try NativeUIController(workspace: nativeUIWorkspace, mode: mode, session: session,
+                                          executor: executor, artifacts: artifacts, concurrency: concurrency)
     } catch let error as ToolError {
         throw ValidationError(error.message)
     }

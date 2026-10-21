@@ -50,9 +50,12 @@ func registerSnapshotUITool(
             return .error(error)
         }
 
+        var backendReason: String?
         if let nativeUI {
             do {
                 return .success(try await nativeUI.inspect(udid: resolvedUDID))
+            } catch let unavailable as NativeUIUnavailable {
+                backendReason = unavailable.reason
             } catch let error as ToolError {
                 return .error(error)
             } catch {
@@ -60,36 +63,39 @@ func registerSnapshotUITool(
             }
         }
 
-        let resolvedAxe: String
-        if let axePath {
-            resolvedAxe = axePath
-        } else {
-            switch resolveAxePath() {
-            case .success(let path): resolvedAxe = path
-            case .failure(let error): return .error(error)
-            }
-        }
-
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["describe-ui", "--udid", resolvedUDID],
-                timeout: 120,
-                environment: nil
-            )
-
-            guard result.succeeded else {
-                return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
+        let response: ToolResponse = await {
+            let resolvedAxe: String
+            if let axePath {
+                resolvedAxe = axePath
+            } else {
+                switch resolveAxePath() {
+                case .success(let path): resolvedAxe = path
+                case .failure(let error): return .error(error)
+                }
             }
 
-            return .success(ToolResult(content: result.stdout))
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to capture UI snapshot: \(error.localizedDescription)"
-            ))
-        }
+            do {
+                let result = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["describe-ui", "--udid", resolvedUDID],
+                    timeout: 120,
+                    environment: nil
+                )
+
+                guard result.succeeded else {
+                    return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
+                }
+
+                return .success(ToolResult(content: result.stdout))
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(
+                    code: .internalError,
+                    message: "Failed to capture UI snapshot: \(error.localizedDescription)"
+                ))
+            }
+        }()
+        return backendReason.map { uiBackendResponse(response, reason: $0) } ?? response
     }
 }
