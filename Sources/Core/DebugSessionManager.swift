@@ -131,7 +131,7 @@ public actor LLDBSessionManager: DebugSessionManaging {
 // MARK: - Output Buffer
 
 /// Thread-safe output buffer using a lock instead of actor isolation.
-/// This avoids deadlocking when the actor's synchronous `waitForPrompt`
+/// This avoids deadlocking when the actor's synchronous `waitForCompletion`
 /// spin loop needs to read output written by a detached read task.
 final class LLDBOutputBuffer: @unchecked Sendable {
     private let lock = NSLock()
@@ -143,14 +143,14 @@ final class LLDBOutputBuffer: @unchecked Sendable {
         lock.unlock()
     }
 
-    func consumeIfPrompt(_ prompt: String) -> String? {
+    func consumeThroughMarker(_ marker: String) -> String? {
         lock.lock()
         defer { lock.unlock() }
-        guard storage.contains(prompt) else { return nil }
-        let result = storage
-            .replacingOccurrences(of: prompt, with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        storage = ""
+        guard let range = storage.range(of: marker + "\n") else { return nil }
+        // The marker is echoed on its own line, preceded by LLDB's prompt.
+        let prefix = storage[..<range.lowerBound]
+        let result = prefix.lastIndex(of: "\n").map { String(prefix[...$0]) } ?? ""
+        storage.removeSubrange(..<range.upperBound)
         return result
     }
 
@@ -189,14 +189,15 @@ actor LLDBSession {
     func launch() throws {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        proc.arguments = ["lldb"]
+        proc.arguments = ["lldb", "--no-use-colors"]
 
         let stdin = Pipe()
         let stdout = Pipe()
 
         proc.standardInput = stdin
         proc.standardOutput = stdout
-        proc.standardError = Pipe() // discard stderr
+        // One pipe preserves ordering between diagnostics and command completion.
+        proc.standardError = stdout
 
         try proc.run()
 
@@ -215,9 +216,6 @@ actor LLDBSession {
                 }
             }
         }
-
-        // Wait for initial prompt
-        _ = try? waitForPrompt(timeout: 10)
     }
 
     func sendCommand(_ command: String, timeout: TimeInterval) throws -> String {
@@ -230,10 +228,16 @@ actor LLDBSession {
 
         outputBuffer.clear()
 
-        let commandData = Data((command + "\n").utf8)
+        // With piped stdin LLDB echoes the prompt BEFORE executing a command.
+        // An echoed trailing comment proves that the preceding command finished.
+        let marker = "# ios-mcp-command-end-\(UUID().uuidString)"
+        let commandData = Data((command + "\n" + marker + "\n").utf8)
         stdinPipe.fileHandleForWriting.write(commandData)
 
-        return try waitForPrompt(timeout: timeout)
+        let output = try waitForCompletion(marker: marker, timeout: timeout)
+        return Redactor.redact(output
+            .replacingOccurrences(of: Self.prompt + command + "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     func terminate() {
@@ -249,11 +253,11 @@ actor LLDBSession {
 
     // MARK: - Private
 
-    private func waitForPrompt(timeout: TimeInterval) throws -> String {
+    private func waitForCompletion(marker: String, timeout: TimeInterval) throws -> String {
         let deadline = Date().addingTimeInterval(timeout)
 
         while Date() < deadline {
-            if let result = outputBuffer.consumeIfPrompt(Self.prompt) {
+            if let result = outputBuffer.consumeThroughMarker(marker) {
                 return result
             }
             Thread.sleep(forTimeInterval: 0.05)
@@ -263,7 +267,7 @@ actor LLDBSession {
         throw ToolError(
             code: .timeout,
             message: "LLDB command timed out after \(Int(timeout))s",
-            details: partial.isEmpty ? nil : partial
+            details: partial.isEmpty ? nil : Redactor.redact(partial)
         )
     }
 }
