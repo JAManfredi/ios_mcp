@@ -10,8 +10,8 @@ An absent context permits AXe selection only in `auto`; a malformed/stale path
 is an error. `.xcodeproj` and `.xcworkspace` are supported.
 
 In `auto`, an `xcrun --find mcpbridge` lookup and bounded native catalog check
-precede all native tool execution. Only a confirmed missing binary or incompatible
-catalog permits AXe selection. Unexpected lookup/connection errors, cancellation,
+precede all native tool execution. With a project configured, only a confirmed
+missing binary or incompatible catalog permits AXe selection. Unexpected lookup/connection errors, cancellation,
 permission denial, and every failure after catalog selection remain errors.
 There is no action replay. No capability decision is cached across operations:
 session project changes take effect on the next call, and the existing connection
@@ -20,7 +20,7 @@ the native service and request normal project authorization; it never grants it.
 
 ## Behavior and ownership
 
-Each operation connects an owned `xcrun mcpbridge`, checks the required tool
+Each native operation connects an owned `xcrun mcpbridge`, checks the required tool
 schemas, opens the configured project to request normal Xcode authorization,
 and starts one device interaction session. It verifies the returned simulator
 UUID exactly before capturing or sending input. Xcode may prompt again when the
