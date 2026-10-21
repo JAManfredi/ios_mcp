@@ -34,15 +34,12 @@ func registerListDevicesTool(
             guard result.succeeded else {
                 return .error(ToolError(
                     code: .commandFailed,
-                    message: "devicectl list devices failed. Ensure Xcode 16+ is installed.",
+                    message: "devicectl list devices failed. Ensure Xcode 15+ is installed and selected with xcode-select.",
                     details: result.stderr
                 ))
             }
 
-            guard let data = result.stdout.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let resultObj = json["result"] as? [String: Any],
-                  let devices = resultObj["devices"] as? [[String: Any]] else {
+            guard let devices = DeviceIdentity.physicalDevices(fromDevicectlJSON: result.stdout) else {
                 return .success(ToolResult(content: "No devices found or unable to parse devicectl output."))
             }
 
@@ -53,15 +50,10 @@ func registerListDevicesTool(
             var lines: [String] = ["Connected devices (\(devices.count)):"]
 
             for device in devices {
-                let deviceProps = device["deviceProperties"] as? [String: Any]
-                let name = deviceProps?["name"] as? String ?? "Unknown"
-                let osVersion = deviceProps?["osVersionNumber"] as? String ?? "?"
-                let hardwareProps = device["hardwareProperties"] as? [String: Any]
-                let model = hardwareProps?["marketingName"] as? String
-                    ?? hardwareProps?["productType"] as? String
-                    ?? "Unknown"
-                let connectionProps = device["connectionProperties"] as? [String: Any]
-                let transportType = connectionProps?["transportType"] as? String ?? "?"
+                let name = DeviceIdentity.name(for: device) ?? "Unknown"
+                let osVersion = DeviceIdentity.osVersion(for: device) ?? "?"
+                let model = DeviceIdentity.model(for: device) ?? "Unknown"
+                let transportType = DeviceIdentity.transportType(for: device) ?? "?"
 
                 let identifier = DeviceIdentity.destinationUDID(for: device) ?? "unidentified"
                 lines.append(

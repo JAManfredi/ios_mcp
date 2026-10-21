@@ -16,7 +16,7 @@ func registerOpenSimulatorTool(
 ) async {
     let manifest = ToolManifest(
         name: "open_simulator",
-        description: "Open the iOS Simulator app. Optionally boots a specific simulator by UDID first. Falls back to session default simulator_udid.",
+        description: "Open the simulator viewer (Device Hub on Xcode 27+, Simulator.app on earlier Xcode). Optionally boots a specific simulator by UDID first. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "udid": .init(
@@ -72,30 +72,40 @@ func registerOpenSimulatorTool(
             }
         }
 
-        // Open Simulator.app
+        // Xcode 27 replaced Simulator.app with Device Hub. Open by bundle ID,
+        // newest first, so older Xcode installs keep working.
         do {
-            let result = try await executor.execute(
-                executable: "/usr/bin/open",
-                arguments: ["-a", "Simulator"],
-                timeout: 15,
-                environment: nil
-            )
+            var failures: [String] = []
+            var openedApp: SimulatorViewerApp?
+            for app in SimulatorViewerApp.allCases {
+                let result = try await executor.execute(
+                    executable: "/usr/bin/open",
+                    arguments: ["-b", app.bundleID],
+                    timeout: 15,
+                    environment: nil
+                )
+                if result.succeeded {
+                    openedApp = app
+                    break
+                }
+                failures.append("\(app.displayName): \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
 
-            guard result.succeeded else {
+            guard let openedApp else {
                 return .error(ToolError(
                     code: .commandFailed,
-                    message: "Failed to open Simulator.app",
-                    details: result.stderr
+                    message: "Failed to open Device Hub or Simulator.app",
+                    details: failures.joined(separator: "\n")
                 ))
             }
 
             if let udid {
                 return .success(ToolResult(
-                    content: "Booted simulator \(udid) and opened Simulator.app."
+                    content: "Booted simulator \(udid) and opened \(openedApp.displayName)."
                 ))
             } else {
                 return .success(ToolResult(
-                    content: "Opened Simulator.app."
+                    content: "Opened \(openedApp.displayName)."
                 ))
             }
         } catch let error as ToolError {
@@ -105,6 +115,28 @@ func registerOpenSimulatorTool(
                 code: .internalError,
                 message: "Failed to open Simulator: \(error.localizedDescription)"
             ))
+        }
+    }
+}
+
+/// The GUI that displays simulators. Ordered newest first.
+enum SimulatorViewerApp: CaseIterable {
+    /// Xcode 27+: Device Hub replaced Simulator.app.
+    case deviceHub
+    /// Xcode 26 and earlier.
+    case simulator
+
+    var bundleID: String {
+        switch self {
+        case .deviceHub: "com.apple.dt.Devices"
+        case .simulator: "com.apple.iphonesimulator"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .deviceHub: "Device Hub"
+        case .simulator: "Simulator.app"
         }
     }
 }
