@@ -17,7 +17,7 @@
 
 ## 💡 Why ios-mcp
 
-- **Single native binary** — one `make install` and you're running. No runtimes, no interpreters, no background daemons. Optional tools (axe, SwiftLint) enhance specific features but aren't required.
+- **Native CLI** — `make install` builds ios-mcp and installs AXe for UI automation through Homebrew. No background daemon is required. SwiftLint is optional.
 - **Interactive debugging** — attach to processes, set breakpoints, inspect stacks and variables, execute LLDB commands — all through MCP. Go beyond build-and-test into real debugging workflows.
 - **Deep UI automation** — tap, swipe, type, long press, screenshot, record video, read the full accessibility tree. Drive the simulator the way a user would.
 - **Security by default** — secrets are automatically redacted from all output (tokens, keys, signing identities). Dangerous debugger commands are blocked. All subprocesses use argument arrays — never shell execution. No telemetry. No network access.
@@ -124,22 +124,37 @@ cd ios_mcp
 make install
 ```
 
-Installs to `/usr/local/bin` by default. Use `PREFIX=~/.local` to install elsewhere.
+Requires [Homebrew](https://brew.sh). `make install` installs or upgrades AXe
+through `cameroncooke/axe/axe`, then installs ios-mcp to `/usr/local/bin` by
+default. Use `PREFIX=~/.local` to install ios-mcp elsewhere. If AXe installation
+fails, ios-mcp is not copied into the destination.
+
+AXe follows the upstream Homebrew formula rather than a pinned release (currently
+1.8.0). Homebrew's pinning and no-upgrade settings still apply; run `ios-mcp doctor`
+after installation to check the version actually resolved by your MCP environment.
+Restart the MCP connection after upgrading AXe. `make setup` also installs the
+optional SwiftLint tool.
 
 ### Homebrew (build from source)
 
 ```bash
-brew install --build-from-source Formula/ios-mcp.rb
+brew tap JAManfredi/ios-mcp https://github.com/JAManfredi/ios_mcp.git
+brew trust --formula cameroncooke/axe/axe  # Homebrew 6+: trust this dependency
+brew install --HEAD JAManfredi/ios-mcp/ios-mcp
 ```
+
+The formula declares AXe as a runtime dependency, so Homebrew manages it during
+installation and upgrades. Homebrew 6+ requires explicit trust for dependencies
+from other taps; the command above trusts only the AXe formula.
 
 ### Manual
 
 ```bash
 git clone https://github.com/JAManfredi/ios_mcp.git
 cd ios_mcp
-brew bundle          # optional dependencies (swiftlint, etc.)
+brew bundle          # installs/upgrades AXe and optional SwiftLint
 swift build -c release --disable-sandbox
-cp .build/release/ios-mcp /usr/local/bin/
+cp "$(swift build -c release --show-bin-path)/ios-mcp" /usr/local/bin/
 ```
 
 ---
@@ -238,7 +253,7 @@ See [validation and limits](docs/native-ui-pilot.md) before enabling it.
 | Xcode | 16+ (tested through 27.1) | ✅ |
 | iOS Simulator runtime | Any installed | ✅ |
 | Swift | 6.1+ | ✅ |
-| [axe](https://github.com/cameroncooke/AXe) | 1.8.0+ (required for Xcode 27) | Optional — UI automation |
+| [axe](https://github.com/cameroncooke/AXe) | 1.8.0+ (required for Xcode 27) | UI automation — installed by `make install` and Homebrew |
 | SwiftLint | Any | Optional — lint tool |
 | devicectl (via Xcode) | Xcode 16+ | Optional — physical devices |
 
