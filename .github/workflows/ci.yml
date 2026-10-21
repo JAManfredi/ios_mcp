@@ -38,7 +38,21 @@ jobs:
       - name: Test
         run: swift test
       - name: Test LLDB with one concurrency worker
-        run: LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --skip-build --filter LLDBSessionTests
+        timeout-minutes: 2
+        # Limit the test process, not SwiftPM's build/planning process.
+        run: |
+          LLDB_TEST_BIN_DIR=$(swift build --show-bin-path)
+          LLDB_TEST_SWIFT=$(xcrun --find swift)
+          LLDB_TEST_HELPER="${LLDB_TEST_SWIFT%/bin/swift}/libexec/swift/pm/swiftpm-testing-helper"
+          LLDB_TEST_FRAMEWORKS="$(xcrun --show-sdk-platform-path)/Developer/Library/Frameworks"
+          LLDB_TEST_LIBRARIES="$(xcrun --show-sdk-platform-path)/Developer/usr/lib"
+          LLDB_TEST_BUNDLE="$LLDB_TEST_BIN_DIR/CoreTests.xctest"
+          if [ ! -d "$LLDB_TEST_BUNDLE" ]; then
+            LLDB_TEST_BUNDLE="$LLDB_TEST_BIN_DIR/ios-mcpPackageTests.xctest"
+          fi
+          LLDB_TEST_BINARY="$LLDB_TEST_BUNDLE/Contents/MacOS/$(basename "$LLDB_TEST_BUNDLE" .xctest)"
+          test -f "$LLDB_TEST_BINARY"
+          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter LLDBSessionTests
 
   # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
   # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image
