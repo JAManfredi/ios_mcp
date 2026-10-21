@@ -38,22 +38,23 @@ jobs:
       - name: Test
         run: swift test
 
-  # Xcode 27 ships Swift 6.4 and needs macOS Tahoe 26.6+. Building and testing
-  # here catches compiler changes the macos-15 (Xcode 16) jobs never see.
-  test-xcode-27:
-    name: Test (Xcode 27)
+  # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
+  # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image
+  # ships it, and warns until then.
+  test-latest-xcode:
+    name: Test (latest Xcode)
     runs-on: macos-26
     needs: build
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 27
+      - name: Select newest Xcode
         run: |
-          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then
-            echo "::error::No Xcode 27 on this runner image"
-            exit 1
-          fi
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
+          case "$XCODE" in
+            *Xcode_27*) ;;
+            *) echo "::warning::No Xcode 27 on this runner image yet; testing with $XCODE" ;;
+          esac
       - name: Test
         run: swift test
