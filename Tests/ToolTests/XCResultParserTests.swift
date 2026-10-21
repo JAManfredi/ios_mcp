@@ -284,6 +284,24 @@ struct AxeHealthTests {
         #expect(axeVersionWarning(reported: "1.9.2") == nil)
     }
 
+    @Test("Names the axe upgrade when SimulatorKit fails to load")
+    func simulatorKitFailure() {
+        let error = axeCommandError(
+            "axe tap failed",
+            stderr: "Failed to load essential private frameworks: Attempting to load a file at path '/Applications/Xcode.app/Contents/Developer/Library/PrivateFrameworks/SimulatorKit.framework' but it does not exist"
+        )
+        #expect(error.code == .dependencyMissing)
+        #expect(error.message.contains("brew upgrade"))
+    }
+
+    @Test("Other axe failures stay command failures")
+    func ordinaryAxeFailure() {
+        let error = axeCommandError("axe tap failed", stderr: "No element matches identifier 'x'")
+        #expect(error.code == .commandFailed)
+        #expect(error.message == "axe tap failed")
+        #expect(error.details == "No element matches identifier 'x'")
+    }
+
     @Test("Compares versions componentwise, not lexically")
     func comparesVersions() {
         #expect(isVersion("1.4.0", olderThan: "1.8.0"))

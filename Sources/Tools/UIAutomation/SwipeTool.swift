@@ -152,11 +152,7 @@ func registerSwipeTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe swipe failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe swipe failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: "Swiped \(direction) on simulator \(resolvedUDID)."))

@@ -90,11 +90,7 @@ func registerTapTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe tap failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe tap failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: "Tapped element on simulator \(resolvedUDID)."))

@@ -122,11 +122,7 @@ func registerTypeTextTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe type failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe type failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: "Typed text on simulator \(resolvedUDID)."))

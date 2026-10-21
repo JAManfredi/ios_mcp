@@ -103,11 +103,7 @@ func registerTagScreenTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe describe-ui failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
             }
 
             treeOutput = result.stdout
