@@ -4,7 +4,7 @@ class IosMcp < Formula
   license "MIT"
   head "https://github.com/JAManfredi/ios_mcp.git", branch: "main"
 
-  depends_on xcode: ["16.0", :build]
+  depends_on xcode: ["16.0", :build]  # tested through Xcode 27.1
   depends_on macos: :sonoma
 
   def install
