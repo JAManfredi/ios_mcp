@@ -89,20 +89,26 @@ All 76 tools have next-step mappings; `ToolRegistrationTests` fails if a registe
 
 ### LLDB Denylist
 
-`debug_run_command` checks commands against a denylist before execution. Denied commands and their safe alternatives:
+`debug_run_command` checks commands against a denylist before execution. Aliases and abbreviations are resolved first (`r`, `attach`, `pro la`, `shell`, `p`), so they match the command they expand to. Denied commands and their safe alternatives:
 
 | Command Pattern | Reason | Alternative |
 |----------------|--------|-------------|
 | `platform shell` | Arbitrary shell execution | Use MCP tools |
-| `command script` | Arbitrary Python scripts | Not available |
+| `script`, `command script` | Arbitrary Python scripts | Not available |
 | `command source` | Source arbitrary files | Not available |
+| `command alias`, `command regex` | User-defined commands bypass the denylist | Run the full command |
 | `process kill` | Kill target process | Use `stop_app` |
 | `process destroy` | Destroy target process | Use `stop_app` |
+| `process launch` (`run`, `r`) | Relaunch kills the attached process | `build_run_simulator` or `launch_app`, then `debug_attach` |
+| `process attach` (`attach`), `process connect` (`gdb-remote`) | Replaces the debug target | `debug_detach`, then `debug_attach` |
+| `platform process launch`/`attach` | Launches or attaches outside the session | `launch_app` / `debug_attach` |
 | `memory write` | Memory mutation | Read-only inspection |
 | `register write` | Register mutation | Read-only inspection |
 | `expression @import` | Load frameworks | `expression` without `@import` |
 | `settings set target.run-args` | Modify launch args | Use `build_run_simulator` |
 | `target delete` | Remove debug target | Use `debug_detach` |
+
+Sessions start with `settings set auto-confirm true`, verified before attaching, because LLDB reads confirmation answers from the same stdin as commands. `quit`/`exit`, multiline input, and `settings` changes that could disable auto-confirm (`auto-confirm`, `settings read`, `settings clear --all`) return `invalid_input` even with `allow_unsafe`.
 
 Set `allow_unsafe: true` to bypass — response is marked `[UNSAFE]` and audit-logged. **Never set `allow_unsafe: true` without explicit user confirmation.** The denylist exists to prevent accidental damage.
 
