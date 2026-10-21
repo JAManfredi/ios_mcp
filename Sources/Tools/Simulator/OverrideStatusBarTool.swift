@@ -60,6 +60,23 @@ func registerOverrideStatusBarTool(
 
     await registry.register(manifest: manifest) { args in
         do {
+            for key in ["time", "operator_name", "preset"] {
+                guard let value = args[key] else { continue }
+                guard case .string = value else {
+                    return .error(ToolError(code: .invalidInput, message: "\(key) must be a string."))
+                }
+            }
+            if let value = args["clear"] {
+                guard case .bool = value else {
+                    return .error(ToolError(code: .invalidInput, message: "clear must be a boolean."))
+                }
+            }
+            var numbers: [String: Int] = [:]
+            for key in ["battery_level", "cellular_bars", "wifi_bars"] {
+                if let value = args[key] {
+                    numbers[key] = try integerArgument(value, named: key).get()
+                }
+            }
             let udid: String?
             if case .string(let u) = args["udid"] {
                 udid = u
@@ -135,17 +152,17 @@ func registerOverrideStatusBarTool(
                 overrideArgs.append(contentsOf: ["--operatorName", name])
             }
 
-            if let batteryLevel = extractInt(from: args["battery_level"]) {
+            if let batteryLevel = numbers["battery_level"] {
                 let clamped = min(max(batteryLevel, 0), 100)
                 overrideArgs.append(contentsOf: ["--batteryLevel", "\(clamped)"])
             }
 
-            if let cellularBars = extractInt(from: args["cellular_bars"]) {
+            if let cellularBars = numbers["cellular_bars"] {
                 let clamped = min(max(cellularBars, 0), 4)
                 overrideArgs.append(contentsOf: ["--cellularBars", "\(clamped)"])
             }
 
-            if let wifiBars = extractInt(from: args["wifi_bars"]) {
+            if let wifiBars = numbers["wifi_bars"] {
                 let clamped = min(max(wifiBars, 0), 3)
                 overrideArgs.append(contentsOf: ["--wifiBars", "\(clamped)"])
             }
@@ -198,12 +215,3 @@ let screenshotStatusBarPreset: [(flag: String, value: String)] = [
     ("--batteryState", "charged"),
     ("--batteryLevel", "100"),
 ]
-
-private func extractInt(from value: Value?) -> Int? {
-    guard let value else { return nil }
-    switch value {
-    case .int(let v): return v
-    case .double(let v): return Int(v)
-    default: return nil
-    }
-}

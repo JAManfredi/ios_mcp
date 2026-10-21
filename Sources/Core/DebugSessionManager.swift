@@ -81,7 +81,6 @@ public actor LLDBSessionManager: DebugSessionManaging {
         }
 
         _ = try? await session.sendCommand("detach", timeout: 10)
-        _ = try? await session.sendCommand("quit", timeout: 5)
         await session.terminate()
         sessions[sessionID] = nil
 
@@ -119,7 +118,6 @@ public actor LLDBSessionManager: DebugSessionManaging {
     public func teardownAll() async {
         for (id, session) in sessions {
             _ = try? await session.sendCommand("detach", timeout: 5)
-            _ = try? await session.sendCommand("quit", timeout: 3)
             await session.terminate()
             logger.info("Torn down session \(id)")
         }
@@ -222,6 +220,21 @@ actor LLDBSession {
     }
 
     func sendCommand(_ command: String, timeout: TimeInterval) throws -> String {
+        guard !command.contains("\n"), !command.contains("\r") else {
+            throw ToolError(code: .invalidInput, message: "Send one LLDB command per request; multiline interactive input is not supported.")
+        }
+        // Confirmation input cannot share the command/marker stream: LLDB can
+        // consume subsequent commands as answers. Require an explicit deletion
+        // target (or LLDB's explicit --force form) instead of answering prompts.
+        let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
+        if let first = words.first, ["q", "qu", "qui", "quit", "exit"].contains(first) {
+            throw ToolError(code: .invalidInput, message: "Use debug_detach to close a debug session; interactive quit is not supported.")
+        }
+        if words.count >= 2, words[0].count >= 2,
+           ["breakpoint", "watchpoint"].contains(where: { $0.hasPrefix(words[0]) }),
+           "delete".hasPrefix(words[1]), words.dropFirst(2).allSatisfy({ $0 == "--" }) {
+            throw ToolError(code: .invalidInput, message: "Deleting all breakpoints or watchpoints requires confirmation. Supply explicit IDs or an explicit --force option; interactive confirmation is not supported.")
+        }
         guard let stdinPipe, let process, process.isRunning else {
             throw ToolError(
                 code: .internalError,

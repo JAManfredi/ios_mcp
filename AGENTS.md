@@ -262,3 +262,7 @@ brew install --HEAD JAManfredi/ios-mcp/ios-mcp
 make build
 make install  # installs/upgrades AXe, then installs ios-mcp to /usr/local/bin
 ```
+
+For a destination that needs sudo, run `make install-dependencies build` as the
+normal user, then `sudo make install-binary`. Do not run Homebrew or the build as
+root.

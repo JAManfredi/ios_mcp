@@ -14,6 +14,12 @@ import Testing
 
 @Suite("list_crash_logs")
 struct CrashLogToolTests {
+    @Test("Preserves a header-only IPS report without a trailing newline")
+    func headerOnlyIPS() {
+        let header = #"{"app_name":"MyApp","bundleID":"com.example.MyApp","timestamp":"today"}"#
+        #expect(summarizeIPS(header) == ["Process: MyApp", "Bundle: com.example.MyApp", "Timestamp: today"])
+        #expect(summarizeIPS(header) == summarizeIPS(header + "\n"))
+    }
 
     @Test("Returns empty when no crash logs directory")
     func noCrashDir() async throws {

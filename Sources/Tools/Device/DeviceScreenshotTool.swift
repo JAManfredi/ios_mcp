@@ -35,6 +35,7 @@ func registerDeviceScreenshotTool(
         case .success(let udid):
             let outputPath = NSTemporaryDirectory() + "ios-mcp-device-screenshot-\(UUID().uuidString).png"
 
+            defer { try? FileManager.default.removeItem(atPath: outputPath) }
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/xcrun",
@@ -58,7 +59,6 @@ func registerDeviceScreenshotTool(
                         message: "devicectl reported success but wrote no screenshot to \(outputPath)."
                     ))
                 }
-                try? FileManager.default.removeItem(at: fileURL)
 
                 let ref = try await artifacts.store(
                     data: data,
@@ -70,6 +70,8 @@ func registerDeviceScreenshotTool(
                     content: "Device screenshot captured.\nDevice: \(udid)\nStored at: \(ref.path)",
                     artifacts: [ref]
                 ))
+            } catch let error as ToolError {
+                return .error(error)
             } catch {
                 return .error(ToolError(
                     code: .internalError,

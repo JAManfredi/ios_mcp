@@ -15,25 +15,29 @@ public actor NativeUIController: NativeUIAutomating {
     private let mode: UIBackendMode
     private let session: SessionStore?
     private let executor: any CommandExecuting
+    private let validator: DefaultsValidator
     private let artifacts: ArtifactStore
     private let concurrency: ConcurrencyPolicy
     private let makeClient: @Sendable () -> any NativeMCPCalling
     private let artifactRoot: URL
-    private var active: Task<ToolResult, Error>?
+    private var active: [String: Task<ToolResult, Error>] = [:]
     private var stopping = false
 
-    private static func validatedWorkspace(_ workspace: String) throws -> String {
+    private static func validatedWorkspace(_ workspace: String, validator: DefaultsValidator) throws -> String {
         let url = URL(fileURLWithPath: workspace).standardizedFileURL
-        guard workspace.hasPrefix("/"), ["xcodeproj", "xcworkspace"].contains(url.pathExtension),
-              FileManager.default.fileExists(atPath: url.path) else {
+        guard workspace.hasPrefix("/"), ["xcodeproj", "xcworkspace"].contains(url.pathExtension) else {
             throw ToolError(code: .invalidInput, message: "Native UI requires an existing absolute .xcodeproj or .xcworkspace path. Check --native-ui-workspace or session workspace/project defaults.")
         }
+        if let error = validator.validatePathExists(url.path, label: "Native UI project") { throw error }
         return url.path
     }
 
     public init(workspace: String? = nil, mode: UIBackendMode = .native, session: SessionStore? = nil,
-                executor: any CommandExecuting = CommandExecutor(), artifacts: ArtifactStore, concurrency: ConcurrencyPolicy) throws {
-        self.workspace = try workspace.map(Self.validatedWorkspace)
+                executor: any CommandExecuting = CommandExecutor(), artifacts: ArtifactStore, concurrency: ConcurrencyPolicy,
+                validator: DefaultsValidator? = nil) throws {
+        let validator = validator ?? DefaultsValidator(executor: executor, pathPolicy: PathPolicy())
+        self.validator = validator
+        self.workspace = try workspace.map { try Self.validatedWorkspace($0, validator: validator) }
         self.mode = mode
         self.session = session
         self.executor = executor
@@ -45,11 +49,13 @@ public actor NativeUIController: NativeUIAutomating {
 
     init(workspace: String?, artifacts: ArtifactStore, concurrency: ConcurrencyPolicy,
          artifactRoot: URL, mode: UIBackendMode = .native, session: SessionStore? = nil,
-         executor: any CommandExecuting = CommandExecutor(), makeClient: @escaping @Sendable () -> any NativeMCPCalling) {
+         executor: any CommandExecuting = CommandExecutor(), validator: DefaultsValidator? = nil,
+         makeClient: @escaping @Sendable () -> any NativeMCPCalling) {
         self.workspace = workspace
         self.mode = mode
         self.session = session
         self.executor = executor
+        self.validator = validator ?? DefaultsValidator(executor: executor, pathPolicy: PathPolicy())
         self.artifacts = artifacts
         self.concurrency = concurrency
         self.artifactRoot = artifactRoot
@@ -66,14 +72,16 @@ public actor NativeUIController: NativeUIAutomating {
 
     public func shutdown() async {
         stopping = true
-        active?.cancel()
-        _ = await active?.result
+        let tasks = Array(active.values)
+        for task in tasks { task.cancel() }
+        for task in tasks { _ = await task.result }
     }
 
     private func perform(udid: String, target: NativeUITarget?) async throws -> ToolResult {
         try Task.checkCancellation()
-        guard !stopping, active == nil else {
-            throw ToolError(code: .resourceBusy, message: "Native UI is busy or shutting down. Wait for the current operation to finish.")
+        let deviceKey = UUID(uuidString: udid)?.uuidString ?? udid
+        guard !stopping, active[deviceKey] == nil else {
+            throw ToolError(code: .resourceBusy, message: "Native UI is busy on this simulator or shutting down. Wait for the current operation to finish.")
         }
         if mode == .axe { throw NativeUIUnavailable("axe mode") }
         // Take one snapshot: an operation must not combine workspace/project
@@ -82,7 +90,7 @@ public actor NativeUIController: NativeUIAutomating {
         try Task.checkCancellation()
         // The defaults snapshot awaited another actor; recheck ownership before
         // publishing this task so concurrent calls cannot replace active work.
-        guard !stopping, active == nil else {
+        guard !stopping, active[deviceKey] == nil else {
             throw ToolError(code: .resourceBusy, message: "Native UI is busy or shutting down.")
         }
         let selectedWorkspace = workspace ?? defaults[.workspace] ?? defaults[.project]
@@ -90,7 +98,7 @@ public actor NativeUIController: NativeUIAutomating {
             if mode == .auto { throw NativeUIUnavailable("auto: no workspace/project configured") }
             throw ToolError(code: .invalidInput, message: "Native UI needs --native-ui-workspace or a session workspace/project default.")
         }
-        let selectedPath = try Self.validatedWorkspace(selectedWorkspace)
+        let selectedPath = try Self.validatedWorkspace(selectedWorkspace, validator: validator)
         guard let uuid = UUID(uuidString: udid) else {
             throw ToolError(code: .invalidInput, message: "Native UI requires an exact simulator UUID, not a device name or partial identifier.")
         }
@@ -99,8 +107,8 @@ public actor NativeUIController: NativeUIAutomating {
                                artifacts: artifacts, concurrency: concurrency,
                                artifactRoot: artifactRoot, client: makeClient())
         }
-        active = task
-        defer { active = nil }
+        active[deviceKey] = task
+        defer { active[deviceKey] = nil }
         return try await withTaskCancellationHandler {
             try await task.value
         } onCancel: { task.cancel() }

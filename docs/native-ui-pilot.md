@@ -9,6 +9,11 @@ session defaults; otherwise each operation snapshots `workspace`, then `project`
 An absent context permits AXe selection only in `auto`; a malformed/stale path
 is an error. `.xcodeproj` and `.xcworkspace` are supported.
 
+Both configured and session-derived paths use the shared `DefaultsValidator`
+and allowed-root policy, including directory-boundary and symlink checks.
+An invalid configured project remains an error rather than silently changing
+backends; clear the default when AXe without project context is intended.
+
 In `auto`, an `xcrun --find mcpbridge` lookup and bounded native catalog check
 precede all native tool execution. With a project configured, only a confirmed
 missing binary or incompatible catalog permits AXe selection. Unexpected lookup/connection errors, cancellation,
@@ -27,6 +32,12 @@ UUID exactly before capturing or sending input. Xcode may prompt again when the
 agent executable changes. Keep the Mac unlocked for approval. The project is
 left open because it may already belong to another client; ios-mcp does not
 close shared workspaces, stop the shared native service, or change permissions.
+
+Operations on different simulator UUIDs own independent tasks and clients.
+Operations on the same simulator are mutually exclusive. Shutdown cancels all
+owned tasks and awaits their cleanup. Concurrent ownership and cancellation are
+covered by deterministic tests, including the single-worker run; simultaneous
+live native sessions on two simulators have not been validated.
 
 For `tap`, a fresh hierarchy resolves identifiers/labels to Apple's `hitPoint`.
 Coordinates use screen points. Duplicate targets, incomplete/malformed

@@ -154,11 +154,9 @@ func registerCrashLogTool(
 /// `usedImages`. There is no plain-text "Thread N Crashed:" section, so the
 /// backtrace has to be rebuilt from the body.
 func summarizeIPS(_ content: String, maxFrames: Int = 15) -> [String] {
-    guard let newline = content.firstIndex(of: "\n") else {
-        return ["(.ips header not parseable)"]
-    }
-    let header = jsonObject(String(content[..<newline]))
-    let body = jsonObject(String(content[content.index(after: newline)...]))
+    let documents = content.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+    let header = documents.first.flatMap { jsonObject(String($0)) }
+    let body = documents.count > 1 ? jsonObject(String(documents[1])) : nil
 
     guard header != nil || body != nil else {
         return ["(.ips JSON not parseable)"]

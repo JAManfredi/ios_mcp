@@ -160,6 +160,41 @@ struct UIBackendSelectionTests {
         await #expect(throws: NativeUIUnavailable.self) { try await controller.inspect(udid: pilotUDID) }
     }
 
+    @Test(arguments: ["missing", "wrong-extension", "outside", "symlink"])
+    func invalidContextRemainsAnErrorBeforeNativeCalls(kind: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let allowed = fixture.root.appendingPathComponent("allowed")
+        try FileManager.default.createDirectory(at: allowed, withIntermediateDirectories: true)
+        var path = allowed.appendingPathComponent("Project.xcodeproj")
+        switch kind {
+        case "wrong-extension": path = allowed
+        case "outside":
+            path = fixture.root.appendingPathComponent("Other.xcodeproj")
+            try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        case "symlink":
+            let outside = fixture.root.appendingPathComponent("Other.xcodeproj")
+            try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: path, withDestinationURL: outside)
+        default: break
+        }
+        let session = SessionStore()
+        await session.set(.project, value: path.path)
+        let client = PilotClient(fixture: fixture)
+        let controller = NativeUIController(workspace: nil, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                                            concurrency: ConcurrencyPolicy(), artifactRoot: fixture.artifactRoot,
+                                            mode: .auto, session: session, executor: BackendLookup(),
+                                            validator: DefaultsValidator(executor: BackendLookup(), pathPolicy: PathPolicy(allowedRoots: [allowed.path])),
+                                            makeClient: { client })
+        do {
+            _ = try await controller.inspect(udid: pilotUDID)
+            Issue.record("Expected project validation error")
+        } catch let error as ToolError {
+            #expect(error.code == (kind == "missing" ? .staleDefault : .invalidInput))
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
     @Test(arguments: ["XcodeOpenWorkspace", "DeviceInteractionStartSession", "tap", "DeviceInteractionEndSession"])
     func dependencyErrorsAfterSelectionNeverBecomeFallback(stage: String) async throws {
         let fixture = CaptureFixture()
@@ -332,6 +367,31 @@ private actor PilotClient: NativeMCPCalling {
 
 @Suite("Native UI lifecycle")
 struct NativeUIControllerTests {
+    @Test func differentSimulatorsRunConcurrentlyAndShutdownCleansBoth() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let project = fixture.root.appendingPathComponent("Pilot.xcodeproj")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let gate = ConcurrentPilotGate()
+        let locks = ConcurrencyPolicy()
+        let controller = NativeUIController(workspace: project.path, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                                            concurrency: locks, artifactRoot: fixture.artifactRoot,
+                                            makeClient: { ConcurrentPilotClient(gate: gate) })
+        let other = UUID().uuidString
+        let first = Task { try await controller.inspect(udid: pilotUDID) }
+        let second = Task { try await controller.inspect(udid: other) }
+        #expect(await gate.waitForBoth())
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)"))
+        #expect(await locks.isLocked(key: "simulator:\(other)"))
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID.lowercased()) }
+        await controller.shutdown()
+        await #expect(throws: ToolError.self) { try await first.value }
+        await #expect(throws: ToolError.self) { try await second.value }
+        #expect(await gate.ended == Set([pilotUDID, other]))
+        #expect(await gate.closed == 2)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+        #expect(await locks.isLocked(key: "simulator:\(other)") == false)
+    }
     private func controller(_ fixture: CaptureFixture, _ client: PilotClient, _ locks: ConcurrencyPolicy) throws -> NativeUIController {
         let project = fixture.root.appendingPathComponent("Pilot.xcodeproj")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
@@ -421,5 +481,42 @@ struct NativeUIControllerTests {
         await #expect(throws: ToolError.self) { try await controller(fixture, client, locks).inspect(udid: pilotUDID) }
         #expect(await client.calls.isEmpty)
         #expect(await locks.isLocked(key: "simulator:\(pilotUDID)"))
+    }
+}
+
+private actor ConcurrentPilotGate {
+    var started: Set<String> = []
+    var ended: Set<String> = []
+    var closed = 0
+    func start(_ udid: String) { started.insert(udid) }
+    func end(_ udid: String) { ended.insert(udid) }
+    func close() { closed += 1 }
+    func waitForBoth() async -> Bool {
+        for _ in 0..<500 {
+            if started.count == 2 { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+}
+
+private actor ConcurrentPilotClient: NativeMCPCalling {
+    let gate: ConcurrentPilotGate
+    var udid = ""
+    init(gate: ConcurrentPilotGate) { self.gate = gate }
+    func connect() {}
+    func close() async { await gate.close() }
+    func call(_ name: String, arguments: [String: Value], timeout: TimeInterval) async throws -> [String: Value] {
+        switch name {
+        case "DeviceInteractionStartSession":
+            if case .string(let id) = arguments["deviceIdentifier"] { udid = id }
+            return ["interactionSessionKey": .string(udid), "deviceIsSimulator": .bool(true), "deviceUUID": .string(udid)]
+        case "DeviceInteractionSynthesize":
+            await gate.start(udid)
+            try await Task.sleep(for: .seconds(60))
+        case "DeviceInteractionEndSession": await gate.end(udid)
+        default: break
+        }
+        return [:]
     }
 }

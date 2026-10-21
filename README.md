@@ -88,6 +88,11 @@ debug_attach → debug_add_breakpoint → debug_resume → debug_backtrace → d
 
 > Attach LLDB, set breakpoints, hit them, inspect the stack and variables, detach cleanly.
 
+`debug_run_command` accepts one noninteractive command. Supply explicit IDs when
+deleting breakpoints or watchpoints (or explicitly use LLDB's `--force` option).
+Bare bulk-deletion commands are rejected instead of answering a confirmation
+prompt. Use `debug_detach` to close the session rather than `quit`.
+
 ### Navigation
 
 ```
@@ -128,6 +133,17 @@ Requires [Homebrew](https://brew.sh). `make install` installs or upgrades AXe
 through `cameroncooke/axe/axe`, then installs ios-mcp to `/usr/local/bin` by
 default. Use `PREFIX=~/.local` to install ios-mcp elsewhere. If AXe installation
 fails, ios-mcp is not copied into the destination.
+
+If the destination needs administrator permissions, install dependencies and
+build as your normal user, then elevate only the copy step:
+
+```bash
+make install-dependencies build
+sudo make install-binary
+```
+
+Do not run `sudo make install`: Homebrew must run as your normal user. A writable
+prefix such as `make install PREFIX="$HOME/.local"` needs no sudo.
 
 AXe follows the upstream Homebrew formula rather than a pinned release (currently
 1.8.0). Homebrew's pinning and no-upgrade settings still apply; run `ios-mcp doctor`
@@ -233,6 +249,12 @@ trigger AXe fallback. A tap may have happened before an error was returned:
 inspect the screen before deciding whether to repeat it. No tap is automatically
 retried through another backend.
 
+Missing or disallowed configured project paths are errors, even in `auto` mode.
+Fix the path or clear the session default to intentionally select AXe. Native
+operations on different simulators can run concurrently; operations on the same
+simulator remain mutually exclusive. Shutdown cancels and cleans up every owned
+native session.
+
 Only inspection and taps participate in this selection. Other gestures and
 navigation tools retain their existing backends and may still require AXe
 (1.8.0+ under Xcode 27). Native inspection returns Apple's text hierarchy and
@@ -287,7 +309,11 @@ Some tools auto-set defaults as a side effect:
 - `boot_simulator` → `simulator_udid`
 - `list_devices` → `device_udid` (when exactly one device is connected)
 
-Session defaults are **validated before use** — if a simulator is deleted or a path no longer exists, the tool returns a `stale_default` error instead of silently using invalid state.
+Session defaults are **validated before use**. Simulator and device checks query
+the current inventory each time; successful sightings are not cached. Missing
+identifiers or paths return `stale_default`. If the inventory command itself
+fails, validation retains its existing graceful-degradation behavior and lets
+the requested operation report the failure.
 
 ---
 

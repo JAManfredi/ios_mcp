@@ -6,12 +6,39 @@
 //
 
 import Foundation
+import MCP
 import Testing
 @testable import Core
 @testable import Tools
 
 @Suite("override_status_bar")
 struct OverrideStatusBarToolTests {
+    @Test(arguments: ["battery_level", "cellular_bars", "wifi_bars", "time", "operator_name", "clear", "preset"])
+    func rejectsWrongTypesEvenWithPreset(key: String) async throws {
+        let registry = ToolRegistry()
+        let capture = ArgCapture()
+        let executor = MockCommandExecutor { _, args in
+            await capture.capture(args)
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+        await registerOverrideStatusBarTool(with: registry, session: SessionStore(), executor: executor, validator: testValidator())
+        var args: [String: Value] = ["udid": .string("AAAA-1111"), "preset": .string("screenshot")]
+        args[key] = ["battery_level", "cellular_bars", "wifi_bars"].contains(key) ? .string("100") : .int(1)
+        guard case .error(let error) = try await registry.callTool(name: "override_status_bar", arguments: args) else {
+            Issue.record("Expected invalid input"); return
+        }
+        #expect(error.code == .invalidInput)
+        #expect(await capture.lastArgs.isEmpty)
+    }
+
+    @Test(arguments: [Double.nan, .infinity, 1e100, 1.5])
+    func rejectsUnrepresentableNumbers(number: Double) async throws {
+        let registry = ToolRegistry()
+        await registerOverrideStatusBarTool(with: registry, session: SessionStore(), executor: MockCommandExecutor.succeedingWith(""), validator: testValidator())
+        let response = try await registry.callTool(name: "override_status_bar", arguments: ["udid": .string("AAAA-1111"), "preset": .string("screenshot"), "battery_level": .double(number)])
+        guard case .error(let error) = response else { Issue.record("Expected invalid input"); return }
+        #expect(error.code == .invalidInput)
+    }
 
     @Test("Overrides status bar with time")
     func happyPath() async throws {

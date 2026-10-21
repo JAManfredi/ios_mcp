@@ -61,6 +61,7 @@ func registerRecordDeviceScreenTool(
 
         return await concurrency.withLock(key: "device-recording:\(udid)", owner: "record_device_screen") {
             let outputPath = NSTemporaryDirectory() + "ios-mcp-device-recording-\(UUID().uuidString).mp4"
+            defer { try? FileManager.default.removeItem(atPath: outputPath) }
             do {
                 let result = try await executor.execute(
                     executable: "/usr/bin/xcrun",
@@ -84,7 +85,6 @@ func registerRecordDeviceScreenTool(
                         message: "devicectl reported success but wrote no video to \(outputPath)."
                     ))
                 }
-                try? FileManager.default.removeItem(at: fileURL)
 
                 let ref = try await artifacts.store(data: data, filename: "device-recording.mp4", mimeType: "video/mp4")
                 let megabytes = String(format: "%.1f", Double(data.count) / 1_048_576)
