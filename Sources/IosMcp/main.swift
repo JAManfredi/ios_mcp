@@ -54,7 +54,7 @@ private func startServer() async throws {
         capabilities: .init(tools: .init())
     )
 
-    let progressReporter = ProgressReporter { token, progress, total, message in
+    let progressReporter = Core.ProgressReporter { token, progress, total, message in
         let params = ProgressNotification.Parameters(
             progressToken: token,
             progress: progress,

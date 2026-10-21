@@ -17,7 +17,7 @@ func registerDeviceTools(
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
     validator: DefaultsValidator,
-    progressReporter: ProgressReporter? = nil
+    progressReporter: Core.ProgressReporter? = nil
 ) async {
     await registerListDevicesTool(with: registry, session: session, executor: executor)
     await registerBuildDeviceTool(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)

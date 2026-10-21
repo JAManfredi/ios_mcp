@@ -16,7 +16,7 @@ func registerTestSimTool(
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
     validator: DefaultsValidator,
-    progressReporter: ProgressReporter? = nil
+    progressReporter: Core.ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
         name: "test_simulator",
@@ -68,7 +68,7 @@ func registerTestSimTool(
                     description: "Enable code coverage (read it afterwards with inspect_xcresult sections=coverage)."
                 ),
                 "test_iterations": .init(
-                    type: "number",
+                    type: "integer",
                     description: "Run each test this many times (2–100). Combine with retry_on_failure or run_until_failure to chase flaky tests."
                 ),
                 "retry_on_failure": .init(
@@ -224,10 +224,11 @@ func xcodebuildTestRepetitionArgs(_ args: [String: Value]) -> Result<[String], T
     }
 
     var iterations: Int?
-    switch args["test_iterations"] {
-    case .some(.int(let i)): iterations = i
-    case .some(.double(let d)): iterations = Int(d)
-    default: break
+    if let value = args["test_iterations"] {
+        switch integerArgument(value, named: "test_iterations") {
+        case .success(let integer): iterations = integer
+        case .failure(let error): return .failure(error)
+        }
     }
     if let iterations, !(2...100).contains(iterations) {
         return .failure(ToolError(code: .invalidInput, message: "test_iterations must be between 2 and 100."))

@@ -20,7 +20,7 @@ public func registerAllTools(
     validator: DefaultsValidator,
     videoRecording: any VideoRecording,
     navGraph: NavGraphStore,
-    progressReporter: ProgressReporter? = nil
+    progressReporter: Core.ProgressReporter? = nil
 ) async {
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)

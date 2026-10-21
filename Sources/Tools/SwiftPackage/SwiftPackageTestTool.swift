@@ -18,7 +18,7 @@ func registerSwiftPackageTestTool(
 ) async {
     let manifest = ToolManifest(
         name: "swift_package_test",
-        description: "Run a Swift package's tests with `swift test` (XCTest and Swift Testing) on the host. Supports filtering, parallel runs, and repeating flaky tests until they pass or fail (Xcode 27 toolchain). Falls back to session workspace or project parent directory for the package path.",
+        description: "Run a Swift package's tests with `swift test` (XCTest and Swift Testing) on the host. Supports filtering and parallel runs. Repetition is supported only for Swift Testing tests (Xcode 27 toolchain). Falls back to session workspace or project parent directory for the package path.",
         inputSchema: JSONSchema(
             properties: [
                 "path": .init(
@@ -36,15 +36,15 @@ func registerSwiftPackageTestTool(
                 "parallel": .init(type: "boolean", description: "Run tests in parallel."),
                 "repeat_until": .init(
                     type: "string",
-                    description: "Repeat each matching test until it passes or fails (Swift 6.4 / Xcode 27+). Use 'fail' to reproduce a flaky test.",
+                    description: "Repeat each matching Swift Testing test until it passes or fails (Swift 6.4 / Xcode 27+). Does not repeat XCTest tests. Use 'fail' to reproduce a flaky test.",
                     enumValues: ["pass", "fail"]
                 ),
                 "maximum_repetitions": .init(
-                    type: "number",
+                    type: "integer",
                     description: "Upper bound on repetitions when repeat_until is set. Default: 10."
                 ),
                 "enable_code_coverage": .init(type: "boolean", description: "Collect code coverage."),
-                "timeout": .init(type: "number", description: "Timeout in seconds (default 900, max 3600)."),
+                "timeout": .init(type: "integer", description: "Timeout in whole seconds (default 900, clamped to 1–3600)."),
             ]
         ),
         category: .swiftPackage
@@ -125,7 +125,12 @@ struct SwiftTestOptions: Equatable, Sendable {
             options.repeatUntil = r
             options.maximumRepetitions = 10
         }
-        if let max = intValue(args["maximum_repetitions"]) {
+        if let value = args["maximum_repetitions"] {
+            let max: Int
+            switch integerArgument(value, named: "maximum_repetitions") {
+            case .success(let integer): max = integer
+            case .failure(let error): return .failure(error)
+            }
             guard options.repeatUntil != nil else {
                 return .failure(ToolError(code: .invalidInput, message: "maximum_repetitions requires repeat_until."))
             }
@@ -134,7 +139,12 @@ struct SwiftTestOptions: Equatable, Sendable {
             }
             options.maximumRepetitions = max
         }
-        if let t = intValue(args["timeout"]) {
+        if let value = args["timeout"] {
+            let t: Int
+            switch integerArgument(value, named: "timeout") {
+            case .success(let integer): t = integer
+            case .failure(let error): return .failure(error)
+            }
             options.timeout = TimeInterval(min(max(t, 1), 3600))
         }
         return .success(options)
@@ -152,13 +162,6 @@ struct SwiftTestOptions: Equatable, Sendable {
         return args
     }
 
-    private static func intValue(_ value: Value?) -> Int? {
-        switch value {
-        case .some(.int(let i)): i
-        case .some(.double(let d)): Int(d)
-        default: nil
-        }
-    }
 }
 
 /// Pulls the result lines out of `swift test` output: XCTest's
