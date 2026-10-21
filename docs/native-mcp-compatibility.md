@@ -118,7 +118,9 @@ test intentionally does not parse the configuration contents.
 
 The [native UI pilot](native-ui-pilot.md) implements the first follow-up using
 a disposable project/device. Its report distinguishes completed checks from
-remaining live authorization and behavior checks.
+remaining compatibility checks. Live inspection, identifier/label/coordinate
+taps, invalid-target recovery, and managed capture retention passed through the
+actual ios-mcp adapter on Xcode 27.1 after user approval.
 Recheck the LLDB launcher against the installed version's catalog and explicit
 session-selection behavior before choosing a transport. These checks are
 opt-in because connecting can start services and requesting project access can

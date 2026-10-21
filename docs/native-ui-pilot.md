@@ -63,11 +63,21 @@ Simulator. Xcode 27.2 was not installed or tested.
 - A separately approved native probe started the exact simulator session,
   captured the app's screenshot and hierarchy (including identifiers and screen
   point hit positions), and ended the session successfully.
-- The actual ios-mcp executable reached Xcode's authorization boundary and returned
-  a permission error. At that point the Mac was locked. Live adapter inspection,
-  identifier/label/coordinate taps, and app-state verification remain pending
-  approval of this executable. The native probe capture does not establish those
-  behaviors for the adapter.
+- After the user approved the actual ios-mcp executable, live acceptance passed
+  at `6a5f418`. Inspection returned the expected app and accessibility IDs. Taps
+  by identifier, label, and fractional coordinates `(201.1, 451.3)` advanced the
+  counter from 0 to 1 to 2 to 3. Both the returned capture and a fresh inspection
+  confirmed exactly one increment per call.
+- An absent identifier and out-of-window coordinates returned errors. Subsequent
+  inspections succeeded and still showed 3. All 18 managed files from nine
+  captures survived session cleanup and client disconnect. The server exited
+  normally, and neither it nor its owned bridge remained running. The disposable
+  workspace was closed and its simulator removed after validation.
+- Startup was not immediate: the first simulator launch and direct screenshot
+  stalled, and native capture failed. Restarting only the disposable simulator
+  restored app launch. The successful run's first inspection took about 60
+  seconds; subsequent calls took about 1–5 seconds. These are observations from
+  one run, not a latency benchmark or a performance improvement claim.
 - Local `swift test` passed 536 enabled tests (including 19 pilot tests and two
   process I/O regressions);
   12 opt-in integration tests were skipped. Deterministic checks cover schema changes, structured/text replies, permission
@@ -97,6 +107,8 @@ simulator and launch the app. Use the existing `udid`/session-default inputs:
 4. Disconnect the client; check that no owned bridge remains and managed captures
    survive session cleanup. Close/remove only the disposable workspace/simulator.
 
-Do not enable this by default until the live checks pass on the supported Xcode
-versions. Add other gestures only after their coordinate and failure behavior
-has been verified separately.
+The live checks pass on this Xcode 27.1 setup. Keep the pilot opt-in until the
+supported Xcode versions and broader app/device cases have been exercised.
+Cancellation and timeout cleanup remain covered by deterministic tests, not
+live fault injection. Add other gestures only after their coordinate and
+failure behavior has been verified separately.
