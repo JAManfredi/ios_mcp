@@ -25,7 +25,7 @@ func registerInspectXCResultTool(
                 ),
                 "sections": .init(
                     type: "string",
-                    description: "Comma-separated list of sections to extract: diagnostics, tests, coverage, attachments, timeline. Default: all."
+                    description: "Comma-separated list of sections to extract: diagnostics, tests, coverage, attachments, timeline. Default: all. The attachments section retains up to 10 images in managed storage; other attachments remain in the source bundle."
                 ),
             ],
             required: ["path"]
@@ -47,6 +47,7 @@ func registerInspectXCResultTool(
         }
 
         var output: [String] = ["XCResult Inspection: \(path)", ""]
+        var attachmentRefs: [ArtifactReference] = []
 
         // MARK: Diagnostics & Timeline (from build-results)
         if requestedSections.contains("diagnostics") || requestedSections.contains("timeline") {
@@ -203,6 +204,7 @@ func registerInspectXCResultTool(
             output.append("## Attachments")
 
             let tempDir = NSTemporaryDirectory() + "ios-mcp-xcresult-attachments-\(UUID().uuidString)"
+            defer { try? FileManager.default.removeItem(atPath: tempDir) }
 
             // `export attachments` (Xcode 16+) replaces the legacy
             // `export --type file`, which needs an object `--id` and exported
@@ -220,16 +222,17 @@ func registerInspectXCResultTool(
                 } else {
                     let names = attachmentNames(manifestPath: (tempDir as NSString).appendingPathComponent("manifest.json"))
                     let imageFiles = files.filter { imageMimeType(for: $0) != nil }.sorted()
-                    output.append("Exported \(files.count) files (\(imageFiles.count) images) to \(tempDir)")
+                    output.append("Exported \(files.count) files (\(imageFiles.count) images). Retaining up to 10 images; other attachments remain in the source bundle.")
                     for file in imageFiles.prefix(10) {
+                        guard let mime = imageMimeType(for: file) else { continue }
                         let filePath = (tempDir as NSString).appendingPathComponent(file)
-                        if let data = fm.contents(atPath: filePath), let mime = imageMimeType(for: file) {
-                            _ = try? await artifacts.store(data: data, filename: file, mimeType: mime)
-                        }
-                        if let label = names[file] {
-                            output.append("  - \(file) — \(label)")
-                        } else {
-                            output.append("  - \(file)")
+                        do {
+                            let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
+                            let ref = try await artifacts.store(data: data, filename: file, mimeType: mime)
+                            attachmentRefs.append(ref)
+                            output.append("  - \(file)\(names[file].map { " — \($0)" } ?? "")\n    Stored at: \(ref.path)")
+                        } catch {
+                            output.append("  - Could not retain \(file): \(error.localizedDescription)")
                         }
                     }
                 }
@@ -239,7 +242,7 @@ func registerInspectXCResultTool(
             output.append("")
         }
 
-        return .success(ToolResult(content: output.joined(separator: "\n")))
+        return .success(ToolResult(content: output.joined(separator: "\n"), artifacts: attachmentRefs, inlineArtifacts: false))
     }
 }
 

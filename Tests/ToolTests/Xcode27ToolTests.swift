@@ -287,6 +287,32 @@ struct SwiftPackageTestToolTests {
 @Suite("debug_task_tree")
 struct DebugTaskTreeToolTests {
 
+    @Test("Reports unsupported LLDB commands", arguments: [
+        "error: 'language swift task tree' is not a valid command.",
+        "\"tree\" is not a valid subcommand of \"task\". Valid subcommands are: backtrace, info, list, select.",
+    ])
+    func unsupportedCommand(output: String) async throws {
+        let debug = MockDebugSession(commandResponses: ["language swift task tree": output])
+        let sessionID = try await debug.attach(pid: 1, bundleID: nil, udid: nil)
+        let registry = await makeRegistry(executor: .succeedingWith(""), debugSession: debug)
+        let response = try await registry.callTool(name: "debug_task_tree", arguments: ["session_id": .string(sessionID)])
+        guard case .error(let error) = response else { Issue.record("Expected dependency error"); return }
+        #expect(error.code == .dependencyMissing)
+        #expect(error.details == output)
+    }
+
+    @Test("Reports runtime LLDB errors instead of an empty task tree")
+    func runtimeError() async throws {
+        let output = "error: must be run from a running process"
+        let debug = MockDebugSession(commandResponses: ["language swift task tree": output])
+        let sessionID = try await debug.attach(pid: 1, bundleID: nil, udid: nil)
+        let registry = await makeRegistry(executor: .succeedingWith(""), debugSession: debug)
+        let response = try await registry.callTool(name: "debug_task_tree", arguments: ["session_id": .string(sessionID)])
+        guard case .error(let error) = response else { Issue.record("Expected command error"); return }
+        #expect(error.code == .commandFailed)
+        #expect(error.details == output)
+    }
+
     @Test("Sends language swift task tree")
     func sendsCommand() async throws {
         let debug = MockDebugSession(

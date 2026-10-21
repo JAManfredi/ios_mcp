@@ -45,10 +45,23 @@ func registerDebugTaskTreeTool(
             )
 
             // Older LLDB parses the command but has no such subcommand.
-            if output.contains("is not a valid command") || output.contains("invalid command") {
+            let lowered = output.lowercased()
+            if lowered.contains("is not a valid command")
+                || lowered.contains("is not a valid subcommand")
+                || lowered.contains("invalid command") {
                 return .error(ToolError(
                     code: .dependencyMissing,
                     message: "This LLDB has no `language swift task tree`. It ships with Xcode 27 or later.",
+                    details: output
+                ))
+            }
+
+            if lowered.split(separator: "\n").contains(where: {
+                $0.trimmingCharacters(in: .whitespaces).hasPrefix("error:")
+            }) {
+                return .error(ToolError(
+                    code: .commandFailed,
+                    message: "LLDB could not print the Swift task tree.",
                     details: output
                 ))
             }
