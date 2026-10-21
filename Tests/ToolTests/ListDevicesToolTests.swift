@@ -20,8 +20,37 @@ private let twoDevicesJSON = """
 {"result":{"devices":[{"identifier":"DEVICE-1","deviceProperties":{"name":"iPhone A","osVersionNumber":"18.0"},"hardwareProperties":{"marketingName":"iPhone 16"},"connectionProperties":{"transportType":"usb"}},{"identifier":"DEVICE-2","deviceProperties":{"name":"iPhone B","osVersionNumber":"17.0"},"hardwareProperties":{"marketingName":"iPhone 15"},"connectionProperties":{"transportType":"wifi"}}]}}
 """
 
+private let v5JSON = """
+{"info":{"jsonVersion":5},"result":{"devices":[{"identifier":"CORE-1","properties":{"hardware":{"udid":"00008140-HW","marketingName":"iPhone 17 Pro","reality":"physical"},"device":{"name":"Jared's iPhone","osVersionNumber":"27.1"},"connection":{"transportType":"wired"}}},{"identifier":"SIM-1","properties":{"hardware":{"udid":"SIM-UDID","reality":"simulator"},"device":{"name":"iPhone 17"}}}]}}
+"""
+
 @Suite("list_devices")
 struct ListDevicesToolTests {
+
+    @Test("Parses devicectl JSON v5 and ignores simulators")
+    func v5Schema() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor { _, args in
+            if args.contains("devicectl") { return CommandResult(stdout: v5JSON, stderr: "", exitCode: 0) }
+            return CommandResult(stdout: validatorSimctlJSON, stderr: "", exitCode: 0)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test-\(UUID())")), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
+
+        let response = try await registry.callTool(name: "list_devices", arguments: [:])
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("Connected devices (1)"))
+            #expect(result.content.contains("Jared's iPhone"))
+            #expect(result.content.contains("iPhone 17 Pro, iOS 27.1, wired"))
+            #expect(!result.content.contains("SIM-UDID"))
+        } else {
+            Issue.record("Expected success response")
+        }
+
+        #expect(await session.get(.deviceUDID) == "00008140-HW")
+    }
 
     @Test("Lists connected devices and auto-sets session default for single device")
     func singleDevice() async throws {
