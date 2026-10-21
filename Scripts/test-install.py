@@ -22,6 +22,7 @@ class InstallTests(unittest.TestCase):
         self.env = dict(os.environ, PATH=f"{self.commands}:/usr/bin:/bin",
                         INSTALL_CHECK_LOG=str(self.root / "commands.log"),
                         INSTALL_CHECK_BIN=str(self.root / "build products"))
+        self.stub("id", 'echo "${INSTALL_CHECK_UID:-501}"\n')
         self.stub("brew", '''
 printf 'brew %s\n' "$*" >> "$INSTALL_CHECK_LOG"
 test "$*" = 'install cameroncooke/axe/axe' || exit 99
@@ -63,6 +64,27 @@ printf '#!/bin/sh\necho installed\n' > "$INSTALL_CHECK_BIN/ios-mcp"
                 result = self.install(**{f"INSTALL_CHECK_{failure}_STATUS": "1"})
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.destination.read_text(), "previous executable\n")
+
+    def test_root_install_explains_separate_copy_step(self):
+        result = self.install(INSTALL_CHECK_UID="0")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sudo make install-binary", result.stderr)
+        self.assertFalse((self.root / "commands.log").exists())
+
+    def test_elevated_copy_does_not_run_brew_or_build(self):
+        binary = Path(self.env["INSTALL_CHECK_BIN"]) / "ios-mcp"
+        binary.parent.mkdir()
+        binary.write_text("prebuilt executable\n")
+        result = subprocess.run(
+            ["/usr/bin/make", "install-binary", f"PREFIX={self.destination.parent.parent}"],
+            cwd=self.root, env=self.env | {"INSTALL_CHECK_UID": "0", "INSTALL_CHECK_BREW_STATUS": "1",
+                                          "INSTALL_CHECK_BUILD_STATUS": "1"},
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.destination.read_text(), "prebuilt executable\n")
+        self.assertEqual((self.root / "commands.log").read_text().splitlines(),
+                         ["swift build -c release --show-bin-path"])
 
 
 if __name__ == "__main__":

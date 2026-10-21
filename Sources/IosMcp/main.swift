@@ -50,10 +50,12 @@ private func startServer(nativeUIWorkspace: String?, mode: UIBackendMode) async 
     let artifacts = ArtifactStore(
         baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ios-mcp-artifacts")
     )
+    let pathPolicy = PathPolicy()
+    let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
     let nativeUI: NativeUIController?
     do {
         nativeUI = mode == .axe ? nil : try NativeUIController(workspace: nativeUIWorkspace, mode: mode, session: session,
-                                          executor: executor, artifacts: artifacts, concurrency: concurrency)
+                                          executor: executor, artifacts: artifacts, concurrency: concurrency, validator: validator)
     } catch let error as ToolError {
         throw ValidationError(error.message)
     }
@@ -62,8 +64,6 @@ private func startServer(nativeUIWorkspace: String?, mode: UIBackendMode) async 
     let videoRecording = VideoRecordingManager()
     try? await artifacts.cleanupStaleDirectories()
 
-    let pathPolicy = PathPolicy()
-    let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
     let navGraph = NavGraphStore()
 
     let server = Server(
@@ -352,7 +352,9 @@ struct Doctor: AsyncParsableCommand {
             feature("devicectl capture (device_screenshot, device recording)", has266, "26.6+")
             feature("Simulator orientation (set_orientation)", has27, "27+")
             feature("simctl reboot (reboot_simulator)", has27, "27+")
-            if has27 && osVersion.majorVersion < 26 {
+            if has27 && !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+                OperatingSystemVersion(majorVersion: 26, minorVersion: 6, patchVersion: 0)
+            ) {
                 print("[!!] macOS: Xcode 27 requires macOS Tahoe 26.6 or later")
                 requiredFailed = true
             }

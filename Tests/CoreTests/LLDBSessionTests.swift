@@ -39,6 +39,23 @@ struct LLDBSessionTests {
             #expect(version.contains("lldb-"))
             #expect(!version.contains("__ios_mcp_missing_command__"))
             #expect(!version.contains("error:"))
+
+            // Load symbols only. LLDB 27 crashes deleting IDs on its dummy target.
+            _ = try await session.sendCommand("target create /usr/bin/true", timeout: 10)
+            _ = try await session.sendCommand("breakpoint set --name ios_mcp_pending", timeout: 10)
+            for command in ["breakpoint delete", "br del", "watchpoint delete", "quit", "q", "breakpoint delete\nversion"] {
+                do {
+                    _ = try await session.sendCommand(command, timeout: 1)
+                    Issue.record("Expected an actionable noninteractive-command error")
+                } catch let error as ToolError {
+                    #expect(error.code == .invalidInput)
+                }
+            }
+            let listing = try await session.sendCommand("breakpoint list", timeout: 10)
+            #expect(listing.contains("ios_mcp_pending"))
+            let deleted = try await session.sendCommand("breakpoint delete 1", timeout: 10)
+            #expect(deleted.contains("deleted"))
+            #expect(try await session.sendCommand("version", timeout: 10).contains("lldb-"))
             await session.terminate()
         } catch {
             await session.terminate()

@@ -11,6 +11,21 @@ import Testing
 
 @Suite("PathPolicy")
 struct PathPolicyTests {
+    @Test("Allowed roots require directory boundaries and reject symlink escapes")
+    func preventsPrefixAndSymlinkEscapes() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let allowed = root.appendingPathComponent("allowed")
+        let outside = root.appendingPathComponent("allowed-other")
+        try FileManager.default.createDirectory(at: allowed, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let link = allowed.appendingPathComponent("Project.xcodeproj")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        let policy = PathPolicy(allowedRoots: [allowed.path])
+        #expect(policy.validate(allowed.path, label: "Project") == nil)
+        #expect(policy.validate(outside.path, label: "Project")?.code == .invalidInput)
+        #expect(policy.validate(link.path, label: "Project")?.code == .invalidInput)
+    }
 
     @Test("Allows paths under home directory")
     func allowsHomePaths() {

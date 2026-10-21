@@ -26,7 +26,7 @@ func registerDebugLLDBCommandTool(
                 ),
                 "command": .init(
                     type: "string",
-                    description: "The LLDB command to execute."
+                    description: "One noninteractive LLDB command. Supply breakpoint/watchpoint IDs for deletion; use debug_detach to close the session."
                 ),
                 "allow_unsafe": .init(
                     type: "boolean",
