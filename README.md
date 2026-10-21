@@ -188,7 +188,8 @@ with `session_set_defaults`. Alternatively, add
 `"--native-ui-workspace", "/absolute/path/YourApp.xcodeproj"` to `args` to pin
 an existing absolute `.xcodeproj` or `.xcworkspace` path. The pinned path takes
 precedence; otherwise the current session's `workspace`, then `project`, is used
-for each operation. Clearing the defaults also clears this project context.
+for each operation. Clearing defaults removes session-derived context; a pinned
+workspace option remains active until the server is restarted without it.
 
 | Mode | Behavior of `inspect_ui` and `tap` |
 |------|-----------------------------------|
@@ -210,8 +211,9 @@ need fresh approval. No permissions are granted automatically.
 
 Automatic selection occurs **before any native workspace, device session, or
 input tool call**. Successful native captures and AXe responses in `auto` identify
-the selected backend and reason, including when AXe itself fails. Permission denials, malformed project paths,
-unknown lookup/connection failures, timeouts, and native action errors do not
+the selected backend and reason, including when AXe itself fails. Permission
+denials, malformed project paths, unknown lookup/connection failures, timeouts,
+and native action errors do not
 trigger AXe fallback. A tap may have happened before an error was returned:
 inspect the screen before deciding whether to repeat it. No tap is automatically
 retried through another backend.
