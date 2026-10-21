@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: swift test
-      - name: Test LLDB with one concurrency worker
+      - name: Test process I/O and native MCP with one concurrency worker
         timeout-minutes: 2
         # Limit the test process, not SwiftPM's build/planning process.
         run: |
@@ -52,7 +52,7 @@ jobs:
           fi
           LLDB_TEST_BINARY="$LLDB_TEST_BUNDLE/Contents/MacOS/$(basename "$LLDB_TEST_BUNDLE" .xctest)"
           test -f "$LLDB_TEST_BINARY"
-          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter LLDBSessionTests
+          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter 'LLDBSessionTests|CommandExecutorTests|NativeMCPClientTests'
 
   # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
   # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image
