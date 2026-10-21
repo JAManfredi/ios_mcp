@@ -8,11 +8,13 @@
 import Core
 
 /// Registers all Swift Package tools: swift_package_resolve, swift_package_update,
-/// swift_package_init, swift_package_clean, swift_package_show_deps, swift_package_dump.
+/// swift_package_init, swift_package_clean, swift_package_show_deps, swift_package_dump,
+/// swift_package_test.
 func registerSwiftPackageTools(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
+    concurrency: ConcurrencyPolicy,
     validator: DefaultsValidator
 ) async {
     await registerSwiftPackageResolveTool(with: registry, session: session, executor: executor, validator: validator)
@@ -21,4 +23,5 @@ func registerSwiftPackageTools(
     await registerSwiftPackageCleanTool(with: registry, session: session, executor: executor, validator: validator)
     await registerSwiftPackageShowDepsTool(with: registry, session: session, executor: executor, validator: validator)
     await registerSwiftPackageDumpTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerSwiftPackageTestTool(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
 }

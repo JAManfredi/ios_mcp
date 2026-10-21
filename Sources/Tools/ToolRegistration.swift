@@ -31,7 +31,7 @@ public func registerAllTools(
     await registerInspectionTools(with: registry, session: session, executor: executor, validator: validator)
     await registerQualityTools(with: registry, session: session, executor: executor, validator: validator)
     await registerExtrasTools(with: registry, session: session, executor: executor, validator: validator)
-    await registerSwiftPackageTools(with: registry, session: session, executor: executor, validator: validator)
+    await registerSwiftPackageTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
     await registerDeviceTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
     await registerNavigationTools(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
 }
