@@ -16,7 +16,7 @@ func registerBuildRunSimTool(
     concurrency: ConcurrencyPolicy,
     artifacts: ArtifactStore,
     validator: DefaultsValidator,
-    progressReporter: ProgressReporter? = nil
+    progressReporter: Core.ProgressReporter? = nil
 ) async {
     let manifest = ToolManifest(
         name: "build_run_simulator",

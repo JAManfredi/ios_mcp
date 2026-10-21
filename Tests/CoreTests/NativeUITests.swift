@@ -1,0 +1,522 @@
+// Created by Jared Manfredi
+
+import Foundation
+import MCP
+import Testing
+@testable import Core
+
+private let pilotUDID = "8DF48930-CF63-4ABD-9749-530E74A99366"
+private let pilotKey = "private-session-key"
+private let pilotTree = """
+Device orientation: Unknown
+Application bundle identifier: org.iosmcp.NativeUIPilot
+Application UI orientation: Portrait
+Application, pid: 1, label: 'NativeUIPilot'
+ Window, {{0.0, 0.0}, {402.0, 874.0}}, hitPoint: {201.0, 437.0}
+  StaticText, {{168.3, 388.5}, {65.3, 20.3}}, identifier: 'pilot.count', label: 'Count: 0', hitPoint: {201.0, 398.7}
+  Button, {{162.7, 441.0}, {76.7, 20.3}}, identifier: 'pilot.increment', label: 'Increment', hitPoint: {201.0, 451.2}
+"""
+private let pilotPNG = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=")!
+
+private struct CaptureFixture: Sendable {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    var native: URL { root.appendingPathComponent("ActionArtifacts/default/DeviceInteractionSynthesize") }
+    var artifactRoot: URL { root.appendingPathComponent("ActionArtifacts") }
+    func reply(tree: String = pilotTree) throws -> [String: Value] {
+        try FileManager.default.createDirectory(at: native, withIntermediateDirectories: true)
+        var reply: [String: Value] = [:]
+        for (key, name, data) in [
+            ("hierarchyPath", "hierarchy.txt", Data(tree.utf8)),
+            ("screenshotPath", "screenshot.png", pilotPNG),
+            ("thumbnailScreenshotPath", "thumbnail.png", pilotPNG),
+            ("logsPath", "logs.txt", Data("log".utf8)),
+        ] {
+            let url = native.appendingPathComponent("\(pilotKey)-\(name)")
+            try data.write(to: url)
+            reply[key] = .string(url.path)
+        }
+        return reply
+    }
+    func remove() { try? FileManager.default.removeItem(at: root) }
+}
+
+private struct BackendLookup: CommandExecuting {
+    var stderr = ""
+    var code: ErrorCode?
+    func execute(executable: String, arguments: [String], timeout: TimeInterval?, environment: [String: String]?) async throws -> CommandResult {
+        #expect(executable == "/usr/bin/xcrun" && arguments == ["--find", "mcpbridge"])
+        if let code { throw ToolError(code: code, message: "Lookup failed") }
+        return CommandResult(stdout: stderr.isEmpty ? "/Xcode/usr/bin/mcpbridge\n" : "", stderr: stderr, exitCode: stderr.isEmpty ? 0 : 1)
+    }
+}
+
+@Suite("UI backend selection")
+struct UIBackendSelectionTests {
+    @Test func preservesExplicitAndLegacyConfiguration() throws {
+        #expect(try UIBackendMode.resolve(nil, workspace: nil) == .axe)
+        #expect(try UIBackendMode.resolve(nil, workspace: "/App.xcodeproj") == .native)
+        for mode in UIBackendMode.allCases {
+            #expect(try UIBackendMode.resolve(mode.rawValue, workspace: nil) == mode)
+        }
+        #expect(throws: ToolError.self) { try UIBackendMode.resolve("unknown", workspace: nil) }
+        #expect(throws: ToolError.self) { try UIBackendMode.resolve("axe", workspace: "/App.xcodeproj") }
+    }
+
+    private func project(_ fixture: CaptureFixture, name: String = "Pilot.xcodeproj") throws -> String {
+        let url = fixture.root.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url.path
+    }
+
+    private func controller(_ fixture: CaptureFixture, client: PilotClient, session: SessionStore,
+                            mode: UIBackendMode = .auto, workspace: String? = nil,
+                            lookup: BackendLookup = BackendLookup(), locks: ConcurrencyPolicy = ConcurrencyPolicy()) -> NativeUIController {
+        NativeUIController(workspace: workspace, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                           concurrency: locks, artifactRoot: fixture.artifactRoot, mode: mode, session: session,
+                           executor: lookup, makeClient: { client })
+    }
+
+    @Test func missingContextFallsBackButForcedNativeErrors() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture)
+        for mode in [UIBackendMode.auto, .axe] {
+            await #expect(throws: NativeUIUnavailable.self) {
+                try await controller(fixture, client: client, session: SessionStore(), mode: mode).inspect(udid: pilotUDID)
+            }
+        }
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: SessionStore(), mode: .native).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test(arguments: ["binary", "schema"])
+    func unsupportedNativeFallsBackBeforeAnyToolCall(kind: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, connectFailure: kind == "schema" ? .dependencyMissing : nil)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        let lookup = BackendLookup(stderr: kind == "binary" ? "xcrun: error: unable to find utility \"mcpbridge\", not a developer tool or in PATH" : "")
+        let locks = ConcurrencyPolicy()
+        await #expect(throws: NativeUIUnavailable.self) {
+            try await controller(fixture, client: client, session: session, lookup: lookup, locks: locks).tap(udid: pilotUDID, target: .label("Increment"))
+        }
+        #expect(await client.calls.isEmpty)
+        #expect(await client.closed)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+    }
+
+    @Test(arguments: [ErrorCode.commandDenied, .timeout, .commandFailed])
+    func unknownOrDeniedPreflightNeverFallsBack(code: ErrorCode) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        await session.set(.workspace, value: try project(fixture, name: "Pilot.xcworkspace"))
+        let client = PilotClient(fixture: fixture, connectFailure: code)
+        do {
+            _ = try await controller(fixture, client: client, session: session).inspect(udid: pilotUDID)
+            Issue.record("Expected preflight error")
+        } catch let error as ToolError { #expect(error.code == code) }
+        #expect(await client.calls.isEmpty)
+        #expect(await client.closed)
+    }
+
+    @Test func lookupErrorsAndInvalidPathsDoNotBecomeFallback() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        let client = PilotClient(fixture: fixture)
+        await session.set(.project, value: try project(fixture))
+        for lookup in [BackendLookup(stderr: "license agreement required"), BackendLookup(code: .timeout)] {
+            await #expect(throws: ToolError.self) {
+                try await controller(fixture, client: client, session: session, lookup: lookup).inspect(udid: pilotUDID)
+            }
+        }
+        await session.set(.workspace, value: "/missing/Invalid.xcworkspace")
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test func sessionChangesAndWorkspaceOverrideAreRespected() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        let client = PilotClient(fixture: fixture)
+        let project = try project(fixture)
+        let workspace = try self.project(fixture, name: "Pilot.xcworkspace")
+        let controller = controller(fixture, client: client, session: session)
+        await session.set(.project, value: project)
+        let first = try await controller.inspect(udid: pilotUDID)
+        #expect(first.content.contains("UI backend: native (auto:"))
+        await session.set(.workspace, value: workspace)
+        _ = try await controller.inspect(udid: pilotUDID)
+        _ = try await self.controller(fixture, client: client, session: session, workspace: project).inspect(udid: pilotUDID)
+        #expect(await client.calls.filter { $0.0 == "XcodeOpenWorkspace" }.map { $0.1["path"] } == [.string(project), .string(workspace), .string(project)])
+        await session.reset()
+        await #expect(throws: NativeUIUnavailable.self) { try await controller.inspect(udid: pilotUDID) }
+    }
+
+    @Test(arguments: ["missing", "wrong-extension", "outside", "symlink"])
+    func invalidContextRemainsAnErrorBeforeNativeCalls(kind: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let allowed = fixture.root.appendingPathComponent("allowed")
+        try FileManager.default.createDirectory(at: allowed, withIntermediateDirectories: true)
+        var path = allowed.appendingPathComponent("Project.xcodeproj")
+        switch kind {
+        case "wrong-extension": path = allowed
+        case "outside":
+            path = fixture.root.appendingPathComponent("Other.xcodeproj")
+            try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        case "symlink":
+            let outside = fixture.root.appendingPathComponent("Other.xcodeproj")
+            try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: path, withDestinationURL: outside)
+        default: break
+        }
+        let session = SessionStore()
+        await session.set(.project, value: path.path)
+        let client = PilotClient(fixture: fixture)
+        let controller = NativeUIController(workspace: nil, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                                            concurrency: ConcurrencyPolicy(), artifactRoot: fixture.artifactRoot,
+                                            mode: .auto, session: session, executor: BackendLookup(),
+                                            validator: DefaultsValidator(executor: BackendLookup(), pathPolicy: PathPolicy(allowedRoots: [allowed.path])),
+                                            makeClient: { client })
+        do {
+            _ = try await controller.inspect(udid: pilotUDID)
+            Issue.record("Expected project validation error")
+        } catch let error as ToolError {
+            #expect(error.code == (kind == "missing" ? .staleDefault : .invalidInput))
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test(arguments: ["XcodeOpenWorkspace", "DeviceInteractionStartSession", "tap", "DeviceInteractionEndSession"])
+    func dependencyErrorsAfterSelectionNeverBecomeFallback(stage: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, failure: stage, failureCode: .dependencyMissing)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session).tap(udid: pilotUDID, target: .label("Increment"))
+        }
+        #expect(await client.calls.filter { $0.1["interactionCommand"] != nil }.count <= 1)
+        #expect(await client.closed)
+    }
+
+    @Test func forcedNativeRejectsIncompatibleSchemas() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, connectFailure: .dependencyMissing)
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        await #expect(throws: ToolError.self) {
+            try await controller(fixture, client: client, session: session, mode: .native).inspect(udid: pilotUDID)
+        }
+        #expect(await client.calls.isEmpty)
+    }
+
+    @Test func autoShutdownAndBusyStateCannotSelectFallback() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let session = SessionStore()
+        await session.set(.project, value: try project(fixture))
+        let client = PilotClient(fixture: fixture, suspendCapture: true)
+        let controller = controller(fixture, client: client, session: session)
+        let task = Task { try await controller.inspect(udid: pilotUDID) }
+        try await client.waitForCapture()
+        await session.reset()
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }
+        await controller.shutdown()
+        await #expect(throws: ToolError.self) { try await task.value }
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }
+        #expect(await client.calls.last?.0 == "DeviceInteractionEndSession")
+        #expect(await client.closed)
+    }
+}
+
+@Suite("Native UI hierarchy")
+struct NativeUIHierarchyTests {
+    @Test func usesNativeHitPoint() throws {
+        let hierarchy = try NativeUIHierarchy(text: pilotTree)
+        #expect(try hierarchy.point(for: .identifier("pilot.increment")) == CGPoint(x: 201, y: 451.2))
+        #expect(try hierarchy.point(for: .label("Increment")) == CGPoint(x: 201, y: 451.2))
+        #expect(try hierarchy.point(for: .coordinates(x: 0.5, y: 0.5)) == CGPoint(x: 0.5, y: 0.5))
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity, -1, 402, 1e20])
+    func rejectsUnsafeCoordinates(x: Double) throws {
+        let hierarchy = try NativeUIHierarchy(text: pilotTree)
+        #expect(throws: ToolError.self) { try hierarchy.point(for: .coordinates(x: x, y: 1)) }
+    }
+
+    @Test func rejectsMissingAmbiguousAndUnhittableTargets() throws {
+        #expect(throws: ToolError.self) { try NativeUIHierarchy(text: pilotTree).point(for: .identifier("absent")) }
+        let duplicate = pilotTree + "\n Button, identifier: 'pilot.increment', hitPoint: {20, 20}"
+        #expect(throws: ToolError.self) { try NativeUIHierarchy(text: duplicate).point(for: .identifier("pilot.increment")) }
+        for suffix in ["", ", hitPoint: {20, 20}, Disabled", ", hitPoint: {20, 20}, activationBundleId: com.other.app"] {
+            let text = pilotTree + "\n Button, identifier: 'blocked'" + suffix
+            #expect(throws: ToolError.self) { try NativeUIHierarchy(text: text).point(for: .identifier("blocked")) }
+        }
+    }
+
+    @Test func metadataInsideLabelsCannotCreateTargets() throws {
+        let text = pilotTree + #"\n Button, identifier: 'safe', label: 'hello, identifier: \'evil\', hitPoint: {1, 1}', hitPoint: {22, 33}"#.replacingOccurrences(of: #"\n"#, with: "\n")
+        let hierarchy = try NativeUIHierarchy(text: text)
+        #expect(try hierarchy.point(for: .identifier("safe")) == CGPoint(x: 22, y: 33))
+        #expect(throws: ToolError.self) { try hierarchy.point(for: .identifier("evil")) }
+        #expect(throws: ToolError.self) { try NativeUIHierarchy(text: "Window, {{nan, 0}, {10, 20}}") }
+        #expect(throws: ToolError.self) { try NativeUIHierarchy(text: pilotTree + "\n Button, identifier: 'pilot.increment', label: 'broken") }
+        let partial = try NativeUIHierarchy(text: pilotTree + "\n Other, isRemoteLeafPlaceholder")
+        #expect(throws: ToolError.self) { try partial.point(for: .identifier("pilot.increment")) }
+        let overlapping = try NativeUIHierarchy(text: pilotTree + "\n Button, activationBundleId: com.other.app")
+        #expect(throws: ToolError.self) { try overlapping.point(for: .coordinates(x: 1, y: 1)) }
+    }
+}
+
+@Suite("Native UI capture files")
+struct NativeUICaptureTests {
+    @Test func consumesOwnedFilesOnly() throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let reply = try fixture.reply()
+        let unrelated = fixture.native.appendingPathComponent("other-session-hierarchy.txt")
+        try Data("untouched".utf8).write(to: unrelated)
+        let capture = try NativeUICapture(reply: reply, sessionKey: pilotKey, artifactRoot: fixture.artifactRoot)
+        #expect(capture.hierarchy == pilotTree)
+        #expect(capture.screenshot == pilotPNG)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.native.path) == [unrelated.lastPathComponent])
+    }
+
+    @Test(arguments: ["outside", "symlink", "oversize", "image", "fifo"])
+    func rejectsUnsafeFiles(mode: String) throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        var reply = try fixture.reply()
+        let protected = fixture.root.appendingPathComponent("protected.txt")
+        try Data("do not read or delete".utf8).write(to: protected)
+        guard case .string(let path) = reply["hierarchyPath"] else { return }
+        switch mode {
+        case "outside": reply["hierarchyPath"] = .string(protected.path)
+        case "symlink":
+            try FileManager.default.removeItem(atPath: path)
+            try FileManager.default.createSymbolicLink(atPath: path, withDestinationPath: protected.path)
+        case "oversize": try Data(repeating: 65, count: 1024 * 1024 + 1).write(to: URL(fileURLWithPath: path))
+        case "fifo":
+            try FileManager.default.removeItem(atPath: path)
+            #expect(mkfifo(path, 0o600) == 0)
+        default:
+            guard case .string(let image) = reply["screenshotPath"] else { return }
+            try Data("not png".utf8).write(to: URL(fileURLWithPath: image))
+        }
+        #expect(throws: ToolError.self) { try NativeUICapture(reply: reply, sessionKey: pilotKey, artifactRoot: fixture.artifactRoot) }
+        #expect(try String(contentsOf: protected, encoding: .utf8) == "do not read or delete")
+    }
+}
+
+private actor PilotClient: NativeMCPCalling {
+    let fixture: CaptureFixture
+    let wrongDevice: Bool
+    let failure: String?
+    let suspendCapture: Bool
+    let connectFailure: ErrorCode?
+    let failureCode: ErrorCode
+    private(set) var calls: [(String, [String: Value])] = []
+    private(set) var closed = false
+    init(fixture: CaptureFixture, wrongDevice: Bool = false, failure: String? = nil, suspendCapture: Bool = false, connectFailure: ErrorCode? = nil, failureCode: ErrorCode = .timeout) {
+        self.fixture = fixture
+        self.wrongDevice = wrongDevice
+        self.failure = failure
+        self.suspendCapture = suspendCapture
+        self.connectFailure = connectFailure
+        self.failureCode = failureCode
+    }
+    func connect() throws {
+        if let connectFailure { throw ToolError(code: connectFailure, message: "Preflight failure") }
+    }
+    func close() { closed = true }
+    func call(_ name: String, arguments: [String: Value], timeout: TimeInterval) async throws -> [String: Value] {
+        calls.append((name, arguments))
+        if failure == name || (failure == "tap" && arguments["interactionCommand"] != nil) {
+            throw ToolError(code: failureCode, message: name == "DeviceInteractionStartSession" ? "Native start failed" : "failure including \(pilotKey)")
+        }
+        switch name {
+        case "DeviceInteractionStartSession":
+            return ["interactionSessionKey": .string(pilotKey), "deviceIsSimulator": .bool(true),
+                    "deviceUUID": .string(wrongDevice ? UUID().uuidString : pilotUDID)]
+        case "DeviceInteractionSynthesize":
+            if suspendCapture { try await Task.sleep(for: .seconds(60)) }
+            let text = pilotTree + "\n Session marker: \(pilotKey)\n Bearer sensitivevalue"
+            return try fixture.reply(tree: text)
+        default: return [:]
+        }
+    }
+    func waitForCapture() async throws {
+        for _ in 0..<1000 {
+            if calls.contains(where: { $0.0 == "DeviceInteractionSynthesize" }) { return }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        throw ToolError(code: .timeout, message: "Test capture did not start")
+    }
+}
+
+@Suite("Native UI lifecycle")
+struct NativeUIControllerTests {
+    @Test func differentSimulatorsRunConcurrentlyAndShutdownCleansBoth() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let project = fixture.root.appendingPathComponent("Pilot.xcodeproj")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let gate = ConcurrentPilotGate()
+        let locks = ConcurrencyPolicy()
+        let controller = NativeUIController(workspace: project.path, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                                            concurrency: locks, artifactRoot: fixture.artifactRoot,
+                                            makeClient: { ConcurrentPilotClient(gate: gate) })
+        let other = UUID().uuidString
+        let first = Task { try await controller.inspect(udid: pilotUDID) }
+        let second = Task { try await controller.inspect(udid: other) }
+        #expect(await gate.waitForBoth())
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)"))
+        #expect(await locks.isLocked(key: "simulator:\(other)"))
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID.lowercased()) }
+        await controller.shutdown()
+        await #expect(throws: ToolError.self) { try await first.value }
+        await #expect(throws: ToolError.self) { try await second.value }
+        #expect(await gate.ended == Set([pilotUDID, other]))
+        #expect(await gate.closed == 2)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+        #expect(await locks.isLocked(key: "simulator:\(other)") == false)
+    }
+    private func controller(_ fixture: CaptureFixture, _ client: PilotClient, _ locks: ConcurrencyPolicy) throws -> NativeUIController {
+        let project = fixture.root.appendingPathComponent("Pilot.xcodeproj")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        return NativeUIController(workspace: project.path, artifacts: ArtifactStore(baseDirectory: fixture.root.appendingPathComponent("managed")),
+                           concurrency: locks, artifactRoot: fixture.artifactRoot, makeClient: { client })
+    }
+
+    @Test func identifierTapUsesFreshCaptureAndEndsSession() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture)
+        let locks = ConcurrencyPolicy()
+        let result = try await controller(fixture, client, locks).tap(udid: pilotUDID, target: .identifier("pilot.increment"))
+        let calls = await client.calls
+        #expect(calls.map(\.0) == ["XcodeOpenWorkspace", "DeviceInteractionStartSession", "DeviceInteractionSynthesize", "DeviceInteractionSynthesize", "DeviceInteractionEndSession"])
+        #expect(calls[3].1["interactionCommand"] == .string("t 201.0 451.2"))
+        #expect(!result.content.contains(pilotKey))
+        #expect(!result.content.contains("sensitivevalue"))
+        #expect(!result.inlineArtifacts)
+        #expect(result.artifacts.count == 2)
+        for artifact in result.artifacts { #expect(FileManager.default.fileExists(atPath: artifact.path)) }
+        #expect(await client.closed)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.native.path).isEmpty)
+    }
+
+    @Test func wrongDeviceEndsWithoutTouchingIt() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, wrongDevice: true)
+        await #expect(throws: ToolError.self) { try await controller(fixture, client, ConcurrencyPolicy()).inspect(udid: pilotUDID) }
+        #expect(await client.calls.map(\.0) == ["XcodeOpenWorkspace", "DeviceInteractionStartSession", "DeviceInteractionEndSession"])
+        #expect(await client.closed)
+    }
+
+    @Test func missingTargetEndsWithoutTap() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture)
+        await #expect(throws: ToolError.self) { try await controller(fixture, client, ConcurrencyPolicy()).tap(udid: pilotUDID, target: .identifier("absent")) }
+        let calls = await client.calls
+        #expect(!calls.contains(where: { $0.1["interactionCommand"] != nil }))
+        #expect(calls.last?.0 == "DeviceInteractionEndSession")
+    }
+
+    @Test(arguments: ["tap", "DeviceInteractionEndSession", "DeviceInteractionStartSession"])
+    func failuresNeverRetryOrLeakKey(stage: String) async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, failure: stage)
+        do {
+            _ = try await controller(fixture, client, ConcurrencyPolicy()).tap(udid: pilotUDID, target: .label("Increment"))
+            Issue.record("Expected native failure")
+        } catch let error as ToolError {
+            #expect(!error.message.contains(pilotKey))
+            if stage == "tap" { #expect(error.message.contains("tap may have occurred")) }
+            if stage == "DeviceInteractionEndSession" { #expect(error.message.contains("cleanup was not confirmed")) }
+            if stage == "DeviceInteractionStartSession" { #expect(error.message.contains("orphaned")) }
+        }
+        #expect(await client.calls.filter { $0.1["interactionCommand"] != nil }.count <= 1)
+        #expect(await client.closed)
+    }
+
+    @Test func cancellationAndShutdownAwaitCleanup() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let client = PilotClient(fixture: fixture, suspendCapture: true)
+        let locks = ConcurrencyPolicy()
+        let controller = try controller(fixture, client, locks)
+        let task = Task { try await controller.inspect(udid: pilotUDID) }
+        try await client.waitForCapture()
+        await #expect(throws: ToolError.self) { try await controller.inspect(udid: pilotUDID) }
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)"))
+        await controller.shutdown()
+        await #expect(throws: ToolError.self) { try await task.value }
+        #expect(await client.calls.last?.0 == "DeviceInteractionEndSession")
+        #expect(await client.closed)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)") == false)
+    }
+
+    @Test func respectsExistingSimulatorLock() async throws {
+        let fixture = CaptureFixture()
+        defer { fixture.remove() }
+        let locks = ConcurrencyPolicy()
+        _ = await locks.acquire(key: "simulator:\(pilotUDID)", owner: "boot")
+        let client = PilotClient(fixture: fixture)
+        await #expect(throws: ToolError.self) { try await controller(fixture, client, locks).inspect(udid: pilotUDID) }
+        #expect(await client.calls.isEmpty)
+        #expect(await locks.isLocked(key: "simulator:\(pilotUDID)"))
+    }
+}
+
+private actor ConcurrentPilotGate {
+    var started: Set<String> = []
+    var ended: Set<String> = []
+    var closed = 0
+    func start(_ udid: String) { started.insert(udid) }
+    func end(_ udid: String) { ended.insert(udid) }
+    func close() { closed += 1 }
+    func waitForBoth() async -> Bool {
+        for _ in 0..<500 {
+            if started.count == 2 { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+}
+
+private actor ConcurrentPilotClient: NativeMCPCalling {
+    let gate: ConcurrentPilotGate
+    var udid = ""
+    init(gate: ConcurrentPilotGate) { self.gate = gate }
+    func connect() {}
+    func close() async { await gate.close() }
+    func call(_ name: String, arguments: [String: Value], timeout: TimeInterval) async throws -> [String: Value] {
+        switch name {
+        case "DeviceInteractionStartSession":
+            if case .string(let id) = arguments["deviceIdentifier"] { udid = id }
+            return ["interactionSessionKey": .string(udid), "deviceIsSimulator": .bool(true), "deviceUUID": .string(udid)]
+        case "DeviceInteractionSynthesize":
+            await gate.start(udid)
+            try await Task.sleep(for: .seconds(60))
+        case "DeviceInteractionEndSession": await gate.end(udid)
+        default: break
+        }
+        return [:]
+    }
+}

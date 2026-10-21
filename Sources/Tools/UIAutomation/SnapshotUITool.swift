@@ -13,7 +13,8 @@ func registerSnapshotUITool(
     session: SessionStore,
     executor: any CommandExecuting,
     axePath: String? = nil,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    nativeUI: (any NativeUIAutomating)? = nil
 ) async {
     let manifest = ToolManifest(
         name: "inspect_ui",
@@ -31,16 +32,6 @@ func registerSnapshotUITool(
     )
 
     await registry.register(manifest: manifest) { args in
-        let resolvedAxe: String
-        if let axePath {
-            resolvedAxe = axePath
-        } else {
-            switch resolveAxePath() {
-            case .success(let path): resolvedAxe = path
-            case .failure(let error): return .error(error)
-            }
-        }
-
         var udid: String?
         if case .string(let u) = args["udid"] {
             udid = u
@@ -59,30 +50,52 @@ func registerSnapshotUITool(
             return .error(error)
         }
 
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["describe-ui", "--udid", resolvedUDID],
-                timeout: 120,
-                environment: nil
-            )
+        var backendReason: String?
+        if let nativeUI {
+            do {
+                return .success(try await nativeUI.inspect(udid: resolvedUDID))
+            } catch let unavailable as NativeUIUnavailable {
+                backendReason = unavailable.reason
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(code: .commandFailed, message: "Native UI operation failed or was cancelled. Inspect the screen before retrying a tap."))
+            }
+        }
 
-            guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe describe-ui failed",
-                    details: result.stderr
-                ))
+        let response: ToolResponse = await {
+            let resolvedAxe: String
+            if let axePath {
+                resolvedAxe = axePath
+            } else {
+                switch resolveAxePath() {
+                case .success(let path): resolvedAxe = path
+                case .failure(let error): return .error(error)
+                }
             }
 
-            return .success(ToolResult(content: result.stdout))
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to capture UI snapshot: \(error.localizedDescription)"
-            ))
-        }
+            do {
+                let result = try await executor.execute(
+                    executable: resolvedAxe,
+                    arguments: ["describe-ui", "--udid", resolvedUDID],
+                    timeout: 120,
+                    environment: nil
+                )
+
+                guard result.succeeded else {
+                    return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
+                }
+
+                return .success(ToolResult(content: result.stdout))
+            } catch let error as ToolError {
+                return .error(error)
+            } catch {
+                return .error(ToolError(
+                    code: .internalError,
+                    message: "Failed to capture UI snapshot: \(error.localizedDescription)"
+                ))
+            }
+        }()
+        return backendReason.map { uiBackendResponse(response, reason: $0) } ?? response
     }
 }

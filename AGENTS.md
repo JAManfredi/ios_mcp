@@ -11,7 +11,7 @@ ios-mcp is a Model Context Protocol (MCP) server that gives Claude Code full con
 | Module | Role |
 |--------|------|
 | **Core** | Shared infrastructure — tool registry, command execution, session state, concurrency policy, artifact store, redaction, validation, next-step resolution, log capture management, LLDB session management, video recording management |
-| **Tools** | 65 tool implementations grouped into 12 categories. Each subdirectory maps to a tool category. |
+| **Tools** | 76 tool implementations grouped into 13 categories. Each subdirectory maps to a tool category. |
 | **IosMcp** | Executable entry point — MCP server startup, ArgumentParser routing, `doctor` diagnostic command |
 
 ### How Tools Work
@@ -85,24 +85,30 @@ Every successful `ToolResult` includes a `nextSteps` array of `NextStep(tool:des
 - `build_run_simulator` → `screenshot`, `inspect_ui`, `start_log_capture`, `debug_attach`
 - `debug_attach` → `debug_add_breakpoint`, `debug_backtrace`, `debug_variables`
 
-All 65 tools have next-step mappings.
+All 76 tools have next-step mappings; `ToolRegistrationTests` fails if a registered tool has none.
 
 ### LLDB Denylist
 
-`debug_run_command` checks commands against a denylist before execution. Denied commands and their safe alternatives:
+`debug_run_command` checks commands against a denylist before execution. Aliases and abbreviations are resolved first (`r`, `attach`, `pro la`, `shell`, `p`), so they match the command they expand to. Denied commands and their safe alternatives:
 
 | Command Pattern | Reason | Alternative |
 |----------------|--------|-------------|
 | `platform shell` | Arbitrary shell execution | Use MCP tools |
-| `command script` | Arbitrary Python scripts | Not available |
+| `script`, `command script` | Arbitrary Python scripts | Not available |
 | `command source` | Source arbitrary files | Not available |
+| `command alias`, `command regex` | User-defined commands bypass the denylist | Run the full command |
 | `process kill` | Kill target process | Use `stop_app` |
 | `process destroy` | Destroy target process | Use `stop_app` |
+| `process launch` (`run`, `r`) | Relaunch kills the attached process | `build_run_simulator` or `launch_app`, then `debug_attach` |
+| `process attach` (`attach`), `process connect` (`gdb-remote`) | Replaces the debug target | `debug_detach`, then `debug_attach` |
+| `platform process launch`/`attach` | Launches or attaches outside the session | `launch_app` / `debug_attach` |
 | `memory write` | Memory mutation | Read-only inspection |
 | `register write` | Register mutation | Read-only inspection |
 | `expression @import` | Load frameworks | `expression` without `@import` |
 | `settings set target.run-args` | Modify launch args | Use `build_run_simulator` |
 | `target delete` | Remove debug target | Use `debug_detach` |
+
+Sessions start with `settings set auto-confirm true`, verified before attaching, because LLDB reads confirmation answers from the same stdin as commands. `quit`/`exit`, multiline input, and `settings` changes that could disable auto-confirm (`auto-confirm`, `settings read`, `settings clear --all`) return `invalid_input` even with `allow_unsafe`.
 
 Set `allow_unsafe: true` to bypass — response is marked `[UNSAFE]` and audit-logged. **Never set `allow_unsafe: true` without explicit user confirmation.** The denylist exists to prevent accidental damage.
 
@@ -145,21 +151,32 @@ If a resource is busy, the tool returns `resource_busy` with the lock owner.
 - Integration tests in `IntegrationTests` gated with `CI_INTEGRATION` environment variable.
 - Prefer testing through public interfaces over internal implementation details.
 
-## Tool Categories (65 tools)
+## Tool Categories (76 tools)
 
 | Category | Directory | Count | Tools |
 |----------|-----------|-------|-------|
 | Project Discovery | `Tools/ProjectDiscovery/` | 3 | `discover_projects`, `list_schemes`, `show_build_settings` |
-| Simulator | `Tools/Simulator/` | 15 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `session_set_defaults`, `simulate_location`, `clear_location`, `set_appearance`, `override_status_bar`, `show_session`, `clear_session`, `manage_privacy`, `send_push_notification`, `get_app_container`, `uninstall_app` |
+| Simulator | `Tools/Simulator/` | 17 | `list_simulators`, `boot_simulator`, `shutdown_simulator`, `erase_simulator`, `reboot_simulator`, `set_orientation`, `session_set_defaults`, `simulate_location`, `clear_location`, `set_appearance`, `override_status_bar`, `show_session`, `clear_session`, `manage_privacy`, `send_push_notification`, `get_app_container`, `uninstall_app` |
 | Build | `Tools/Build/` | 8 | `build_simulator`, `build_run_simulator`, `test_simulator`, `launch_app`, `stop_app`, `clean_derived_data`, `inspect_xcresult`, `list_crash_logs` |
 | Logging | `Tools/Logging/` | 2 | `start_log_capture`, `stop_log_capture` |
 | UI Automation | `Tools/UIAutomation/` | 10 | `screenshot`, `inspect_ui`, `deep_link`, `tap`, `swipe`, `type_text`, `key_press`, `long_press`, `start_recording`, `stop_recording` |
-| Debugging | `Tools/Debugging/` | 8 | `debug_attach`, `debug_detach`, `debug_add_breakpoint`, `debug_remove_breakpoint`, `debug_resume`, `debug_backtrace`, `debug_variables`, `debug_run_command` |
+| Debugging | `Tools/Debugging/` | 9 | `debug_attach`, `debug_detach`, `debug_add_breakpoint`, `debug_remove_breakpoint`, `debug_resume`, `debug_backtrace`, `debug_variables`, `debug_run_command`, `debug_task_tree` |
 | Inspection | `Tools/Inspection/` | 2 | `read_user_defaults`, `write_user_default` |
 | Quality | `Tools/Quality/` | 2 | `lint`, `accessibility_audit` |
-| Swift Package | `Tools/SwiftPackage/` | 6 | `swift_package_resolve`, `swift_package_update`, `swift_package_init`, `swift_package_clean`, `swift_package_show_deps`, `swift_package_dump` |
-| Device | `Tools/Device/` | 8 | `list_devices`, `build_for_device`, `build_run_device`, `test_on_device`, `install_app_device`, `launch_app_device`, `stop_app_device`, `device_screenshot` |
+| Swift Package | `Tools/SwiftPackage/` | 7 | `swift_package_resolve`, `swift_package_update`, `swift_package_init`, `swift_package_clean`, `swift_package_show_deps`, `swift_package_dump`, `swift_package_test` |
+| Device | `Tools/Device/` | 9 | `list_devices`, `build_for_device`, `build_run_device`, `test_on_device`, `install_app_device`, `launch_app_device`, `stop_app_device`, `device_screenshot`, `record_device_screen` |
+| Navigation | `Tools/Navigation/` | 6 | `load_nav_graph`, `get_nav_graph`, `navigate_to`, `where_am_i`, `tag_screen`, `save_nav_graph` |
 | Extras | `Tools/Extras/` | 1 | `open_simulator` |
+
+## Xcode 27 Compatibility
+
+Supported range is Xcode 16 through 27.x. Keep both working:
+- **Device Hub replaced Simulator.app.** Open it by bundle ID `com.apple.dt.Devices`, falling back to `com.apple.iphonesimulator`. Never `open -a Simulator`.
+- **devicectl JSON v5** deprecates `hardwareProperties` / `deviceProperties` / `connectionProperties` in favor of `properties`. Read device fields only through `DeviceIdentity`, which tries `properties` first. `devicectl list devices` also lists simulators on Xcode 27; `DeviceIdentity.physicalDevices` filters them out.
+- **devicectl capture** (`device capture screenshot|screen-record --destination`) needs Xcode 26.6+. There is no `devicectl device screenshot`.
+- **xcresult:** coverage comes from `xccov view --report --json`, and attachments from `xcresulttool export attachments`. Don't use `xcresulttool get object --legacy`.
+- **axe 1.8.0+** is required under Xcode 27, because SimulatorKit moved to `Contents/SharedFrameworks`. Route axe failures through `axeCommandError` so this case is named.
+- Tools that need Xcode 27 (`set_orientation`, `reboot_simulator`, `debug_task_tree`) map "unknown subcommand" failures to `dependency_missing` with the version requirement.
 
 ## Workflow Examples
 
@@ -240,12 +257,18 @@ swift_package_show_deps → swift_package_resolve → swift_package_update
 ### Homebrew (build from source)
 
 ```bash
-brew install --build-from-source Formula/ios-mcp.rb
+brew tap JAManfredi/ios-mcp https://github.com/JAManfredi/ios_mcp.git
+brew trust --formula cameroncooke/axe/axe  # Homebrew 6+: trust this dependency
+brew install --HEAD JAManfredi/ios-mcp/ios-mcp
 ```
 
 ### Manual
 
 ```bash
 make build
-make install  # installs to /usr/local/bin
+make install  # installs/upgrades AXe, then installs ios-mcp to /usr/local/bin
 ```
+
+For a destination that needs sudo, run `make install-dependencies build` as the
+normal user, then `sudo make install-binary`. Do not run Homebrew or the build as
+root.

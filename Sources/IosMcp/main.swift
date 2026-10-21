@@ -22,14 +22,25 @@ struct IosMcpCommand: AsyncParsableCommand {
         defaultSubcommand: nil
     )
 
+    @Option(name: .long, help: "Opt in to native Xcode inspect_ui and tap using this absolute .xcodeproj/.xcworkspace path. Requires Xcode agent approval; other UI tools still use AXe.")
+    var nativeUIWorkspace: String?
+
+    @Option(name: .long, help: "UI backend for inspect_ui/tap: auto, native, or axe. Default: axe; --native-ui-workspace alone preserves native opt-in.")
+    var uiBackend: String?
+
     func run() async throws {
-        try await startServer()
+        do {
+            let mode = try UIBackendMode.resolve(uiBackend, workspace: nativeUIWorkspace)
+            try await startServer(nativeUIWorkspace: nativeUIWorkspace, mode: mode)
+        } catch let error as ToolError {
+            throw ValidationError(error.message)
+        }
     }
 }
 
 // MARK: - MCP Server
 
-private func startServer() async throws {
+private func startServer(nativeUIWorkspace: String?, mode: UIBackendMode) async throws {
     LoggingConfiguration.bootstrap(level: .info)
     let logger = Logger(label: "ios-mcp")
 
@@ -39,13 +50,20 @@ private func startServer() async throws {
     let artifacts = ArtifactStore(
         baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ios-mcp-artifacts")
     )
+    let pathPolicy = PathPolicy()
+    let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
+    let nativeUI: NativeUIController?
+    do {
+        nativeUI = mode == .axe ? nil : try NativeUIController(workspace: nativeUIWorkspace, mode: mode, session: session,
+                                          executor: executor, artifacts: artifacts, concurrency: concurrency, validator: validator)
+    } catch let error as ToolError {
+        throw ValidationError(error.message)
+    }
     let logCapture = LogCaptureManager()
     let debugSession = LLDBSessionManager()
     let videoRecording = VideoRecordingManager()
     try? await artifacts.cleanupStaleDirectories()
 
-    let pathPolicy = PathPolicy()
-    let validator = DefaultsValidator(executor: executor, pathPolicy: pathPolicy)
     let navGraph = NavGraphStore()
 
     let server = Server(
@@ -54,7 +72,7 @@ private func startServer() async throws {
         capabilities: .init(tools: .init())
     )
 
-    let progressReporter = ProgressReporter { token, progress, total, message in
+    let progressReporter = Core.ProgressReporter { token, progress, total, message in
         let params = ProgressNotification.Parameters(
             progressToken: token,
             progress: progress,
@@ -65,7 +83,7 @@ private func startServer() async throws {
     }
 
     let registry = ToolRegistry()
-    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, navGraph: navGraph, progressReporter: progressReporter)
+    await registerAllTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, logCapture: logCapture, debugSession: debugSession, validator: validator, videoRecording: videoRecording, navGraph: navGraph, progressReporter: progressReporter, nativeUI: nativeUI)
 
     await server.withMethodHandler(ListTools.self) { _ in
         let manifests = await registry.listTools()
@@ -146,6 +164,7 @@ private func startServer() async throws {
     await server.waitUntilCompleted()
 
     // Cleanup: tear down active sessions, log captures, and locks
+    await nativeUI?.shutdown()
     await debugSession.teardownAll()
     await logCapture.stopAll()
     await videoRecording.stopAll()
@@ -196,6 +215,7 @@ struct Doctor: AsyncParsableCommand {
         }
 
         // Xcode version (required: 16+)
+        var xcodeVersion: String?
         do {
             let result = try await executor.execute(
                 executable: "/usr/bin/xcodebuild",
@@ -208,6 +228,7 @@ struct Doctor: AsyncParsableCommand {
                 let parts = firstLine.components(separatedBy: " ")
                 if parts.count >= 2,
                    let majorVersion = Int(parts[1].components(separatedBy: ".").first ?? "") {
+                    xcodeVersion = parts[1]
                     if majorVersion >= 16 {
                         print("[ok] Xcode version: \(parts[1])")
                     } else {
@@ -276,8 +297,15 @@ struct Doctor: AsyncParsableCommand {
                     let version = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                     let checksumStatus = verifyAxeChecksum(binaryPath: path)
                     if let upgrade = axeVersionWarning(reported: version) {
-                        print("[--] axe: \(version)\(checksumStatus) — \(upgrade)")
-                        optionalFailed = true
+                        // Under Xcode 27 an old axe can't load SimulatorKit at
+                        // all, so every UI tool fails: that's not optional.
+                        if let xcodeVersion, !isVersion(xcodeVersion, olderThan: "27") {
+                            print("[!!] axe: \(version)\(checksumStatus) — \(upgrade)")
+                            requiredFailed = true
+                        } else {
+                            print("[--] axe: \(version)\(checksumStatus) — \(upgrade)")
+                            optionalFailed = true
+                        }
                     } else {
                         print("[ok] axe: \(version)\(checksumStatus)")
                     }
@@ -312,6 +340,26 @@ struct Doctor: AsyncParsableCommand {
             optionalFailed = true
         }
 
+        // Xcode 27 toolchain features, so a missing tool reads as a version gap
+        // rather than a bug.
+        if let xcodeVersion {
+            let has27 = !isVersion(xcodeVersion, olderThan: "27")
+            let has266 = !isVersion(xcodeVersion, olderThan: "26.6")
+            func feature(_ name: String, _ available: Bool, _ needs: String) {
+                print(available ? "[ok] \(name)" : "[--] \(name): needs Xcode \(needs)")
+            }
+            feature("Device Hub (open_simulator)", has27, "27+; falls back to Simulator.app")
+            feature("devicectl capture (device_screenshot, device recording)", has266, "26.6+")
+            feature("Simulator orientation (set_orientation)", has27, "27+")
+            feature("simctl reboot (reboot_simulator)", has27, "27+")
+            if has27 && !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+                OperatingSystemVersion(majorVersion: 26, minorVersion: 6, patchVersion: 0)
+            ) {
+                print("[!!] macOS: Xcode 27 requires macOS Tahoe 26.6 or later")
+                requiredFailed = true
+            }
+        }
+
         // SwiftLint (optional)
         do {
             let result = try await executor.execute(
@@ -331,8 +379,13 @@ struct Doctor: AsyncParsableCommand {
             optionalFailed = true
         }
 
+        // Native servers are optional candidates, not dependencies of our current tools.
+        for line in try await NativeMCPDiagnostics.run(executor: executor) {
+            print(line)
+        }
+
         // Version
-        print("[ok] ios-mcp version: 0.2.0")
+        print("[ok] ios-mcp version: \(IosMcpCommand.configuration.version)")
 
         // Verdict
         if requiredFailed {
@@ -340,7 +393,7 @@ struct Doctor: AsyncParsableCommand {
         } else if optionalFailed {
             print("\nVerdict: WARNING — optional dependencies are missing. Some tools will be unavailable.")
         } else {
-            print("\nVerdict: SUPPORTED — all checks passed.")
+            print("\nVerdict: SUPPORTED — required and optional dependencies are available.")
         }
     }
 }

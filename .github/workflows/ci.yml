@@ -20,6 +20,8 @@ jobs:
         run: pip3 install pyyaml
       - name: Validate manifest schemas
         run: bash Scripts/validate-manifests.sh
+      - name: Check installation workflow
+        run: python3 Scripts/test-install.py
 
   build:
     name: Build
@@ -35,5 +37,42 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Test process I/O and native MCP with one concurrency worker
+        timeout-minutes: 2
+        # Limit the test process, not SwiftPM's build/planning process.
+        run: |
+          LLDB_TEST_BIN_DIR=$(swift build --show-bin-path)
+          LLDB_TEST_SWIFT=$(xcrun --find swift)
+          LLDB_TEST_HELPER="${LLDB_TEST_SWIFT%/bin/swift}/libexec/swift/pm/swiftpm-testing-helper"
+          LLDB_TEST_FRAMEWORKS="$(xcrun --show-sdk-platform-path)/Developer/Library/Frameworks"
+          LLDB_TEST_LIBRARIES="$(xcrun --show-sdk-platform-path)/Developer/usr/lib"
+          LLDB_TEST_BUNDLE="$LLDB_TEST_BIN_DIR/CoreTests.xctest"
+          if [ ! -d "$LLDB_TEST_BUNDLE" ]; then
+            LLDB_TEST_BUNDLE="$LLDB_TEST_BIN_DIR/ios-mcpPackageTests.xctest"
+          fi
+          LLDB_TEST_BINARY="$LLDB_TEST_BUNDLE/Contents/MacOS/$(basename "$LLDB_TEST_BUNDLE" .xctest)"
+          test -f "$LLDB_TEST_BINARY"
+          DYLD_FRAMEWORK_PATH="$LLDB_TEST_FRAMEWORKS" DYLD_LIBRARY_PATH="$LLDB_TEST_LIBRARIES" LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 "$LLDB_TEST_HELPER" --test-bundle-path "$LLDB_TEST_BINARY" --testing-library swift-testing --filter 'LLDBSessionTests|CommandExecutorTests|NativeMCPClientTests|UIBackendSelectionTests|NativeUIControllerTests'
+
+  # Newest Xcode on the newest runner image. GitHub's macos-26 image tops out
+  # at Xcode 26.6 today; this picks up Xcode 27 automatically once the image
+  # ships it, and warns until then.
+  test-latest-xcode:
+    name: Test (latest Xcode)
+    runs-on: macos-26
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          case "$XCODE" in
+            *Xcode_27*) ;;
+            *) echo "::warning::No Xcode 27 on this runner image yet; testing with $XCODE" ;;
+          esac
       - name: Test
         run: swift test

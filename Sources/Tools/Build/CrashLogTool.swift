@@ -74,7 +74,10 @@ func registerCrashLogTool(
             let processName = bundleID.components(separatedBy: ".").last ?? bundleID
             crashFiles = crashFiles.filter { path in
                 let filename = (path as NSString).lastPathComponent
-                return filename.contains(processName) || filename.contains(bundleID)
+                if filename.contains(processName) || filename.contains(bundleID) { return true }
+                // .ips names use the executable name, which often differs from the
+                // last bundle ID component; the JSON header carries the real ID.
+                return path.hasSuffix(".ips") && ipsHeaderBundleID(atPath: path) == bundleID
             }
         }
 
@@ -107,35 +110,7 @@ func registerCrashLogTool(
             }
 
             if path.hasSuffix(".ips") {
-                // .ips format: first line is JSON header, rest is plain text crash log
-                let lines = content.components(separatedBy: .newlines)
-                if let firstLine = lines.first,
-                   let headerData = firstLine.data(using: .utf8),
-                   let header = try? JSONSerialization.jsonObject(with: headerData) as? [String: Any] {
-                    let procName = header["procName"] as? String ?? "?"
-                    let timestamp = header["timestamp"] as? String ?? "?"
-                    let exception = header["exception"] as? [String: Any]
-                    let exceptionType = exception?["type"] as? String ?? "?"
-                    let signal = exception?["signal"] as? String ?? header["termination"] as? String ?? "?"
-
-                    output.append("  Process: \(procName)")
-                    output.append("  Timestamp: \(timestamp)")
-                    output.append("  Exception: \(exceptionType) (\(signal))")
-                } else {
-                    output.append("  (JSON header not parseable)")
-                }
-
-                // Extract crashed thread backtrace from plain text portion
-                let crashedThreadLines = extractCrashedThread(from: content)
-                if !crashedThreadLines.isEmpty {
-                    output.append("  Crashed thread backtrace:")
-                    for line in crashedThreadLines.prefix(15) {
-                        output.append("    \(line)")
-                    }
-                    if crashedThreadLines.count > 15 {
-                        output.append("    ... (\(crashedThreadLines.count - 15) more frames)")
-                    }
-                }
+                output.append(contentsOf: summarizeIPS(content).map { "  \($0)" })
             } else {
                 // .crash format: plain text throughout
                 let lines = content.components(separatedBy: .newlines)
@@ -167,6 +142,113 @@ func registerCrashLogTool(
 
         return .success(ToolResult(content: output.joined(separator: "\n")))
     }
+}
+
+// MARK: - .ips Parsing
+
+/// Summarizes a modern `.ips` crash report (iOS 15+ / macOS 12+).
+///
+/// The format is two JSON documents: a one-line header (`app_name`,
+/// `bundleID`, `timestamp`, `bug_type`), then a multi-line body holding
+/// `exception`, `termination`, `faultingThread`, `threads[].frames` and
+/// `usedImages`. There is no plain-text "Thread N Crashed:" section, so the
+/// backtrace has to be rebuilt from the body.
+func summarizeIPS(_ content: String, maxFrames: Int = 15) -> [String] {
+    let documents = content.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+    let header = documents.first.flatMap { jsonObject(String($0)) }
+    let body = documents.count > 1 ? jsonObject(String(documents[1])) : nil
+
+    guard header != nil || body != nil else {
+        return ["(.ips JSON not parseable)"]
+    }
+
+    var lines: [String] = []
+    let procName = body?["procName"] as? String ?? header?["app_name"] as? String ?? header?["name"] as? String ?? "?"
+    lines.append("Process: \(procName)")
+    if let bundle = header?["bundleID"] as? String { lines.append("Bundle: \(bundle)") }
+    if let timestamp = header?["timestamp"] as? String ?? body?["captureTime"] as? String {
+        lines.append("Timestamp: \(timestamp)")
+    }
+
+    if let exception = body?["exception"] as? [String: Any] {
+        let type = exception["type"] as? String ?? "?"
+        let signal = exception["signal"] as? String ?? "?"
+        var line = "Exception: \(type) (\(signal))"
+        if let subtype = exception["subtype"] as? String { line += " — \(subtype)" }
+        lines.append(line)
+    }
+    if let termination = body?["termination"] as? [String: Any],
+       let indicator = termination["indicator"] as? String {
+        lines.append("Termination: \(indicator)")
+    }
+    if let asi = body?["asi"] as? [String: [String]] {
+        for message in asi.values.flatMap({ $0 }).prefix(3) {
+            lines.append("Message: \(message)")
+        }
+    }
+
+    // Older reports put a plain-text log after the JSON header.
+    if body == nil {
+        let frames = extractCrashedThread(from: content)
+        if !frames.isEmpty {
+            lines.append("Crashed thread backtrace:")
+            lines.append(contentsOf: frames.prefix(maxFrames).map { "  \($0)" })
+        }
+        return lines
+    }
+
+    guard let threads = body?["threads"] as? [[String: Any]], !threads.isEmpty else {
+        return lines
+    }
+    let faulting = body?["faultingThread"] as? Int
+        ?? threads.firstIndex { $0["triggered"] as? Bool == true }
+        ?? 0
+    guard threads.indices.contains(faulting) else { return lines }
+
+    let images = (body?["usedImages"] as? [[String: Any]]) ?? []
+    let frames = threads[faulting]["frames"] as? [[String: Any]] ?? []
+    if let queue = threads[faulting]["queue"] as? String {
+        lines.append("Crashed thread \(faulting) (\(queue)) backtrace:")
+    } else {
+        lines.append("Crashed thread \(faulting) backtrace:")
+    }
+
+    for (index, frame) in frames.prefix(maxFrames).enumerated() {
+        let imageIndex = frame["imageIndex"] as? Int
+        let image = imageIndex.flatMap { images.indices.contains($0) ? images[$0]["name"] as? String : nil } ?? "???"
+        var line = "  \(index) \(image)"
+        if let symbol = frame["symbol"] as? String {
+            line += " \(symbol)"
+            if let offset = frame["symbolLocation"] as? Int { line += " + \(offset)" }
+        } else if let offset = frame["imageOffset"] as? Int {
+            line += " + \(offset)"
+        }
+        if let file = frame["sourceFile"] as? String {
+            line += " (\(file)"
+            if let lineNumber = frame["sourceLine"] as? Int { line += ":\(lineNumber)" }
+            line += ")"
+        }
+        lines.append(line)
+    }
+    if frames.count > maxFrames {
+        lines.append("  ... (\(frames.count - maxFrames) more frames)")
+    }
+    return lines
+}
+
+/// The `bundleID` from an .ips file's first line, without reading the body.
+private func ipsHeaderBundleID(atPath path: String) -> String? {
+    guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+    defer { try? handle.close() }
+    let chunk = (try? handle.read(upToCount: 4096)) ?? Data()
+    guard let text = String(data: chunk, encoding: .utf8),
+          let firstLine = text.split(separator: "\n", maxSplits: 1).first else { return nil }
+    return jsonObject(String(firstLine))?["bundleID"] as? String
+}
+
+private func jsonObject(_ text: String) -> [String: Any]? {
+    guard let data = text.data(using: .utf8) else { return nil }
+    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
 }
 
 /// Extracts the crashed thread's stack frames from a crash log.

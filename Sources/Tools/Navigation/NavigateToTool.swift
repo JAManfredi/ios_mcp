@@ -316,10 +316,7 @@ private func executeTap(
         )
 
         guard result.succeeded else {
-            return .failure(ToolError(
-                code: .commandFailed,
-                message: "axe tap failed: \(result.stderr)"
-            ))
+            return .failure(axeCommandError("axe tap failed", stderr: result.stderr))
         }
 
         return .success("Tapped \(targetDesc)")
@@ -386,10 +383,7 @@ private func executeSwipe(
         )
 
         guard result.succeeded else {
-            return .failure(ToolError(
-                code: .commandFailed,
-                message: "axe swipe failed: \(result.stderr)"
-            ))
+            return .failure(axeCommandError("axe swipe failed", stderr: result.stderr))
         }
 
         return .success("Swiped \(direction)")
@@ -437,10 +431,7 @@ private func executeTypeText(
         )
 
         guard result.succeeded else {
-            return .failure(ToolError(
-                code: .commandFailed,
-                message: "axe type-text failed: \(result.stderr)"
-            ))
+            return .failure(axeCommandError("axe type-text failed", stderr: result.stderr))
         }
 
         return .success("Typed '\(text)'")

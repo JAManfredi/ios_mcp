@@ -31,14 +31,13 @@ struct OpenSimulatorToolTests {
         )
 
         if case .success(let result) = response {
-            #expect(result.content.contains("Opened Simulator.app"))
+            #expect(result.content.contains("Opened Device Hub"))
         } else {
             Issue.record("Expected success response")
         }
 
         let capturedArgs = await capture.lastArgs
-        #expect(capturedArgs.contains("-a"))
-        #expect(capturedArgs.contains("Simulator"))
+        #expect(capturedArgs == ["-b", "com.apple.dt.Devices"])
     }
 
     @Test("Boots then opens when UDID provided")
@@ -61,7 +60,7 @@ struct OpenSimulatorToolTests {
 
         if case .success(let result) = response {
             #expect(result.content.contains("Booted simulator AAAA-1111"))
-            #expect(result.content.contains("Simulator.app"))
+            #expect(result.content.contains("Device Hub"))
         } else {
             Issue.record("Expected success response")
         }
@@ -72,7 +71,7 @@ struct OpenSimulatorToolTests {
         #expect(calls[0].args.contains("boot"))
         #expect(calls[0].args.contains("AAAA-1111"))
         // Second call: open
-        #expect(calls[1].args.contains("Simulator"))
+        #expect(calls[1].args.contains("com.apple.dt.Devices"))
     }
 
     @Test("Falls back to session UDID")
@@ -123,9 +122,53 @@ struct OpenSimulatorToolTests {
         )
 
         if case .success(let result) = response {
-            #expect(result.content.contains("Simulator.app"))
+            #expect(result.content.contains("Device Hub"))
         } else {
             Issue.record("Expected success response")
+        }
+    }
+
+    @Test("Falls back to Simulator.app when Device Hub is not installed")
+    func fallsBackToSimulatorApp() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let callTracker = CallTracker()
+        let executor = MockCommandExecutor { executable, args in
+            await callTracker.record(executable: executable, args: args)
+            if args.contains("com.apple.dt.Devices") {
+                return CommandResult(stdout: "", stderr: "Unable to find application with identifier", exitCode: 1)
+            }
+            return CommandResult(stdout: "", stderr: "", exitCode: 0)
+        }
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
+
+        let response = try await registry.callTool(name: "open_simulator", arguments: [:])
+
+        if case .success(let result) = response {
+            #expect(result.content.contains("Opened Simulator.app"))
+        } else {
+            Issue.record("Expected success response")
+        }
+
+        let calls = await callTracker.calls
+        #expect(calls.map(\.args) == [["-b", "com.apple.dt.Devices"], ["-b", "com.apple.iphonesimulator"]])
+    }
+
+    @Test("Errors when neither viewer app can be opened")
+    func neitherViewerOpens() async throws {
+        let session = SessionStore()
+        let registry = ToolRegistry()
+        let executor = MockCommandExecutor.failingWith(stderr: "not found")
+
+        await registerAllTools(with: registry, session: session, executor: executor, concurrency: ConcurrencyPolicy(), artifacts: ArtifactStore(baseDirectory: URL(fileURLWithPath: NSTemporaryDirectory())), logCapture: MockLogCapture(), debugSession: MockDebugSession(), validator: testValidator(), videoRecording: MockVideoRecording(), navGraph: NavGraphStore())
+
+        let response = try await registry.callTool(name: "open_simulator", arguments: [:])
+
+        if case .error(let error) = response {
+            #expect(error.code == .commandFailed)
+        } else {
+            Issue.record("Expected error response")
         }
     }
 }

@@ -22,16 +22,31 @@ public struct PathPolicy: Sendable {
         _ path: String,
         label: String
     ) -> ToolError? {
-        let resolved = (path as NSString).standardizingPath
+        let resolved = Self.resolvedPath(path)
 
         for root in allowedRoots {
-            if resolved.hasPrefix(root) { return nil }
+            let resolvedRoot = Self.resolvedPath(root)
+            if resolved == resolvedRoot || resolved.hasPrefix(resolvedRoot == "/" ? "/" : resolvedRoot + "/") { return nil }
         }
 
         return ToolError(
             code: .invalidInput,
             message: "\(label) path is outside allowed directories: \(path). Paths must be under your home directory or system temp directories."
         )
+    }
+
+    // Foundation canonicalizes /private/tmp to /tmp only for existing paths.
+    // Resolve the existing ancestor first so missing children compare consistently.
+    private static func resolvedPath(_ path: String) -> String {
+        var ancestor = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        var missing: [String] = []
+        while !FileManager.default.fileExists(atPath: ancestor.path), ancestor.path != "/" {
+            missing.append(ancestor.lastPathComponent)
+            ancestor.deleteLastPathComponent()
+        }
+        var resolved = ancestor.resolvingSymlinksInPath()
+        for component in missing.reversed() { resolved.appendPathComponent(component) }
+        return resolved.standardizedFileURL.path
     }
 
     private static func defaultAllowedRoots() -> [String] {

@@ -109,11 +109,7 @@ func registerLongPressTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe touch (long press) failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe touch (long press) failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: "Long pressed element on simulator \(resolvedUDID)."))

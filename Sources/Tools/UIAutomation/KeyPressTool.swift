@@ -105,11 +105,7 @@ func registerKeyPressTool(
             )
 
             guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "axe key failed",
-                    details: result.stderr
-                ))
+                return .error(axeCommandError("axe key failed", stderr: result.stderr))
             }
 
             return .success(ToolResult(content: "Pressed key '\(key)' on simulator \(resolvedUDID)."))

@@ -88,6 +88,28 @@ struct DefaultsValidatorTests {
         let error = await validator.validateSimulatorUDID("ANY-UDID")
         #expect(error == nil)
     }
+
+    @Test(arguments: [false, true])
+    func disappearanceIsDetectedOnNextValidation(device: Bool) async {
+        let id = device ? "DEVICE-ID" : "VALID-UDID-1111"
+        let initial = device ? #"{"result":{"devices":[{"identifier":"DEVICE-ID","deviceProperties":{"name":"Phone"}}]}}"# : Self.simctlJSON
+        let output = ChangingValidationOutput(initial)
+        let executor = MockValidator.Executor { _, _ in
+            CommandResult(stdout: await output.value, stderr: "", exitCode: 0)
+        }
+        let validator = DefaultsValidator(executor: executor)
+        let before = device ? await validator.validateDeviceUDID(id) : await validator.validateSimulatorUDID(id)
+        #expect(before == nil)
+        await output.set(device ? #"{"result":{"devices":[]}}"# : #"{"devices":{}}"#)
+        let after = device ? await validator.validateDeviceUDID(id) : await validator.validateSimulatorUDID(id)
+        #expect(after?.code == .staleDefault)
+    }
+}
+
+private actor ChangingValidationOutput {
+    var value: String
+    init(_ value: String) { self.value = value }
+    func set(_ value: String) { self.value = value }
 }
 
 // MARK: - Test Helpers

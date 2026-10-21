@@ -16,7 +16,7 @@ struct ProgressReporterTests {
     @Test("Sends notification when token is set")
     func sendsWhenTokenSet() async {
         let received = TokenCapture()
-        let reporter = ProgressReporter { token, progress, total, message in
+        let reporter = Core.ProgressReporter { token, progress, total, message in
             await received.record(token: token, progress: progress, total: total, message: message)
         }
 
@@ -36,7 +36,7 @@ struct ProgressReporterTests {
     @Test("No-ops when token is nil")
     func noOpWhenNilToken() async {
         let received = TokenCapture()
-        let reporter = ProgressReporter { token, progress, total, message in
+        let reporter = Core.ProgressReporter { token, progress, total, message in
             await received.record(token: token, progress: progress, total: total, message: message)
         }
 
@@ -49,7 +49,7 @@ struct ProgressReporterTests {
     @Test("Resets step count when token changes")
     func resetsStepCountOnTokenChange() async {
         let received = TokenCapture()
-        let reporter = ProgressReporter { token, progress, total, message in
+        let reporter = Core.ProgressReporter { token, progress, total, message in
             await received.record(token: token, progress: progress, total: total, message: message)
         }
 
@@ -71,7 +71,7 @@ struct ProgressReporterTests {
     @Test("Clearing token stops reporting")
     func clearingTokenStopsReporting() async {
         let received = TokenCapture()
-        let reporter = ProgressReporter { token, progress, total, message in
+        let reporter = Core.ProgressReporter { token, progress, total, message in
             await received.record(token: token, progress: progress, total: total, message: message)
         }
 

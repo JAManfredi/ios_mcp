@@ -14,7 +14,35 @@ import Foundation
 /// 1. Walk up from the main executable to find `Vendor/axe/<arch>/axe`
 /// 2. Fall back to `which axe` via Process
 /// 3. Return `.dependencyMissing` if neither succeeds
+///
+/// A found path is cached for the life of the process: every UI tool call
+/// resolves axe, and the `which` fallback blocks a cooperative-pool thread on a
+/// subprocess. A miss is not cached, so installing axe mid-session still works.
 public func resolveAxePath() -> Result<String, ToolError> {
+    if let cached = resolvedAxePathCache.value, FileManager.default.isExecutableFile(atPath: cached) {
+        return .success(cached)
+    }
+    let result = locateAxe()
+    if case .success(let path) = result { resolvedAxePathCache.value = path }
+    return result
+}
+
+private let resolvedAxePathCache = LockedValue<String?>(nil)
+
+/// Minimal lock-guarded box for process-wide caches.
+final class LockedValue<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: T
+
+    init(_ value: T) { stored = value }
+
+    var value: T {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
+}
+
+private func locateAxe() -> Result<String, ToolError> {
     // 1. Check Vendor directory relative to executable
     if let execURL = Bundle.main.executableURL {
         let candidates = sequence(first: execURL.deletingLastPathComponent()) { url in

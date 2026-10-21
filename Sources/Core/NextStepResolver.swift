@@ -43,6 +43,14 @@ public struct NextStepResolver: Sendable {
         "erase_simulator": [
             NextStep(tool: "boot_simulator", description: "Boot the erased simulator"),
         ],
+        "reboot_simulator": [
+            NextStep(tool: "launch_app", description: "Relaunch the app after reboot"),
+            NextStep(tool: "screenshot", description: "Take a screenshot of the simulator"),
+        ],
+        "set_orientation": [
+            NextStep(tool: "screenshot", description: "Take a screenshot to verify the layout"),
+            NextStep(tool: "inspect_ui", description: "Inspect the rotated UI"),
+        ],
         "session_set_defaults": [
             NextStep(tool: "build_simulator", description: "Build the project with updated defaults"),
             NextStep(tool: "list_simulators", description: "List available simulators"),
@@ -207,6 +215,10 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "swift_package_update", description: "Update dependencies to latest versions"),
             NextStep(tool: "swift_package_resolve", description: "Resolve dependencies"),
         ],
+        "swift_package_test": [
+            NextStep(tool: "swift_package_test", description: "Repeat a flaky test with repeat_until"),
+            NextStep(tool: "build_simulator", description: "Build the app that uses this package"),
+        ],
         "swift_package_dump": [
             NextStep(tool: "swift_package_show_deps", description: "View the dependency tree"),
             NextStep(tool: "build_simulator", description: "Build the project"),
@@ -250,6 +262,10 @@ public struct NextStepResolver: Sendable {
             NextStep(tool: "launch_app_device", description: "Relaunch the app"),
             NextStep(tool: "build_for_device", description: "Rebuild the app"),
         ],
+        "record_device_screen": [
+            NextStep(tool: "device_screenshot", description: "Capture a still from the device"),
+            NextStep(tool: "launch_app_device", description: "Relaunch the app to record again"),
+        ],
         "device_screenshot": [
             NextStep(tool: "launch_app_device", description: "Launch a different screen"),
             NextStep(tool: "stop_app_device", description: "Stop the app"),
@@ -259,6 +275,35 @@ public struct NextStepResolver: Sendable {
         "inspect_xcresult": [
             NextStep(tool: "build_simulator", description: "Rebuild after fixing issues"),
             NextStep(tool: "test_simulator", description: "Re-run tests"),
+        ],
+
+        // Debugging (Swift Concurrency)
+        "debug_task_tree": [
+            NextStep(tool: "debug_backtrace", description: "View the call stack of a blocked thread"),
+            NextStep(tool: "debug_resume", description: "Continue execution"),
+        ],
+
+        // Navigation
+        "load_nav_graph": [
+            NextStep(tool: "where_am_i", description: "Identify the current screen"),
+            NextStep(tool: "navigate_to", description: "Navigate to a screen in the graph"),
+        ],
+        "get_nav_graph": [
+            NextStep(tool: "navigate_to", description: "Navigate to a screen in the graph"),
+        ],
+        "navigate_to": [
+            NextStep(tool: "screenshot", description: "Take a screenshot of the destination"),
+            NextStep(tool: "where_am_i", description: "Confirm the current screen"),
+        ],
+        "where_am_i": [
+            NextStep(tool: "navigate_to", description: "Navigate to another screen"),
+            NextStep(tool: "tag_screen", description: "Tag this screen if it is new"),
+        ],
+        "tag_screen": [
+            NextStep(tool: "save_nav_graph", description: "Persist the updated graph"),
+        ],
+        "save_nav_graph": [
+            NextStep(tool: "navigate_to", description: "Navigate using the saved graph"),
         ],
 
         // Crash Log Analysis
@@ -348,13 +393,14 @@ public struct NextStepResolver: Sendable {
             "accessibility_audit", "open_simulator",
             "simulate_location", "clear_location", "set_appearance", "override_status_bar",
             "manage_privacy", "send_push_notification", "get_app_container", "uninstall_app",
+            "reboot_simulator", "set_orientation",
         ]
 
         let needsWorkspace: Set<String> = [
             "list_schemes", "show_build_settings", "build_simulator", "build_run_simulator",
             "test_simulator", "clean_derived_data", "lint",
             "swift_package_resolve", "swift_package_update", "swift_package_clean",
-            "swift_package_show_deps", "swift_package_dump",
+            "swift_package_show_deps", "swift_package_dump", "swift_package_test",
         ]
 
         let needsScheme: Set<String> = [
@@ -370,7 +416,7 @@ public struct NextStepResolver: Sendable {
         let needsDevice: Set<String> = [
             "build_for_device", "build_run_device", "test_on_device",
             "install_app_device", "launch_app_device", "stop_app_device",
-            "device_screenshot",
+            "device_screenshot", "record_device_screen",
         ]
 
         if needsSimulator.contains(toolName), let udid = defaults[.simulatorUDID] {

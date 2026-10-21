@@ -46,8 +46,26 @@ public func axeFailureDetail(binaryPath: String, failure: String = "") -> String
 public func axeVersionWarning(reported: String) -> String? {
     guard let found = firstSemanticVersion(in: reported) else { return nil }
     guard isVersion(found, olderThan: minimumAxeVersion) else { return nil }
-    return "older than \(minimumAxeVersion); newer simulators may not be supported. "
-        + "Run: brew upgrade cameroncooke/axe/axe"
+    return "older than \(minimumAxeVersion); it cannot drive simulators under Xcode 27+ "
+        + "(SimulatorKit moved). Run: brew upgrade cameroncooke/axe/axe"
+}
+
+/// The error for a failed axe invocation.
+///
+/// Xcode 27 moved SimulatorKit from `Contents/Developer/Library/PrivateFrameworks`
+/// to `Contents/SharedFrameworks`. axe before 1.8.0 only looks in the old place
+/// and dies with "Failed to load essential private frameworks", which reads like
+/// a broken Xcode rather than an outdated axe. Name the real fix instead.
+public func axeCommandError(_ message: String, stderr: String) -> ToolError {
+    let lowered = stderr.lowercased()
+    if lowered.contains("simulatorkit") || lowered.contains("essential private frameworks") {
+        return ToolError(
+            code: .dependencyMissing,
+            message: "\(message): this axe can't load SimulatorKit. Xcode 27 moved it, and axe \(minimumAxeVersion)+ is required. Run: brew upgrade cameroncooke/axe/axe",
+            details: stderr
+        )
+    }
+    return ToolError(code: .commandFailed, message: message, details: stderr)
 }
 
 /// Pulls `1.4.0` out of whatever shape `--version` prints.
