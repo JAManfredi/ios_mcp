@@ -12,6 +12,52 @@ import Testing
 @Suite("CommandExecutor")
 struct CommandExecutorTests {
 
+    @Test("Drains output larger than the pipe buffer", arguments: [false, true])
+    func drainsLargeOutput(streaming: Bool) async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("ios-mcp-pipe-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let expected = String(repeating: "output line\n", count: 20_000) + "partial final line"
+        try Data(expected.utf8).write(to: file)
+        let executor = CommandExecutor()
+        let output = StreamedOutput()
+        let result: CommandResult
+        if streaming {
+            result = try await executor.executeStreaming(executable: "/bin/cat", arguments: [file.path], timeout: 10) {
+                await output.append($0)
+            }
+            #expect(await output.text == expected)
+        } else {
+            result = try await executor.execute(executable: "/bin/cat", arguments: [file.path], timeout: 10)
+        }
+        #expect(result.stdout == expected)
+        #expect(result.succeeded)
+        let failure: CommandResult
+        let missing = file.path + ".missing"
+        if streaming {
+            failure = try await executor.executeStreaming(executable: "/bin/cat", arguments: [missing]) { _ in }
+        } else {
+            failure = try await executor.execute(executable: "/bin/cat", arguments: [missing])
+        }
+        #expect(!failure.succeeded)
+        #expect(failure.stdout.isEmpty)
+        #expect(failure.stderr.contains(missing))
+    }
+
+    @Test("Launch failures release pipe readers and subsequent commands work", arguments: [false, true])
+    func launchFailureDoesNotLeakReaders(streaming: Bool) async throws {
+        let executor = CommandExecutor()
+        do {
+            if streaming {
+                _ = try await executor.executeStreaming(executable: "/__ios_mcp_missing_executable__") { _ in }
+            } else {
+                _ = try await executor.execute(executable: "/__ios_mcp_missing_executable__")
+            }
+            Issue.record("Expected launch failure")
+        } catch let error as ToolError { #expect(error.code == .commandFailed) }
+        let result = try await executor.execute(executable: "/bin/echo", arguments: ["after failure"])
+        #expect(result.stdout == "after failure\n")
+    }
+
     @Test("Executes successfully and returns stdout")
     func executesSuccessfully() async throws {
         let executor = CommandExecutor()
@@ -102,4 +148,9 @@ struct CommandExecutorTests {
             #expect(!isAlive, "Child process \(childPID) should have been killed with the process group")
         }
     }
+}
+
+private actor StreamedOutput {
+    private(set) var text = ""
+    func append(_ chunk: String) { text += chunk }
 }

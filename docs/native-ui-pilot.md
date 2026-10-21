@@ -68,12 +68,21 @@ Simulator. Xcode 27.2 was not installed or tested.
   identifier/label/coordinate taps, and app-state verification remain pending
   approval of this executable. The native probe capture does not establish those
   behaviors for the adapter.
-- Local `swift test` passed 534 enabled tests (including 19 added pilot tests);
+- Local `swift test` passed 536 enabled tests (including 19 pilot tests and two
+  process I/O regressions);
   12 opt-in integration tests were skipped. Deterministic checks cover schema changes, structured/text replies, permission
   failures, timeouts/cancellation, exact-device validation, target ambiguity and
   coordinates, managed captures, unsafe files, cleanup failures, and no AXe
   fallback. These use a fake MCP transport or native service boundary and do not
   substitute for live acceptance.
+
+The initial hosted runs at `2e2f218` exposed cooperative-worker starvation in
+`CommandExecutor`: blocking pipe reads delayed cancellation and native MCP
+requests until a 60-second child exited. The same eight native transport failures
+were reproduced locally with one concurrency worker. Pipe reads now run on
+Dispatch threads, and CI retains a combined one-worker check for the command
+executor, native MCP transport, and LLDB. Output-draining and launch-failure
+checks cover both ordinary and streaming commands.
 
 ## Live acceptance recipe
 
