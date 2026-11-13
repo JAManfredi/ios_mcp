@@ -559,6 +559,27 @@ struct NavigateToEdgeSelectionTests {
         #expect(calls.last?.contains("app://search") == true)
     }
 
+    @Test("'via' runs an in-tab edge even when already on the target node")
+    func viaRunsSameNodeEdge() async throws {
+        let graph = try writeTestGraph(edges: [
+            ["from": "*", "to": "home", "actions": [["type": "deeplink", "url": "app://home"]]],
+            ["id": "pools", "from": "*", "to": "home", "navMode": "in_tab", "actions": [["type": "deeplink", "url": "app://pools"]]],
+        ])
+
+        let (withVia, viaCalls) = try await navigate([
+            "target": .string("home"), "from": .string("home"), "via": .string("pools"),
+        ], graph: graph)
+        guard case .success = withVia else { Issue.record("Expected success: \(withVia)"); return }
+        #expect(viaCalls.last?.contains("app://pools") == true)
+
+        let (withoutVia, plainCalls) = try await navigate([
+            "target": .string("home"), "from": .string("home"),
+        ], graph: graph)
+        guard case .success(let result) = withoutVia else { Issue.record("Expected success"); return }
+        #expect(result.content.contains("Already at target"))
+        #expect(plainCalls.isEmpty)
+    }
+
     @Test("Unknown 'via' lists the available edges")
     func unknownVia() async throws {
         let (response, calls) = try await navigate([

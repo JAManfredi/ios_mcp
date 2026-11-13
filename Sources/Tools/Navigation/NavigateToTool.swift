@@ -133,13 +133,17 @@ func registerNavigateToTool(
             ))
         }
 
-        // If already at target, report success
-        if origin == target {
+        var via: String?
+        if case .string(let selector) = args["via"], !selector.isEmpty { via = selector }
+
+        // Already at target and no specific edge requested. With 'via', still run the
+        // edge: in-tab edges (sub-tabs, filters) lead back to the same node.
+        if origin == target, via == nil {
             return .success(ToolResult(content: "Already at target node '\(target)'."))
         }
 
         let path: [NavGraphStore.NavEdge]
-        if case .string(let via) = args["via"], !via.isEmpty {
+        if let via {
             let direct = await navGraph.directEdges(from: origin, to: target)
             guard let chosen = direct.first(where: { $0.matches(selector: via) }) else {
                 let available = direct.map(\.label)
