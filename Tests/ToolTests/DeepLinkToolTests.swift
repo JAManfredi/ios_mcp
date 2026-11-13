@@ -19,7 +19,7 @@ struct DeepLinkToolTests {
         let registry = ToolRegistry()
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            if args.contains("openurl") { await capture.capture(args) }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 
@@ -51,7 +51,7 @@ struct DeepLinkToolTests {
         let registry = ToolRegistry()
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            if args.contains("openurl") { await capture.capture(args) }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
 

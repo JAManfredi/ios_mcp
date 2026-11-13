@@ -256,6 +256,42 @@ struct NavGraphStoreTests {
         #expect(match?.confidence == "medium")
     }
 
+    @Test("An ID match with missing fingerprint text is only medium confidence")
+    func idMatchWithoutTextIsMedium() async throws {
+        let path = try writeTestGraph(nodes: [
+            "league": [
+                "id": "league", "name": "League", "isTabRoot": false,
+                "fingerprint": ["accessibilityId": "BackButton", "dominantStaticText": "Standings"],
+            ],
+        ])
+        let store = NavGraphStore()
+        try await store.load(from: path)
+
+        let both = await store.matchFingerprint(accessibilityIds: ["BackButton"], staticTexts: ["Standings"])
+        #expect(both?.confidence == "high")
+        let idOnly = await store.matchFingerprint(accessibilityIds: ["BackButton"], staticTexts: ["Trending"])
+        #expect(idOnly?.confidence == "medium")
+        // The fingerprint's ID is required: matching text alone isn't enough.
+        let textOnly = await store.matchFingerprint(accessibilityIds: ["SearchRoot"], staticTexts: ["Standings"])
+        #expect(textOnly == nil)
+    }
+
+    @Test("Observed screens are reported for other nodes and cleared on load")
+    func observedScreens() async throws {
+        let path = try writeTestGraph()
+        let store = NavGraphStore()
+        try await store.load(from: path)
+        await store.recordObservedScreen(nodeId: "home", accessibilityIds: ["TabBar", "HomeRoot"], staticTexts: ["Banner"])
+        await store.recordObservedScreen(nodeId: "search", accessibilityIds: ["TabBar", "SearchRoot"], staticTexts: ["Trending"])
+
+        let others = await store.elementsObservedOnOtherScreens(excluding: "search")
+        #expect(others.accessibilityIds == ["TabBar", "HomeRoot"])
+        #expect(others.staticTexts == ["Banner"])
+
+        try await store.load(from: path)
+        #expect(await store.elementsObservedOnOtherScreens(excluding: "search").accessibilityIds.isEmpty)
+    }
+
     @Test("Returns nil when no match")
     func noFingerprintMatch() async throws {
         let path = try writeTestGraph()
@@ -367,5 +403,133 @@ struct NavGraphStoreTests {
         try await store2.load(from: loadPath)
         let node = await store2.getNode("home")
         #expect(node?.fingerprint?.accessibilityId == "Added")
+    }
+
+    @Test("Save preserves fields the model doesn't decode")
+    func savePreservesUnknownFields() async throws {
+        let graph: [String: Any] = [
+            "version": "3.0",
+            "app": "test",
+            "generatedFrom": ["commitSha": "abc123"],
+            "nodes": [
+                "home": ["id": "home", "name": "Home", "isTabRoot": true, "stateCase": "home(Home.State)"],
+            ],
+            "edges": [
+                ["id": "home", "from": "*", "to": "home", "navMode": "tab_switch", "customKey": 1,
+                 "actions": [["type": "deeplink", "url": "app://home"]]],
+            ],
+        ]
+        let loadPath = NSTemporaryDirectory() + "raw_\(UUID().uuidString).json"
+        try JSONSerialization.data(withJSONObject: graph).write(to: URL(fileURLWithPath: loadPath))
+
+        let store = NavGraphStore()
+        try await store.load(from: loadPath)
+        await store.setFingerprint(nodeId: "home", fingerprint: .init(accessibilityId: "HomeRoot"))
+        try await store.save()
+
+        let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: loadPath))) as? [String: Any]
+        let home = (saved?["nodes"] as? [String: Any])?["home"] as? [String: Any]
+        let edge = (saved?["edges"] as? [[String: Any]])?.first
+        #expect((saved?["generatedFrom"] as? [String: Any])?["commitSha"] as? String == "abc123")
+        #expect(home?["stateCase"] as? String == "home(Home.State)")
+        #expect((home?["fingerprint"] as? [String: Any])?["accessibilityId"] as? String == "HomeRoot")
+        #expect(edge?["customKey"] as? Int == 1)
+        #expect(edge?["navMode"] as? String == "tab_switch")
+    }
+
+    // MARK: - Edge Selection
+
+    private func parallelSearchEdgesGraph() throws -> String {
+        try writeTestGraph(edges: [
+            ["id": "search", "from": "*", "to": "search", "actions": [["type": "deeplink", "url": "app://search"]]],
+            ["id": "searchWithQuery", "from": "*", "to": "search", "actions": [["type": "deeplink", "url": "app://search/{term}"]]],
+        ])
+    }
+
+    @Test("Prefers the edge that uses supplied parameters")
+    func prefersParameterizedEdgeWhenSupplied() async throws {
+        let store = NavGraphStore()
+        try await store.load(from: try parallelSearchEdgesGraph())
+
+        let withTerm = await store.shortestPath(from: "home", to: "search", providedParameters: ["term"])
+        #expect(withTerm?.first?.id == "searchWithQuery")
+
+        let without = await store.shortestPath(from: "home", to: "search")
+        #expect(without?.first?.id == "search")
+    }
+
+    @Test("Prefers a resolvable edge over one with missing placeholders")
+    func prefersResolvableEdge() async throws {
+        let store = NavGraphStore()
+        try await store.load(from: try writeTestGraph(edges: [
+            ["id": "byId", "from": "*", "to": "search", "actions": [["type": "deeplink", "url": "app://search/{term}"]]],
+            ["id": "plain", "from": "*", "to": "search", "actions": [["type": "deeplink", "url": "app://search"]]],
+        ]))
+
+        let route = await store.shortestPath(from: "home", to: "search")
+        #expect(route?.first?.id == "plain")
+    }
+
+    @Test("Edge selectors match by ID or exact deeplink template")
+    func edgeSelectorMatching() async throws {
+        let store = NavGraphStore()
+        try await store.load(from: try parallelSearchEdgesGraph())
+        let edges = await store.directEdges(from: "home", to: "search")
+
+        #expect(edges.first { $0.matches(selector: "searchWithQuery") }?.id == "searchWithQuery")
+        #expect(edges.first { $0.matches(selector: "app://search/{term}") }?.id == "searchWithQuery")
+        #expect(edges.first { $0.matches(selector: "app://search/") } == nil)
+    }
+
+    @Test("Extracts template placeholders")
+    func placeholderParsing() {
+        #expect(NavGraphStore.placeholders(in: "app://sport/{sportId}/league/{leagueId}") == ["sportId", "leagueId"])
+        #expect(NavGraphStore.placeholders(in: "app://home").isEmpty)
+        #expect(NavGraphStore.placeholders(in: "app://broken/{open").isEmpty)
+    }
+
+    // MARK: - Fingerprint Ambiguity
+
+    @Test("Reports ambiguity when several nodes share a fingerprint ID")
+    func ambiguousFingerprint() async throws {
+        let path = try writeTestGraph(nodes: [
+            "league": ["id": "league", "name": "League", "isTabRoot": false, "fingerprint": ["accessibilityId": "TabBar"]],
+            "event": ["id": "event", "name": "Event", "isTabRoot": false, "fingerprint": ["accessibilityId": "TabBar"]],
+            "home": ["id": "home", "name": "Home", "isTabRoot": true, "fingerprint": ["dominantStaticText": "Welcome"]],
+        ])
+        let store = NavGraphStore()
+        try await store.load(from: path)
+
+        let matches = await store.fingerprintMatches(accessibilityIds: ["TabBar"], staticTexts: ["Welcome"])
+        #expect(matches.map(\.nodeId) == ["event", "league", "home"])
+        #expect(matches.map(\.confidence) == ["high", "high", "medium"])
+
+        let single = await store.matchFingerprint(accessibilityIds: ["TabBar"], staticTexts: [])
+        #expect(single == nil)
+
+        let claimed = await store.fingerprintsClaimed(excluding: "league")
+        #expect(claimed.accessibilityIds == ["TabBar"])
+        #expect(claimed.staticTexts == ["Welcome"])
+    }
+
+    @Test("A labelled fingerprint matches only when its ID's element has that label")
+    func labelScopedFingerprint() async throws {
+        let path = try writeTestGraph(nodes: [
+            "live": ["id": "live", "name": "Live", "isTabRoot": true,
+                     "fingerprint": ["accessibilityId": "page-title", "accessibilityLabel": "Live"]],
+            "search": ["id": "search", "name": "Search", "isTabRoot": true,
+                       "fingerprint": ["accessibilityId": "page-title", "accessibilityLabel": "Search"]],
+        ])
+        let store = NavGraphStore()
+        try await store.load(from: path)
+
+        // The Search tab shows "Live" badges, but its title element is labelled "Search".
+        let matches = await store.fingerprintMatches(
+            accessibilityIds: ["page-title"],
+            staticTexts: ["Search", "Live"],
+            labelsByAccessibilityId: ["page-title": ["Search"]]
+        )
+        #expect(matches == [.init(nodeId: "search", confidence: "high")])
+        #expect(await store.fingerprintMatches(accessibilityIds: ["page-title"], staticTexts: []).isEmpty)
     }
 }

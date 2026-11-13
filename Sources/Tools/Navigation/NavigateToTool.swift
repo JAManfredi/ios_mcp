@@ -14,11 +14,12 @@ func registerNavigateToTool(
     session: SessionStore,
     executor: any CommandExecuting,
     navGraph: NavGraphStore,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    urlOpener: SimulatorURLOpener = SimulatorURLOpener()
 ) async {
     let manifest = ToolManifest(
         name: "navigate_to",
-        description: "Navigate to a target screen using the loaded navigation graph. Computes the shortest path from the current (or specified) node and executes each edge's actions in order: deeplinks open URLs via simctl, taps and swipes use axe. Returns the sequence of actions taken. Requires a loaded nav graph (use load_nav_graph first).",
+        description: "Navigate to a target screen using the loaded navigation graph. Computes the shortest path from the current (or specified) node and executes each edge's actions in order: deeplinks open URLs via simctl, taps, swipes, and typing use axe. When several edges lead to the target, the one that best fits the supplied parameters is used; pass 'via' to pick one explicitly (see get_nav_graph include_edges=true for edge IDs, URLs, and parameters). Returns the sequence of actions taken. When the target node has a fingerprint, checks the screen afterwards and returns an error if it doesn't match the target; otherwise says arrival wasn't checked. Requires a loaded nav graph (use load_nav_graph first).",
         inputSchema: JSONSchema(
             properties: [
                 "target": .init(
@@ -31,7 +32,11 @@ func registerNavigateToTool(
                 ),
                 "parameters": .init(
                     type: "string",
-                    description: "JSON object of parameter substitutions for deeplink templates (e.g. {\"event_id\": \"12345\"})."
+                    description: "JSON object of parameter substitutions for {placeholders} in edge templates (e.g. {\"eventId\": \"12345\"}). Values are percent-encoded for deeplink URLs; values that already contain '%' are treated as pre-encoded."
+                ),
+                "via": .init(
+                    type: "string",
+                    description: "Use this specific edge into the target, by edge ID or exact deeplink URL template (e.g. \"myapp://search/{query}\"). The edge must lead directly to the target."
                 ),
                 "udid": .init(
                     type: "string",
@@ -96,11 +101,10 @@ func registerNavigateToTool(
 
         // Parse parameter substitutions
         var params: [String: String] = [:]
-        if case .string(let paramJSON) = args["parameters"],
-           let data = paramJSON.data(using: .utf8),
-           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            for (key, value) in parsed {
-                params[key] = "\(value)"
+        if case .string(let paramJSON) = args["parameters"] {
+            switch parseParameters(paramJSON) {
+            case .success(let parsed): params = parsed
+            case .failure(let error): return .error(error)
             }
         }
 
@@ -115,9 +119,9 @@ func registerNavigateToTool(
         // If no "from" specified, try fingerprint detection via inspect_ui
         if fromNode == nil {
             let detected = await detectCurrentNode(
-                registry: registry,
                 navGraph: navGraph,
-                udid: resolvedUDID
+                udid: resolvedUDID,
+                executor: executor
             )
             fromNode = detected
         }
@@ -125,23 +129,48 @@ func registerNavigateToTool(
         guard let origin = fromNode else {
             return .error(ToolError(
                 code: .invalidInput,
-                message: "Could not determine current screen. Provide the 'from' parameter or ensure the graph has fingerprints for screen detection.",
+                message: "Could not determine current screen. Provide the 'from' parameter or ensure the graph has fingerprints that identify exactly one screen.",
                 details: "Tip: Use where_am_i to identify the current screen, then pass it as 'from'."
             ))
         }
 
-        // If already at target, report success
-        if origin == target {
+        var via: String?
+        if case .string(let selector) = args["via"], !selector.isEmpty { via = selector }
+
+        // Already at target and no specific edge requested. With 'via', still run the
+        // edge: in-tab edges (sub-tabs, filters) lead back to the same node.
+        if origin == target, via == nil {
             return .success(ToolResult(content: "Already at target node '\(target)'."))
         }
 
-        // Compute shortest path via BFS
-        guard let path = await navGraph.shortestPath(from: origin, to: target) else {
-            return .error(ToolError(
-                code: .invalidInput,
-                message: "No path found from '\(origin)' to '\(target)'.",
-                details: "The graph has no edge sequence connecting these nodes. Use get_nav_graph to inspect the graph structure."
-            ))
+        let path: [NavGraphStore.NavEdge]
+        if let via {
+            let direct = await navGraph.directEdges(from: origin, to: target)
+            guard let chosen = direct.first(where: { $0.matches(selector: via) }) else {
+                let available = direct.map(\.label)
+                return .error(ToolError(
+                    code: .invalidInput,
+                    message: "No edge '\(via)' leads directly from '\(origin)' to '\(target)'.",
+                    details: available.isEmpty
+                        ? "No edges lead directly to '\(target)' from '\(origin)'."
+                        : "Edges to '\(target)': \(available.joined(separator: ", "))"
+                ))
+            }
+            path = [chosen]
+        } else {
+            // Compute shortest path via BFS
+            guard let found = await navGraph.shortestPath(
+                from: origin,
+                to: target,
+                providedParameters: Set(params.keys)
+            ) else {
+                return .error(ToolError(
+                    code: .invalidInput,
+                    message: "No path found from '\(origin)' to '\(target)'.",
+                    details: "The graph has no edge sequence connecting these nodes. Use get_nav_graph to inspect the graph structure."
+                ))
+            }
+            path = found
         }
 
         // Execute each edge's actions in sequence
@@ -150,7 +179,10 @@ func registerNavigateToTool(
 
         for (edgeIndex, edge) in path.enumerated() {
             let edgeTarget = edge.to ?? "(action only)"
-            log.append("\nEdge \(edgeIndex + 1): \(edge.from) → \(edgeTarget)")
+            log.append("\nEdge \(edgeIndex + 1): \(edge.from) → \(edgeTarget) [\(edge.label)]")
+            if let preconditions = edge.preconditions, !preconditions.isEmpty {
+                log.append("  Preconditions (not checked): \(preconditions.joined(separator: ", "))")
+            }
 
             for action in edge.actions {
                 actionCount += 1
@@ -159,7 +191,8 @@ func registerNavigateToTool(
                     params: params,
                     udid: resolvedUDID,
                     executor: executor,
-                    session: session
+                    session: session,
+                    urlOpener: urlOpener
                 )
 
                 switch result {
@@ -184,6 +217,30 @@ func registerNavigateToTool(
 
         log.append("\nNavigation complete: \(actionCount) action(s) executed.")
 
+        switch await checkArrival(
+            at: target,
+            navGraph: navGraph,
+            udid: resolvedUDID,
+            executor: executor,
+            retryDelayMs: settleMs == 0 ? 0 : max(settleMs, 1000)
+        ) {
+        case .arrived(let confidence, let alsoMatching):
+            var line = "Arrived at '\(target)' (fingerprint match, \(confidence) confidence)."
+            if !alsoMatching.isEmpty {
+                line += " The screen also matches \(alsoMatching.joined(separator: ", ")), so these fingerprints don't fully tell the screens apart."
+            }
+            log.append(line)
+        case .notChecked(let reason):
+            log.append("Arrival not checked: \(reason)")
+        case .elsewhere(let description):
+            return .error(ToolError(
+                code: .commandFailed,
+                message: "Navigation ran, but the screen doesn't match '\(target)': \(description).",
+                details: log.joined(separator: "\n")
+                    + "\n\nThe edge may lead somewhere else, need a precondition (such as being logged in), or the screen may still be loading. Check with screenshot or where_am_i."
+            ))
+        }
+
         return .success(ToolResult(
             content: log.joined(separator: "\n"),
             nextSteps: [
@@ -200,6 +257,54 @@ func registerNavigateToTool(
     }
 }
 
+// MARK: - Arrival Check
+
+private enum ArrivalCheck {
+    case arrived(confidence: String, alsoMatching: [String])
+    case notChecked(String)
+    case elsewhere(String)
+}
+
+/// Compare the screen with the target's fingerprint, checking once more after
+/// `retryDelayMs` in case the screen was still loading.
+private func checkArrival(
+    at target: String,
+    navGraph: NavGraphStore,
+    udid: String,
+    executor: any CommandExecuting,
+    retryDelayMs: Int
+) async -> ArrivalCheck {
+    guard let fingerprint = await navGraph.getNode(target)?.fingerprint,
+          fingerprint.accessibilityId != nil || fingerprint.dominantStaticText != nil else {
+        return .notChecked("'\(target)' has no fingerprint. Tag it with tag_screen to enable this check.")
+    }
+
+    var matches: [NavGraphStore.FingerprintMatch] = []
+    for attempt in 0..<2 {
+        if attempt > 0, retryDelayMs > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(retryDelayMs) * 1_000_000)
+        }
+        let snapshot: ScreenSnapshot
+        switch await captureScreenSnapshot(udid: udid, executor: executor) {
+        case .success(let captured): snapshot = captured
+        case .failure(let error): return .notChecked("couldn't read the screen (\(error.message)).")
+        }
+        matches = await navGraph.fingerprintMatches(
+            accessibilityIds: snapshot.accessibilityIdSet,
+            staticTexts: snapshot.staticTexts,
+            labelsByAccessibilityId: snapshot.labelsByAccessibilityId
+        )
+        if let match = matches.first(where: { $0.nodeId == target }) {
+            let others = matches.filter { $0.nodeId != target }.map { "\($0.nodeId) (\($0.confidence))" }
+            return .arrived(confidence: match.confidence, alsoMatching: others)
+        }
+    }
+
+    guard !matches.isEmpty else { return .elsewhere("it matches no node's fingerprint") }
+    let names = matches.map { "\($0.nodeId) (\($0.confidence))" }
+    return .elsewhere("it matches \(names.joined(separator: ", ")) instead")
+}
+
 // MARK: - Action Execution
 
 private func executeAction(
@@ -207,11 +312,12 @@ private func executeAction(
     params: [String: String],
     udid: String,
     executor: any CommandExecuting,
-    session: SessionStore
+    session: SessionStore,
+    urlOpener: SimulatorURLOpener
 ) async -> Result<String, ToolError> {
     switch action.type {
     case .deeplink:
-        return await executeDeeplink(action, params: params, udid: udid, executor: executor)
+        return await executeDeeplink(action, params: params, udid: udid, executor: executor, urlOpener: urlOpener)
     case .tap:
         return await executeTap(action, udid: udid, executor: executor)
     case .swipe:
@@ -227,15 +333,16 @@ private func executeDeeplink(
     _ action: NavGraphStore.EdgeAction,
     params: [String: String],
     udid: String,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    urlOpener: SimulatorURLOpener
 ) async -> Result<String, ToolError> {
     guard var url = action.url else {
         return .failure(ToolError(code: .invalidInput, message: "Deeplink action missing 'url' field."))
     }
 
-    // Substitute template parameters: {param_name} → value
+    // Substitute template parameters: {param_name} → percent-encoded value
     for (key, value) in params {
-        url = url.replacingOccurrences(of: "{\(key)}", with: value)
+        url = url.replacingOccurrences(of: "{\(key)}", with: percentEncodedPathValue(value))
     }
 
     // Warn if unresolved placeholders remain
@@ -249,28 +356,8 @@ private func executeDeeplink(
         ))
     }
 
-    do {
-        let result = try await executor.execute(
-            executable: "/usr/bin/xcrun",
-            arguments: ["simctl", "openurl", udid, url],
-            timeout: 60,
-            environment: nil
-        )
-
-        guard result.succeeded else {
-            return .failure(ToolError(
-                code: .commandFailed,
-                message: "simctl openurl failed: \(result.stderr)"
-            ))
-        }
-
-        return .success("Opened \(url)")
-    } catch {
-        return .failure(ToolError(
-            code: .internalError,
-            message: "Failed to open deeplink: \(error.localizedDescription)"
-        ))
-    }
+    return await urlOpener.open(url, udid: udid, executor: executor)
+        .map { notes in (["Opened \(url)"] + notes).joined(separator: "\n    ") }
 }
 
 private func executeTap(
@@ -416,11 +503,16 @@ private func executeTypeText(
         text = text.replacingOccurrences(of: "{\(key)}", with: value)
     }
 
-    var axeArgs = ["type-text", "--udid", udid, "--text", text]
-
-    if let target = action.target, let id = target.accessibilityId, !id.isEmpty {
-        axeArgs += ["--id", id]
+    // Focus the target field first when the edge names one; `axe type` types into the focused element.
+    var focused = ""
+    if action.target != nil {
+        switch await executeTap(action, udid: udid, executor: executor) {
+        case .success(let message): focused = " after \(message.prefix(1).lowercased() + message.dropFirst())"
+        case .failure(let error): return .failure(error)
+        }
     }
+
+    let axeArgs = ["type", text, "--udid", udid]
 
     do {
         let result = try await executor.execute(
@@ -431,10 +523,10 @@ private func executeTypeText(
         )
 
         guard result.succeeded else {
-            return .failure(axeCommandError("axe type-text failed", stderr: result.stderr))
+            return .failure(axeCommandError("axe type failed", stderr: result.stderr))
         }
 
-        return .success("Typed '\(text)'")
+        return .success("Typed '\(text)'\(focused)")
     } catch {
         return .failure(ToolError(
             code: .internalError,
@@ -478,54 +570,61 @@ private func executeKeyPress(
 
 // MARK: - Helpers
 
+/// Identify the current node from its fingerprint. Returns nil when nothing
+/// matches or several nodes match equally well.
 private func detectCurrentNode(
-    registry: ToolRegistry,
     navGraph: NavGraphStore,
-    udid: String
+    udid: String,
+    executor: any CommandExecuting
 ) async -> String? {
-    // Call inspect_ui to get the accessibility tree, then fingerprint match
-    let response = try? await registry.callTool(
-        name: "inspect_ui",
-        arguments: ["udid": .string(udid)]
-    )
-
-    guard case .success(let result) = response else { return nil }
-
-    // Parse accessibility IDs and static texts from the tree
-    guard let data = result.content.data(using: .utf8),
-          let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-        return nil
-    }
-
-    var accessibilityIds = Set<String>()
-    var staticTexts: [String] = []
-    collectFingerprint(from: json, ids: &accessibilityIds, texts: &staticTexts)
-
+    guard case .success(let snapshot) = await captureScreenSnapshot(udid: udid, executor: executor) else { return nil }
     let match = await navGraph.matchFingerprint(
-        accessibilityIds: accessibilityIds,
-        staticTexts: staticTexts
+        accessibilityIds: snapshot.accessibilityIdSet,
+        staticTexts: snapshot.staticTexts,
+        labelsByAccessibilityId: snapshot.labelsByAccessibilityId
     )
-
     return match?.nodeId
 }
 
-private func collectFingerprint(
-    from nodes: [[String: Any]],
-    ids: inout Set<String>,
-    texts: inout [String]
-) {
-    for node in nodes {
-        if let uid = node["AXUniqueId"] as? String, !uid.isEmpty {
-            ids.insert(uid)
-        }
-        if let role = node["AXRole"] as? String, role == "AXStaticText",
-           let value = node["AXValue"] as? String, !value.isEmpty {
-            texts.append(value)
-        }
-        if let children = node["children"] as? [[String: Any]] {
-            collectFingerprint(from: children, ids: &ids, texts: &texts)
+/// Parse the `parameters` argument: a JSON object of scalar values.
+/// Booleans become "true"/"false"; numbers use their JSON form.
+func parseParameters(_ json: String) -> Result<[String: String], ToolError> {
+    guard let data = json.data(using: .utf8),
+          let object = try? JSONSerialization.jsonObject(with: data),
+          let parsed = object as? [String: Any] else {
+        return .failure(ToolError(
+            code: .invalidInput,
+            message: "'parameters' must be a JSON object, e.g. {\"eventId\": \"12345\"}."
+        ))
+    }
+
+    var params: [String: String] = [:]
+    for (key, value) in parsed {
+        switch value {
+        case let string as String:
+            params[key] = string
+        case let number as NSNumber where CFGetTypeID(number) == CFBooleanGetTypeID():
+            params[key] = number.boolValue ? "true" : "false"
+        case let number as NSNumber:
+            params[key] = number.stringValue
+        default:
+            return .failure(ToolError(
+                code: .invalidInput,
+                message: "Parameter '\(key)' must be a string, number, or boolean."
+            ))
         }
     }
+    return .success(params)
+}
+
+/// Percent-encode a value for substitution into a URL path segment.
+/// `/`, `?`, and `#` are encoded so a value can't change the URL's structure;
+/// `%` is left alone so already-encoded values aren't double-encoded.
+func percentEncodedPathValue(_ value: String) -> String {
+    var allowed = CharacterSet.urlPathAllowed
+    allowed.remove(charactersIn: "/?#")
+    allowed.insert("%")
+    return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
 }
 
 private func extractSettleMs(from value: Value?) -> Int {

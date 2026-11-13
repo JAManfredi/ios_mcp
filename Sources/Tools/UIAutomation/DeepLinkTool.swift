@@ -12,11 +12,12 @@ func registerDeepLinkTool(
     with registry: ToolRegistry,
     session: SessionStore,
     executor: any CommandExecuting,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    urlOpener: SimulatorURLOpener = SimulatorURLOpener()
 ) async {
     let manifest = ToolManifest(
         name: "deep_link",
-        description: "Open a URL (deep link or universal link) in the iOS simulator. Falls back to session default simulator_udid.",
+        description: "Open a URL (deep link or universal link) in the iOS simulator. The first time a custom scheme is opened on a simulator, ios-mcp records iOS's approval for the installed app that declares it, so the system \"Open in\" prompt doesn't block the link, then checks that no prompt appeared. Falls back to session default simulator_udid.",
         inputSchema: JSONSchema(
             properties: [
                 "url": .init(
@@ -62,32 +63,12 @@ func registerDeepLinkTool(
             return .error(error)
         }
 
-        do {
-            let result = try await executor.execute(
-                executable: "/usr/bin/xcrun",
-                arguments: ["simctl", "openurl", resolvedUDID, url],
-                timeout: 60,
-                environment: nil
-            )
-
-            guard result.succeeded else {
-                return .error(ToolError(
-                    code: .commandFailed,
-                    message: "simctl openurl failed",
-                    details: result.stderr
-                ))
-            }
-
-            return .success(ToolResult(
-                content: "Opened URL '\(url)' on simulator \(resolvedUDID)."
-            ))
-        } catch let error as ToolError {
+        switch await urlOpener.open(url, udid: resolvedUDID, executor: executor) {
+        case .success(let notes):
+            let content = (["Opened URL '\(url)' on simulator \(resolvedUDID)."] + notes).joined(separator: "\n")
+            return .success(ToolResult(content: content))
+        case .failure(let error):
             return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to open URL: \(error.localizedDescription)"
-            ))
         }
     }
 }

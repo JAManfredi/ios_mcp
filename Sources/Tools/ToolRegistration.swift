@@ -23,16 +23,18 @@ public func registerAllTools(
     progressReporter: Core.ProgressReporter? = nil,
     nativeUI: (any NativeUIAutomating)? = nil
 ) async {
+    // Shared so deep_link and navigate_to remember which schemes are already approved.
+    let urlOpener = SimulatorURLOpener()
     await registerProjectDiscoveryTools(with: registry, session: session, executor: executor)
     await registerSimulatorTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
     await registerBuildTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
     await registerLoggingTools(with: registry, session: session, logCapture: logCapture, concurrency: concurrency, validator: validator)
-    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator, videoRecording: videoRecording, nativeUI: nativeUI)
+    await registerUIAutomationTools(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator, videoRecording: videoRecording, nativeUI: nativeUI, urlOpener: urlOpener)
     await registerDebuggingTools(with: registry, session: session, debugSession: debugSession, concurrency: concurrency, validator: validator)
     await registerInspectionTools(with: registry, session: session, executor: executor, validator: validator)
     await registerQualityTools(with: registry, session: session, executor: executor, validator: validator)
     await registerExtrasTools(with: registry, session: session, executor: executor, validator: validator)
     await registerSwiftPackageTools(with: registry, session: session, executor: executor, concurrency: concurrency, validator: validator)
     await registerDeviceTools(with: registry, session: session, executor: executor, concurrency: concurrency, artifacts: artifacts, validator: validator, progressReporter: progressReporter)
-    await registerNavigationTools(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
+    await registerNavigationTools(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator, urlOpener: urlOpener)
 }

@@ -2,10 +2,10 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://ios-mcp.local/nav-graph-schema.json",
     "title": "ios-mcp Navigation Graph",
-    "description": "Describes the screen topology, navigation edges, and available commands for an iOS application. Consumed by the ios-mcp navigation tools (navigate_to, next_steps, etc.) to plan and execute multi-step navigation sequences in the simulator.",
+    "description": "Describes the screen topology, navigation edges, and available commands for an iOS application. Consumed by the ios-mcp navigation tools (navigate_to, next_steps, etc.) to plan and execute multi-step navigation sequences in the simulator. Additional properties are allowed so generators can record metadata (e.g. generatedAt, stateCase); tools ignore them and save_nav_graph preserves them.",
     "type": "object",
     "required": ["version", "app", "nodes", "edges"],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "properties": {
         "version": {
             "type": "string",
@@ -49,7 +49,7 @@
             "type": "object",
             "description": "A screen or distinct navigable state within the application.",
             "required": ["id", "name", "isTabRoot"],
-            "additionalProperties": false,
+            "additionalProperties": true,
             "properties": {
                 "id": {
                     "type": "string",
@@ -145,8 +145,12 @@
             "type": "object",
             "description": "A directed edge representing a navigation transition between two nodes.",
             "required": ["from", "actions"],
-            "additionalProperties": false,
+            "additionalProperties": true,
             "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Stable identifier for this edge (e.g. the deeplink case name). Lets navigate_to select it with 'via' when several edges lead to the same node."
+                },
                 "from": {
                     "type": "string",
                     "description": "ID of the source node where this transition begins."
@@ -190,6 +194,10 @@
                 "validated": {
                     "type": "boolean",
                     "description": "Whether this edge has been validated against a live simulator session."
+                },
+                "navMode": {
+                    "type": "string",
+                    "description": "How the destination is presented, e.g. push, sheet, modal, tab_switch, in_tab, action. Informational."
                 }
             }
         },

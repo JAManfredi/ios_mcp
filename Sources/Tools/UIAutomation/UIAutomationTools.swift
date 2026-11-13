@@ -17,10 +17,11 @@ func registerUIAutomationTools(
     artifacts: ArtifactStore,
     validator: DefaultsValidator,
     videoRecording: any VideoRecording,
-    nativeUI: (any NativeUIAutomating)? = nil
+    nativeUI: (any NativeUIAutomating)? = nil,
+    urlOpener: SimulatorURLOpener = SimulatorURLOpener()
 ) async {
     await registerScreenshotTool(with: registry, session: session, executor: executor, artifacts: artifacts, validator: validator)
-    await registerDeepLinkTool(with: registry, session: session, executor: executor, validator: validator)
+    await registerDeepLinkTool(with: registry, session: session, executor: executor, validator: validator, urlOpener: urlOpener)
     await registerSnapshotUITool(with: registry, session: session, executor: executor, validator: validator, nativeUI: nativeUI)
     await registerTapTool(with: registry, session: session, executor: executor, validator: validator, nativeUI: nativeUI)
     await registerSwipeTool(with: registry, session: session, executor: executor, validator: validator)
