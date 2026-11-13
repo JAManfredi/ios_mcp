@@ -63,54 +63,40 @@ func registerWhereAmITool(
             return .error(error)
         }
 
-        // Capture the accessibility tree via inspect_ui
-        let resolvedAxe: String
-        switch resolveAxePath() {
-        case .success(let path): resolvedAxe = path
+        let snapshot: ScreenSnapshot
+        switch await captureScreenSnapshot(udid: resolvedUDID, executor: executor) {
+        case .success(let captured): snapshot = captured
         case .failure(let error): return .error(error)
         }
+        let accessibilityIds = snapshot.accessibilityIdSet
+        let staticTexts = snapshot.staticTexts
 
-        let treeOutput: String
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["describe-ui", "--udid", resolvedUDID],
-                timeout: 120,
-                environment: nil
-            )
-
-            guard result.succeeded else {
-                return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
-            }
-
-            treeOutput = result.stdout
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
-            return .error(ToolError(
-                code: .internalError,
-                message: "Failed to capture UI snapshot: \(error.localizedDescription)"
-            ))
-        }
-
-        // Parse accessibility IDs and static texts from the tree
-        guard let data = treeOutput.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return .error(ToolError(
-                code: .commandFailed,
-                message: "Failed to parse accessibility tree output as JSON."
-            ))
-        }
-
-        var accessibilityIds = Set<String>()
-        var staticTexts: [String] = []
-        collectFingerprint(from: json, ids: &accessibilityIds, texts: &staticTexts)
-
-        // Match against graph fingerprints
-        if let match = await navGraph.matchFingerprint(
+        let matches = await navGraph.fingerprintMatches(
             accessibilityIds: accessibilityIds,
             staticTexts: staticTexts
-        ) {
+        )
+        let topMatches = matches.filter { $0.confidence == matches.first?.confidence }
+
+        // Several nodes match equally well: the fingerprints don't tell these screens apart.
+        if topMatches.count > 1 {
+            var output = "Ambiguous: \(topMatches.count) nodes match the current screen with \(topMatches[0].confidence) confidence.\n"
+            for match in topMatches {
+                let name = await navGraph.getNode(match.nodeId)?.name ?? match.nodeId
+                output += "  - \(match.nodeId) (\(name))\n"
+            }
+            output += "\nTheir fingerprints likely capture shared UI (tab bar, navigation bar). "
+            output += "Re-tag them with tag_screen force=true and an accessibility_id unique to each screen, "
+            output += "or pass 'from' to navigate_to explicitly."
+            return .success(ToolResult(
+                content: output,
+                nextSteps: [
+                    NextStep(tool: "tag_screen", description: "Re-tag an ambiguous node with a screen-specific accessibility ID"),
+                    NextStep(tool: "inspect_ui", description: "Find an accessibility ID unique to this screen"),
+                ]
+            ))
+        }
+
+        if let match = topMatches.first {
             let node = await navGraph.getNode(match.nodeId)
             let nodeName = node?.name ?? match.nodeId
 
@@ -152,22 +138,22 @@ func registerWhereAmITool(
         }
 
         // No match — provide diagnostic info
-        let allNodes = await navGraph.allNodes()
+        let allNodes = await navGraph.allNodes().sorted { $0.id < $1.id }
         let nodesWithFingerprints = allNodes.filter { $0.fingerprint != nil }
         let nodesWithout = allNodes.filter { $0.fingerprint == nil }
 
         var output = "Could not identify the current screen.\n\n"
         output += "Fingerprint data collected:\n"
-        output += "  Accessibility IDs found: \(accessibilityIds.count)\n"
+        output += "  Accessibility IDs found: \(snapshot.accessibilityIds.count)\n"
         output += "  Static texts found: \(staticTexts.count)\n\n"
 
-        if !accessibilityIds.isEmpty {
-            let sample = Array(accessibilityIds.prefix(10)).joined(separator: ", ")
+        if !snapshot.accessibilityIds.isEmpty {
+            let sample = snapshot.accessibilityIds.prefix(10).joined(separator: ", ")
             output += "  Sample IDs: \(sample)\n"
         }
 
         if !staticTexts.isEmpty {
-            let sample = Array(staticTexts.prefix(5)).joined(separator: ", ")
+            let sample = staticTexts.prefix(5).joined(separator: ", ")
             output += "  Sample texts: \(sample)\n"
         }
 
@@ -183,26 +169,5 @@ func registerWhereAmITool(
         output += "or use get_nav_graph to browse nodes and provide the 'from' parameter to navigate_to manually."
 
         return .success(ToolResult(content: output))
-    }
-}
-
-// MARK: - Helpers
-
-private func collectFingerprint(
-    from nodes: [[String: Any]],
-    ids: inout Set<String>,
-    texts: inout [String]
-) {
-    for node in nodes {
-        if let uid = node["AXUniqueId"] as? String, !uid.isEmpty {
-            ids.insert(uid)
-        }
-        if let role = node["AXRole"] as? String, role == "AXStaticText",
-           let value = node["AXValue"] as? String, !value.isEmpty {
-            texts.append(value)
-        }
-        if let children = node["children"] as? [[String: Any]] {
-            collectFingerprint(from: children, ids: &ids, texts: &texts)
-        }
     }
 }

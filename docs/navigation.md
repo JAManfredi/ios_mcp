@@ -91,7 +91,7 @@ Fingerprints enable `where_am_i` and auto-detection in `navigate_to`.
 |-------|------|-------------|
 | `accessibilityId` | string | A unique accessibility identifier present on this screen (high confidence match) |
 | `hierarchyHash` | string | Reserved for future hierarchy-based matching |
-| `dominantStaticText` | string | The most prominent static text on the screen (medium confidence match) |
+| `dominantStaticText` | string | Static text that appears on the screen (medium confidence match). Read from the element's `AXLabel`. |
 
 Matching priority: `accessibilityId` (high confidence) > `dominantStaticText` (medium confidence).
 
@@ -122,6 +122,7 @@ Each edge defines a transition between two nodes and the actions needed to trave
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `id` | string | no | Stable edge identifier (e.g. a deeplink case name). Lets `navigate_to` pick this edge with `via`. |
 | `from` | string | yes | Source node ID. Use `"*"` for globally routable edges (reachable from any screen). |
 | `to` | string | no | Target node ID. Omit for action-only edges (e.g., bet placement). |
 | `actions` | [Action] | yes | Ordered list of actions to execute for this transition. |
@@ -130,7 +131,13 @@ Each edge defines a transition between two nodes and the actions needed to trave
 | `reverseActions` | [Action] | no | Actions to execute for reverse traversal. |
 | `preconditions` | [string] | no | Conditions that must be true for traversal (informational). |
 | `validated` | bool | no | Whether this edge has been validated at runtime. |
+| `navMode` | string | no | How the destination is presented: `push`, `sheet`, `modal`, `tab_switch`, `in_tab`, `action`. Informational. |
 
+Nodes, edges, and the top-level object may carry extra fields (generator metadata such as `generatedAt` or `stateCase`). Tools ignore them, and `save_nav_graph` writes them back unchanged.
+
+#### Choosing among parallel edges
+
+When several edges lead to the same node (for example `search` and `search/{searchTerm}`), `navigate_to` uses the edge whose placeholders are all covered by the supplied `parameters`, preferring the one that uses the most of them. Without parameters it picks an edge that needs none. Pass `via` with an edge `id` or its exact deeplink template to choose one explicitly. `get_nav_graph` with `include_edges=true` (or `node_id`) lists every edge's ID, URL, parameters, and preconditions.
 #### Actions
 
 Each action is a single UI operation. Edges can have multiple actions executed in sequence.
@@ -140,7 +147,7 @@ Each action is a single UI operation. Edges can have multiple actions executed i
 | `deeplink` | `url` | Open a URL via `simctl openurl`. Supports `{parameter}` template substitution. |
 | `tap` | `target` | Tap an element by accessibility ID, label, or coordinates. |
 | `swipe` | `direction`, `target` | Swipe in a direction (up/down/left/right), optionally centered on a target. |
-| `type_text` | `text`, `target` | Type text into the focused field or a target element. Supports `{parameter}` substitution. |
+| `type_text` | `text`, `target` | Type text with `axe type`. If `target` is set, it is tapped first to focus it. Supports `{parameter}` substitution. |
 | `key_press` | `key` | Send a key press (return, escape, backspace, tab, etc.). |
 
 **Action target fields** (for `tap`, `swipe`, `type_text`):
@@ -168,6 +175,8 @@ Template parameters in deeplink URLs and text fields use `{name}` syntax. Pass v
 ```
 navigate_to(target: "event_detail", parameters: '{"event_id": "12345"}')
 ```
+
+Values may be strings, numbers, or booleans (`true`/`false`). Values substituted into deeplink URLs are percent-encoded (spaces, `/`, `?`, `#`); a value that already contains `%` is treated as pre-encoded and left alone. Invalid `parameters` JSON is rejected.
 
 ### Commands
 
@@ -254,7 +263,15 @@ The first four return **success responses with guidance**, not errors, so MCP cl
 
 Use `force=true` only when you intentionally want to replace a fingerprint.
 
-`save_nav_graph` writes the full in-memory graph. To avoid overwriting the source graph, pass a separate `path` argument.
+### Choosing a good fingerprint
+
+A fingerprint only helps if it is unique to its screen. Shared UI such as the tab bar or navigation bar appears on many screens and makes matches ambiguous.
+
+- Pass `accessibility_id` (and optionally `static_text`) to `tag_screen` with values specific to the screen, such as the screen's root view identifier. Both must be present on the current screen.
+- Without `accessibility_id`, `tag_screen` picks the first ID on screen that no other node already uses, marks it `(auto-selected)`, and lists the other IDs it found so you can re-tag.
+- When several nodes match equally well, `where_am_i` reports them all as ambiguous instead of guessing, and `navigate_to` asks for an explicit `from`.
+
+`save_nav_graph` writes the original file contents with fingerprint changes applied, so fields the tools don't model are preserved. To leave the source graph untouched, pass a separate `path` argument.
 
 ---
 

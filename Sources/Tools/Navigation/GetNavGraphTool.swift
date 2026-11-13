@@ -80,8 +80,10 @@ func registerGetNavGraphTool(
             }
             output += "  Edges leading here: \(edgesTo.count)\n"
             for edge in edgesTo {
-                let actionSummary = edge.actions.map(\.type.rawValue).joined(separator: ", ")
-                output += "    - from: \(edge.from), actions: [\(actionSummary)]\n"
+                output += describeEdge(edge, indent: "    ")
+            }
+            if edgesTo.count > 1 {
+                output += "  Pass one of these as navigate_to 'via' to choose a route; otherwise the edge best matching the supplied parameters is used.\n"
             }
 
             return .success(ToolResult(content: output))
@@ -115,9 +117,7 @@ func registerGetNavGraphTool(
         if includeEdges {
             output += "\nEDGES (\(graph.edges.count)):\n"
             for edge in graph.edges {
-                let target = edge.to ?? "(action only)"
-                let actionTypes = edge.actions.map(\.type.rawValue).joined(separator: " → ")
-                output += "  \(edge.from) → \(target) [\(actionTypes)]\n"
+                output += describeEdge(edge, indent: "  ")
             }
         }
 
@@ -131,4 +131,39 @@ func registerGetNavGraphTool(
 
         return .success(ToolResult(content: output))
     }
+}
+
+/// Multi-line description of an edge: route, label, actions, parameters, preconditions.
+func describeEdge(_ edge: NavGraphStore.NavEdge, indent: String) -> String {
+    let target = edge.to ?? "(action only)"
+    var lines = ["\(indent)- \(edge.from) → \(target)  [\(edge.label)]\(edge.navMode.map { " (\($0))" } ?? "")"]
+
+    for action in edge.actions {
+        var detail = action.type.rawValue
+        if let url = action.url { detail += " \(url)" }
+        if let target = action.target {
+            if let id = target.accessibilityId { detail += " id=\(id)" } else if let label = target.accessibilityLabel { detail += " label=\(label)" } else if let x = target.x, let y = target.y { detail += " (\(Int(x)), \(Int(y)))" }
+        }
+        if let direction = action.direction { detail += " \(direction)" }
+        if let text = action.text { detail += " \"\(text)\"" }
+        if let key = action.key { detail += " key=\(key)" }
+        lines.append("\(indent)    \(detail)")
+    }
+
+    if let parameters = edge.parameters, !parameters.isEmpty {
+        let described = parameters.map { param in
+            var text = "\(param.name): \(param.type)\(param.required ? "" : "?")"
+            if let example = param.exampleValue { text += " (e.g. \(example))" }
+            return text
+        }
+        lines.append("\(indent)    params: \(described.joined(separator: ", "))")
+    }
+    let undeclared = edge.placeholders.subtracting(edge.parameters?.map(\.name) ?? []).sorted()
+    if !undeclared.isEmpty {
+        lines.append("\(indent)    undeclared placeholders: \(undeclared.joined(separator: ", "))")
+    }
+    if let preconditions = edge.preconditions, !preconditions.isEmpty {
+        lines.append("\(indent)    requires: \(preconditions.joined(separator: ", "))")
+    }
+    return lines.joined(separator: "\n") + "\n"
 }

@@ -18,7 +18,7 @@ func registerTagScreenTool(
 ) async {
     let manifest = ToolManifest(
         name: "tag_screen",
-        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id to record the fingerprint. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
+        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id. Prefer passing accessibility_id with an identifier unique to this screen (e.g. the screen's root view); otherwise the first ID not already used by another node is chosen, which may be shared UI such as a tab bar. The response lists the IDs found so you can re-tag with a better one. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
         inputSchema: JSONSchema(
             properties: [
                 "node_id": .init(
@@ -28,6 +28,14 @@ func registerTagScreenTool(
                 "force": .init(
                     type: "boolean",
                     description: "Overwrite an existing fingerprint. Defaults to false to protect pre-defined fingerprints."
+                ),
+                "accessibility_id": .init(
+                    type: "string",
+                    description: "Accessibility identifier unique to this screen. Must be present on the current screen."
+                ),
+                "static_text": .init(
+                    type: "string",
+                    description: "Static text that identifies this screen (medium-confidence fallback). Must be visible on the current screen. Defaults to the most frequent static text."
                 ),
                 "udid": .init(
                     type: "string",
@@ -86,59 +94,43 @@ func registerTagScreenTool(
             return .error(error)
         }
 
-        // Capture the accessibility tree
-        let resolvedAxe: String
-        switch resolveAxePath() {
-        case .success(let path): resolvedAxe = path
+        let snapshot: ScreenSnapshot
+        switch await captureScreenSnapshot(udid: resolvedUDID, executor: executor) {
+        case .success(let captured): snapshot = captured
         case .failure(let error): return .error(error)
         }
 
-        let treeOutput: String
-        do {
-            let result = try await executor.execute(
-                executable: resolvedAxe,
-                arguments: ["describe-ui", "--udid", resolvedUDID],
-                timeout: 120,
-                environment: nil
-            )
+        var requestedId: String?
+        if case .string(let id) = args["accessibility_id"], !id.isEmpty { requestedId = id }
+        var requestedText: String?
+        if case .string(let text) = args["static_text"], !text.isEmpty { requestedText = text }
 
-            guard result.succeeded else {
-                return .error(axeCommandError("axe describe-ui failed", stderr: result.stderr))
-            }
-
-            treeOutput = result.stdout
-        } catch let error as ToolError {
-            return .error(error)
-        } catch {
+        if let requestedId, !snapshot.accessibilityIdSet.contains(requestedId) {
             return .error(ToolError(
-                code: .internalError,
-                message: "Failed to capture UI snapshot: \(error.localizedDescription)"
+                code: .invalidInput,
+                message: "accessibility_id '\(requestedId)' is not on the current screen.",
+                details: "IDs on screen: \(snapshot.accessibilityIds.prefix(30).joined(separator: ", "))"
+            ))
+        }
+        if let requestedText, !snapshot.staticTexts.contains(requestedText) {
+            return .error(ToolError(
+                code: .invalidInput,
+                message: "static_text '\(requestedText)' is not on the current screen.",
+                details: "Texts on screen: \(snapshot.uniqueStaticTexts.prefix(30).joined(separator: ", "))"
             ))
         }
 
-        // Parse the tree to extract fingerprint data
-        guard let data = treeOutput.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return .error(ToolError(
-                code: .commandFailed,
-                message: "Failed to parse accessibility tree output as JSON."
-            ))
-        }
-
-        var accessibilityIds: [String] = []
-        var staticTexts: [String] = []
-        collectFingerprintData(from: json, ids: &accessibilityIds, texts: &staticTexts)
-
-        // Build fingerprint: use the first accessibility ID as the root identifier,
-        // and the most common static text as the dominant text
-        let rootId = accessibilityIds.first
-        let dominantText = mostFrequent(staticTexts)
+        // Without an explicit ID, skip IDs other nodes already use: those are
+        // shared UI and would make where_am_i ambiguous.
+        let claimed = await navGraph.fingerprintIdsClaimed(excluding: nodeId)
+        let rootId = requestedId ?? snapshot.accessibilityIds.first { !claimed.contains($0) }
+        let dominantText = requestedText ?? snapshot.dominantStaticText
 
         guard rootId != nil || dominantText != nil else {
             return .error(ToolError(
                 code: .invalidInput,
                 message: "Could not extract any fingerprint data from the current screen. The screen may lack accessibility identifiers and static text.",
-                details: "Accessibility IDs found: \(accessibilityIds.count), Static texts found: \(staticTexts.count)"
+                details: "Accessibility IDs found: \(snapshot.accessibilityIds.count) (\(claimed.count) already used by other nodes), Static texts found: \(snapshot.staticTexts.count)"
             ))
         }
 
@@ -163,10 +155,17 @@ func registerTagScreenTool(
 
         var output = "Fingerprint captured for node '\(nodeId)':\n"
         if let id = rootId {
-            output += "  accessibilityId: \(id)\n"
+            output += "  accessibilityId: \(id)\(requestedId == nil ? " (auto-selected)" : "")\n"
         }
         if let text = dominantText {
-            output += "  dominantStaticText: \(text)\n"
+            output += "  dominantStaticText: \(text)\(requestedText == nil ? " (auto-selected)" : "")\n"
+        }
+        if requestedId == nil {
+            let others = snapshot.accessibilityIds.filter { $0 != rootId }.prefix(20)
+            if !others.isEmpty {
+                output += "\nOther IDs on this screen: \(others.joined(separator: ", "))\n"
+                output += "If the auto-selected ID also appears on other screens, re-run with force=true and accessibility_id set to a screen-specific one.\n"
+            }
         }
         output += "\nThis fingerprint is in memory only. Use save_nav_graph to persist it to disk."
 
@@ -180,32 +179,4 @@ func registerTagScreenTool(
             ]
         ))
     }
-}
-
-// MARK: - Helpers
-
-private func collectFingerprintData(
-    from nodes: [[String: Any]],
-    ids: inout [String],
-    texts: inout [String]
-) {
-    for node in nodes {
-        if let uid = node["AXUniqueId"] as? String, !uid.isEmpty {
-            ids.append(uid)
-        }
-        if let role = node["AXRole"] as? String, role == "AXStaticText",
-           let value = node["AXValue"] as? String, !value.isEmpty {
-            texts.append(value)
-        }
-        if let children = node["children"] as? [[String: Any]] {
-            collectFingerprintData(from: children, ids: &ids, texts: &texts)
-        }
-    }
-}
-
-private func mostFrequent(_ items: [String]) -> String? {
-    guard !items.isEmpty else { return nil }
-    var counts: [String: Int] = [:]
-    for item in items { counts[item, default: 0] += 1 }
-    return counts.max(by: { $0.value < $1.value })?.key
 }
