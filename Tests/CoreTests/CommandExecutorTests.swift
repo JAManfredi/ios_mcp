@@ -108,10 +108,15 @@ struct CommandExecutorTests {
         _ = try await task.value
         let elapsed = ContinuousClock.now - start
 
-        // The task should complete quickly after cancellation (not wait 60s).
+        // The task must finish long before the 60s sleep would. The limit is
+        // loose on purpose: CI also runs this suite with one cooperative
+        // thread shared with other suites, where resuming this task after the
+        // child exits has taken over 2s. That makes the limit too coarse to
+        // tell SIGTERM from the SIGKILL fallback; "Timeout kills child process
+        // tree" covers the kill itself.
         // Exit code is not checked — Process.terminationStatus is unreliable for
         // signal-killed processes (WEXITSTATUS reads a different byte than the signal number).
-        #expect(elapsed < .seconds(2))
+        #expect(elapsed < .seconds(10))
     }
 
     @Test("Timeout kills child process tree")
