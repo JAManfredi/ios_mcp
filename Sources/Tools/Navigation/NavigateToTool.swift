@@ -19,7 +19,7 @@ func registerNavigateToTool(
 ) async {
     let manifest = ToolManifest(
         name: "navigate_to",
-        description: "Navigate to a target screen using the loaded navigation graph. Computes the shortest path from the current (or specified) node and executes each edge's actions in order: deeplinks open URLs via simctl, taps, swipes, and typing use axe. When several edges lead to the target, the one that best fits the supplied parameters is used; pass 'via' to pick one explicitly (see get_nav_graph include_edges=true for edge IDs, URLs, and parameters). Returns the sequence of actions taken. Requires a loaded nav graph (use load_nav_graph first).",
+        description: "Navigate to a target screen using the loaded navigation graph. Computes the shortest path from the current (or specified) node and executes each edge's actions in order: deeplinks open URLs via simctl, taps, swipes, and typing use axe. When several edges lead to the target, the one that best fits the supplied parameters is used; pass 'via' to pick one explicitly (see get_nav_graph include_edges=true for edge IDs, URLs, and parameters). Returns the sequence of actions taken. When the target node has a fingerprint, checks the screen afterwards and returns an error if it doesn't match the target; otherwise says arrival wasn't checked. Requires a loaded nav graph (use load_nav_graph first).",
         inputSchema: JSONSchema(
             properties: [
                 "target": .init(
@@ -217,6 +217,30 @@ func registerNavigateToTool(
 
         log.append("\nNavigation complete: \(actionCount) action(s) executed.")
 
+        switch await checkArrival(
+            at: target,
+            navGraph: navGraph,
+            udid: resolvedUDID,
+            executor: executor,
+            retryDelayMs: settleMs == 0 ? 0 : max(settleMs, 1000)
+        ) {
+        case .arrived(let confidence, let alsoMatching):
+            var line = "Arrived at '\(target)' (fingerprint match, \(confidence) confidence)."
+            if !alsoMatching.isEmpty {
+                line += " The screen also matches \(alsoMatching.joined(separator: ", ")), so these fingerprints don't fully tell the screens apart."
+            }
+            log.append(line)
+        case .notChecked(let reason):
+            log.append("Arrival not checked: \(reason)")
+        case .elsewhere(let description):
+            return .error(ToolError(
+                code: .commandFailed,
+                message: "Navigation ran, but the screen doesn't match '\(target)': \(description).",
+                details: log.joined(separator: "\n")
+                    + "\n\nThe edge may lead somewhere else, need a precondition (such as being logged in), or the screen may still be loading. Check with screenshot or where_am_i."
+            ))
+        }
+
         return .success(ToolResult(
             content: log.joined(separator: "\n"),
             nextSteps: [
@@ -231,6 +255,53 @@ func registerNavigateToTool(
             ]
         ))
     }
+}
+
+// MARK: - Arrival Check
+
+private enum ArrivalCheck {
+    case arrived(confidence: String, alsoMatching: [String])
+    case notChecked(String)
+    case elsewhere(String)
+}
+
+/// Compare the screen with the target's fingerprint, checking once more after
+/// `retryDelayMs` in case the screen was still loading.
+private func checkArrival(
+    at target: String,
+    navGraph: NavGraphStore,
+    udid: String,
+    executor: any CommandExecuting,
+    retryDelayMs: Int
+) async -> ArrivalCheck {
+    guard let fingerprint = await navGraph.getNode(target)?.fingerprint,
+          fingerprint.accessibilityId != nil || fingerprint.dominantStaticText != nil else {
+        return .notChecked("'\(target)' has no fingerprint. Tag it with tag_screen to enable this check.")
+    }
+
+    var matches: [NavGraphStore.FingerprintMatch] = []
+    for attempt in 0..<2 {
+        if attempt > 0, retryDelayMs > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(retryDelayMs) * 1_000_000)
+        }
+        let snapshot: ScreenSnapshot
+        switch await captureScreenSnapshot(udid: udid, executor: executor) {
+        case .success(let captured): snapshot = captured
+        case .failure(let error): return .notChecked("couldn't read the screen (\(error.message)).")
+        }
+        matches = await navGraph.fingerprintMatches(
+            accessibilityIds: snapshot.accessibilityIdSet,
+            staticTexts: snapshot.staticTexts
+        )
+        if let match = matches.first(where: { $0.nodeId == target }) {
+            let others = matches.filter { $0.nodeId != target }.map { "\($0.nodeId) (\($0.confidence))" }
+            return .arrived(confidence: match.confidence, alsoMatching: others)
+        }
+    }
+
+    guard !matches.isEmpty else { return .elsewhere("it matches no node's fingerprint") }
+    let names = matches.map { "\($0.nodeId) (\($0.confidence))" }
+    return .elsewhere("it matches \(names.joined(separator: ", ")) instead")
 }
 
 // MARK: - Action Execution

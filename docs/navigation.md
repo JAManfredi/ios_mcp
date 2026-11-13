@@ -22,7 +22,7 @@ Without a graph, all navigation tools gracefully fall back to guidance pointing 
 |------|-------------|
 | `load_nav_graph` | Load a graph from a JSON file. Auto-searches common locations if no path is given. |
 | `get_nav_graph` | View the loaded graph's nodes, edges, and commands. Supports filtering by node ID. |
-| `navigate_to` | Compute the shortest path between two nodes and execute each edge's actions. |
+| `navigate_to` | Compute the shortest path between two nodes, execute each edge's actions, then check the screen against the target's fingerprint. |
 | `where_am_i` | Capture the accessibility tree and match it against node fingerprints. |
 | `tag_screen` | Capture a live fingerprint and associate it with a graph node. Protects existing fingerprints by default. |
 | `save_nav_graph` | Persist the in-memory graph (including any new fingerprints) to disk. |
@@ -30,10 +30,18 @@ Without a graph, all navigation tools gracefully fall back to guidance pointing 
 ### Workflow
 
 ```
-load_nav_graph → get_nav_graph → where_am_i → navigate_to → where_am_i
+load_nav_graph → get_nav_graph → where_am_i → navigate_to
 ```
 
-> Load the graph, inspect its structure, identify where you are, navigate to a target, verify arrival.
+> Load the graph, inspect its structure, identify where you are, and navigate to a target.
+
+### Arrival check
+
+After running a path, `navigate_to` compares the screen with the target node's fingerprint:
+
+- **Match:** the response ends with `Arrived at '<target>'` and the match confidence. If other nodes match too, it names them.
+- **No match:** it checks once more after a short wait (in case the screen was still loading), then returns an error naming what the screen matched instead. Common causes are an edge that leads somewhere else, a missing precondition such as login, or a slow screen.
+- **No fingerprint on the target:** the response says `Arrival not checked`. Use `tag_screen` on that screen, or confirm with `screenshot`.
 
 ---
 

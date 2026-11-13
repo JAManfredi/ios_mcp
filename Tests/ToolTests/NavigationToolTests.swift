@@ -558,6 +558,46 @@ struct NavigateToEdgeSelectionTests {
         #expect(result.content.contains("Preconditions (not checked): logged_in"))
     }
 
+    @Test("Confirms arrival when the target's fingerprint is on screen", .enabled(if: axeAvailable))
+    func confirmsArrival() async throws {
+        let graph = try writeTestGraph(
+            nodes: [
+                "home": ["id": "home", "name": "Home", "isTabRoot": true],
+                "search": ["id": "search", "name": "Search", "isTabRoot": false, "fingerprint": ["accessibilityId": "SearchScreenRoot"]],
+            ],
+            edges: [["from": "*", "to": "search", "actions": [["type": "deeplink", "url": "app://search"]]]]
+        )
+        let (response, _) = try await navigate(["target": .string("search"), "from": .string("home")], graph: graph)
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        #expect(result.content.contains("Arrived at 'search' (fingerprint match, high confidence)."))
+    }
+
+    @Test("Fails when the screen matches a different node", .enabled(if: axeAvailable))
+    func reportsWrongDestination() async throws {
+        let graph = try writeTestGraph(
+            nodes: [
+                "home": ["id": "home", "name": "Home", "isTabRoot": true, "fingerprint": ["accessibilityId": "SearchScreenRoot"]],
+                "pools": ["id": "pools", "name": "Pools", "isTabRoot": false, "fingerprint": ["accessibilityId": "PoolsRoot"]],
+            ],
+            edges: [["from": "*", "to": "pools", "actions": [["type": "deeplink", "url": "app://pools"]]]]
+        )
+        let (response, _) = try await navigate(["target": .string("pools"), "from": .string("home")], graph: graph)
+
+        guard case .error(let error) = response else { Issue.record("Expected error"); return }
+        #expect(error.code == .commandFailed)
+        #expect(error.message.contains("doesn't match 'pools': it matches home (high) instead"))
+        #expect(error.details?.contains("Opened app://pools") == true)
+    }
+
+    @Test("Says arrival wasn't checked when the target has no fingerprint")
+    func arrivalNotChecked() async throws {
+        let (response, _) = try await navigate(["target": .string("search"), "from": .string("home"), "via": .string("search")], graph: try searchGraph())
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        #expect(result.content.contains("Arrival not checked: 'search' has no fingerprint."))
+    }
+
     @Test("'via' selects an edge by ID")
     func viaSelectsEdge() async throws {
         let (response, calls) = try await navigate([
