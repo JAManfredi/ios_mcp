@@ -18,7 +18,7 @@ func registerTagScreenTool(
 ) async {
     let manifest = ToolManifest(
         name: "tag_screen",
-        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id. Prefer passing accessibility_id with an identifier unique to this screen (e.g. the screen's root view). Otherwise the first ID not used by another node's fingerprint and not seen on another screen tagged this session is chosen; tag several screens in one session so shared UI (tab bars, navigation bars, banners) can be told apart. The response lists screen-specific candidates and warns when another node's fingerprint also matches this screen. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
+        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id. Prefer passing accessibility_id with an identifier unique to this screen (e.g. the screen's root view); when screens share a component such as a page title, pass its ID with accessibility_label set to this screen's title. Otherwise the first ID not used by another node's fingerprint and not seen on another screen tagged this session is chosen; tag several screens in one session so shared UI (tab bars, navigation bars, banners) can be told apart. The response lists screen-specific candidates and warns when another node's fingerprint also matches this screen. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
         inputSchema: JSONSchema(
             properties: [
                 "node_id": .init(
@@ -32,6 +32,10 @@ func registerTagScreenTool(
                 "accessibility_id": .init(
                     type: "string",
                     description: "Accessibility identifier unique to this screen. Must be present on the current screen."
+                ),
+                "accessibility_label": .init(
+                    type: "string",
+                    description: "Label the accessibility_id element must have for a match. Use it when screens share a component, such as a page title with the same ID on every tab but different text. Requires accessibility_id, and must be that element's current label."
                 ),
                 "static_text": .init(
                     type: "string",
@@ -104,6 +108,8 @@ func registerTagScreenTool(
         if case .string(let id) = args["accessibility_id"], !id.isEmpty { requestedId = id }
         var requestedText: String?
         if case .string(let text) = args["static_text"], !text.isEmpty { requestedText = text }
+        var requestedLabel: String?
+        if case .string(let label) = args["accessibility_label"], !label.isEmpty { requestedLabel = label }
 
         if let requestedId, !snapshot.accessibilityIdSet.contains(requestedId) {
             return .error(ToolError(
@@ -111,6 +117,22 @@ func registerTagScreenTool(
                 message: "accessibility_id '\(requestedId)' is not on the current screen.",
                 details: "IDs on screen: \(snapshot.accessibilityIds.prefix(30).joined(separator: ", "))"
             ))
+        }
+        if let requestedLabel {
+            guard let requestedId else {
+                return .error(ToolError(
+                    code: .invalidInput,
+                    message: "accessibility_label requires accessibility_id."
+                ))
+            }
+            let labels = snapshot.labelsByAccessibilityId[requestedId] ?? []
+            guard labels.contains(requestedLabel) else {
+                return .error(ToolError(
+                    code: .invalidInput,
+                    message: "No element with accessibility_id '\(requestedId)' has the label '\(requestedLabel)'.",
+                    details: labels.isEmpty ? "That element has no label." : "Its labels: \(labels.sorted().joined(separator: ", "))"
+                ))
+            }
         }
         if let requestedText, !snapshot.staticTexts.contains(requestedText) {
             return .error(ToolError(
@@ -142,6 +164,7 @@ func registerTagScreenTool(
 
         let fingerprint = NavGraphStore.NodeFingerprint(
             accessibilityId: rootId,
+            accessibilityLabel: requestedLabel,
             hierarchyHash: nil,
             dominantStaticText: dominantText
         )
@@ -166,12 +189,16 @@ func registerTagScreenTool(
         )
         let conflicts = await navGraph.fingerprintMatches(
             accessibilityIds: snapshot.accessibilityIdSet,
-            staticTexts: snapshot.staticTexts
+            staticTexts: snapshot.staticTexts,
+            labelsByAccessibilityId: snapshot.labelsByAccessibilityId
         ).filter { $0.nodeId != nodeId }
 
         var output = "Fingerprint captured for node '\(nodeId)':\n"
         if let id = rootId {
             output += "  accessibilityId: \(id)\(requestedId == nil ? " (auto-selected)" : "")\n"
+        }
+        if let label = requestedLabel {
+            output += "  accessibilityLabel: \(label)\n"
         }
         if let text = dominantText {
             output += "  dominantStaticText: \(text)\(requestedText == nil ? " (auto-selected)" : "")\n"

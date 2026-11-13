@@ -291,7 +291,8 @@ private func checkArrival(
         }
         matches = await navGraph.fingerprintMatches(
             accessibilityIds: snapshot.accessibilityIdSet,
-            staticTexts: snapshot.staticTexts
+            staticTexts: snapshot.staticTexts,
+            labelsByAccessibilityId: snapshot.labelsByAccessibilityId
         )
         if let match = matches.first(where: { $0.nodeId == target }) {
             let others = matches.filter { $0.nodeId != target }.map { "\($0.nodeId) (\($0.confidence))" }
@@ -579,7 +580,8 @@ private func detectCurrentNode(
     guard case .success(let snapshot) = await captureScreenSnapshot(udid: udid, executor: executor) else { return nil }
     let match = await navGraph.matchFingerprint(
         accessibilityIds: snapshot.accessibilityIdSet,
-        staticTexts: snapshot.staticTexts
+        staticTexts: snapshot.staticTexts,
+        labelsByAccessibilityId: snapshot.labelsByAccessibilityId
     )
     return match?.nodeId
 }

@@ -98,10 +98,11 @@ Fingerprints enable `where_am_i` and auto-detection in `navigate_to`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `accessibilityId` | string | A unique accessibility identifier present on this screen (high confidence match) |
+| `accessibilityLabel` | string | Label the `accessibilityId` element must have. Use it when screens share a component, such as a page title whose ID is the same on every tab but whose text differs. |
 | `hierarchyHash` | string | Reserved for future hierarchy-based matching |
-| `dominantStaticText` | string | Static text that appears on the screen (medium confidence match). Read from the element's `AXLabel`. |
+| `dominantStaticText` | string | Static text that appears on the screen (medium confidence match). Read from the `AXLabel` of static text and heading elements, so navigation bar titles count. |
 
-A fingerprint with an `accessibilityId` matches only when that ID is on screen. It is a high-confidence match if its `dominantStaticText` is also on screen (or it has none), and medium if the text is missing. A fingerprint with only `dominantStaticText` matches at medium confidence.
+A fingerprint with an `accessibilityId` matches only when that ID is on screen and, if the fingerprint has an `accessibilityLabel`, an element with that ID has that label. It is a high-confidence match if its `dominantStaticText` is also on screen (or it has none), and medium if the text is missing. A fingerprint with only `dominantStaticText` matches at medium confidence.
 
 #### SubTab
 
@@ -278,6 +279,7 @@ A fingerprint only helps if it is unique to its screen. Shared UI such as the ta
 - Pass `accessibility_id` (and optionally `static_text`) to `tag_screen` with values specific to the screen, such as the screen's root view identifier. Both must be present on the current screen.
 - Without `accessibility_id`, `tag_screen` picks the first ID on screen that no other node's fingerprint uses and that no other screen tagged in this session showed. Without `static_text`, it picks the first text that passes the same test. Auto-selected values are marked `(auto-selected)`, and the response lists other screen-specific candidates. If every ID is shared, the fingerprint uses text only.
 - Tag several screens in one session (for example, each tab root) before relying on auto-selection. The first screen tagged has nothing to compare against, so its choice may be shared UI; the response says so.
+- When screens share a component with the same ID, such as a page title, pass that ID as `accessibility_id` and the screen's title as `accessibility_label`. The fingerprint then matches only when the element shows that title, even if the same words appear elsewhere on another screen.
 - `tag_screen` warns when another node's fingerprint also matches the current screen. Re-tag that node on its own screen with `force=true` and an element this screen doesn't have.
 - When several nodes match equally well, `where_am_i` reports them all as ambiguous instead of guessing, and `navigate_to` asks for an explicit `from`.
 

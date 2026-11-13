@@ -73,7 +73,8 @@ func registerWhereAmITool(
 
         let matches = await navGraph.fingerprintMatches(
             accessibilityIds: accessibilityIds,
-            staticTexts: staticTexts
+            staticTexts: staticTexts,
+            labelsByAccessibilityId: snapshot.labelsByAccessibilityId
         )
         let topMatches = matches.filter { $0.confidence == matches.first?.confidence }
 

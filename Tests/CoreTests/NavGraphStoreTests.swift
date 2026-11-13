@@ -511,4 +511,25 @@ struct NavGraphStoreTests {
         #expect(claimed.accessibilityIds == ["TabBar"])
         #expect(claimed.staticTexts == ["Welcome"])
     }
+
+    @Test("A labelled fingerprint matches only when its ID's element has that label")
+    func labelScopedFingerprint() async throws {
+        let path = try writeTestGraph(nodes: [
+            "live": ["id": "live", "name": "Live", "isTabRoot": true,
+                     "fingerprint": ["accessibilityId": "page-title", "accessibilityLabel": "Live"]],
+            "search": ["id": "search", "name": "Search", "isTabRoot": true,
+                       "fingerprint": ["accessibilityId": "page-title", "accessibilityLabel": "Search"]],
+        ])
+        let store = NavGraphStore()
+        try await store.load(from: path)
+
+        // The Search tab shows "Live" badges, but its title element is labelled "Search".
+        let matches = await store.fingerprintMatches(
+            accessibilityIds: ["page-title"],
+            staticTexts: ["Search", "Live"],
+            labelsByAccessibilityId: ["page-title": ["Search"]]
+        )
+        #expect(matches == [.init(nodeId: "search", confidence: "high")])
+        #expect(await store.fingerprintMatches(accessibilityIds: ["page-title"], staticTexts: []).isEmpty)
+    }
 }

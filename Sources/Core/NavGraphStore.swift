@@ -69,15 +69,21 @@ public actor NavGraphStore {
 
     public struct NodeFingerprint: Codable, Sendable {
         public let accessibilityId: String?
+        /// Label the `accessibilityId` element must have. Use it when screens
+        /// share a component, such as a title whose ID is the same on every
+        /// tab but whose text differs.
+        public let accessibilityLabel: String?
         public let hierarchyHash: String?
         public let dominantStaticText: String?
 
         public init(
             accessibilityId: String? = nil,
+            accessibilityLabel: String? = nil,
             hierarchyHash: String? = nil,
             dominantStaticText: String? = nil
         ) {
             self.accessibilityId = accessibilityId
+            self.accessibilityLabel = accessibilityLabel
             self.hierarchyHash = hierarchyHash
             self.dominantStaticText = dominantStaticText
         }
@@ -359,15 +365,18 @@ public actor NavGraphStore {
 
     /// Every node whose fingerprint matches the snapshot, strongest first.
     ///
-    /// A fingerprint's accessibility ID must be on screen. If its static text
-    /// is on screen too (or it has none), the match is high confidence; if the
-    /// text is missing, medium. A text-only fingerprint matches at medium.
+    /// A fingerprint's accessibility ID must be on screen, and when the
+    /// fingerprint has an `accessibilityLabel`, an element with that ID must
+    /// carry that label (`labelsByAccessibilityId`). If its static text is on
+    /// screen too (or it has none), the match is high confidence; if the text
+    /// is missing, medium. A text-only fingerprint matches at medium.
     /// Within a level, node IDs are sorted so results are stable. More than
     /// one match at the top level means the fingerprints don't distinguish
     /// the screens (often because they captured shared chrome).
     public func fingerprintMatches(
         accessibilityIds: Set<String>,
-        staticTexts: [String]
+        staticTexts: [String],
+        labelsByAccessibilityId: [String: Set<String>] = [:]
     ) -> [FingerprintMatch] {
         guard let graph else { return [] }
         let texts = Set(staticTexts)
@@ -379,6 +388,8 @@ public actor NavGraphStore {
             let textMatches = fingerprint.dominantStaticText.map { texts.contains($0) }
             if let id = fingerprint.accessibilityId {
                 guard accessibilityIds.contains(id) else { continue }
+                if let label = fingerprint.accessibilityLabel,
+                   labelsByAccessibilityId[id]?.contains(label) != true { continue }
                 if textMatches == false { medium.append(nodeId) } else { high.append(nodeId) }
             } else if textMatches == true {
                 medium.append(nodeId)
@@ -393,9 +404,14 @@ public actor NavGraphStore {
     /// confidence level is ambiguous (several nodes match equally well).
     public func matchFingerprint(
         accessibilityIds: Set<String>,
-        staticTexts: [String]
+        staticTexts: [String],
+        labelsByAccessibilityId: [String: Set<String>] = [:]
     ) -> (nodeId: String, confidence: String)? {
-        let matches = fingerprintMatches(accessibilityIds: accessibilityIds, staticTexts: staticTexts)
+        let matches = fingerprintMatches(
+            accessibilityIds: accessibilityIds,
+            staticTexts: staticTexts,
+            labelsByAccessibilityId: labelsByAccessibilityId
+        )
         guard let first = matches.first else { return nil }
         let tied = matches.filter { $0.confidence == first.confidence }
         guard tied.count == 1 else { return nil }

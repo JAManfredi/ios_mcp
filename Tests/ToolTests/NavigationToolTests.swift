@@ -513,6 +513,20 @@ struct ScreenSnapshotTests {
         #expect(snapshot.uniqueStaticTexts == ["Search", "Trending"])
     }
 
+    @Test("Reads headings as text and records each ID's labels")
+    func headingsAndLabels() throws {
+        let tree = #"""
+        [{"role": "AXApplication", "children": [
+          {"role": "AXHeading", "AXUniqueId": "navbar-title", "AXLabel": "Pools", "children": []},
+          {"role": "AXButton", "AXUniqueId": "navbar-title", "AXLabel": "Back to Pools", "children": []},
+          {"role": "AXGroup", "AXUniqueId": "Root", "children": []}
+        ]}]
+        """#
+        let snapshot = try #require(ScreenSnapshot.parse(tree))
+        #expect(snapshot.staticTexts == ["Pools"])
+        #expect(snapshot.labelsByAccessibilityId == ["navbar-title": ["Pools", "Back to Pools"]])
+    }
+
     @Test("Rejects non-JSON output")
     func rejectsGarbage() {
         #expect(ScreenSnapshot.parse("Error: no simulator") == nil)
@@ -810,6 +824,27 @@ struct FingerprintToolTests {
         #expect(result.content.contains("uses text only"))
         // home's ID is on screen but its text isn't, so it is only a medium conflict.
         #expect(result.content.contains("- home (medium)"))
+    }
+
+    @Test("Records a label-scoped fingerprint for a shared title component")
+    func tagWithLabel() async throws {
+        let tree = #"[{"role": "AXApplication", "children": [{"role": "AXStaticText", "AXUniqueId": "page-title", "AXLabel": "Live", "children": []}]}]"#
+        let (registry, navGraph) = try await tagRegistry(screen: TreeBox(tree), nodes: [
+            "live": ["id": "live", "name": "Live", "isTabRoot": true],
+        ])
+
+        let wrong = try await registry.callTool(name: "tag_screen", arguments: [
+            "node_id": .string("live"), "accessibility_id": .string("page-title"), "accessibility_label": .string("Search"),
+        ])
+        guard case .error(let error) = wrong else { Issue.record("Expected error: \(wrong)"); return }
+        #expect(error.details == "Its labels: Live")
+
+        let response = try await registry.callTool(name: "tag_screen", arguments: [
+            "node_id": .string("live"), "accessibility_id": .string("page-title"), "accessibility_label": .string("Live"),
+        ])
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        #expect(result.content.contains("accessibilityLabel: Live"))
+        #expect(await navGraph.getNode("live")?.fingerprint?.accessibilityLabel == "Live")
     }
 
     private func tagRegistry(screen: TreeBox, nodes: [String: [String: Any]]) async throws -> (ToolRegistry, NavGraphStore) {
