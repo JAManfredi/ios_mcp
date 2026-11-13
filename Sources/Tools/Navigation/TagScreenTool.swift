@@ -18,7 +18,7 @@ func registerTagScreenTool(
 ) async {
     let manifest = ToolManifest(
         name: "tag_screen",
-        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id. Prefer passing accessibility_id with an identifier unique to this screen (e.g. the screen's root view); otherwise the first ID not already used by another node is chosen, which may be shared UI such as a tab bar. The response lists the IDs found so you can re-tag with a better one. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
+        description: "Capture the current screen's accessibility fingerprint and associate it with a node in the loaded navigation graph. Navigate to a screen first, then call this tool with the node_id. Prefer passing accessibility_id with an identifier unique to this screen (e.g. the screen's root view). Otherwise the first ID not used by another node's fingerprint and not seen on another screen tagged this session is chosen; tag several screens in one session so shared UI (tab bars, navigation bars, banners) can be told apart. The response lists screen-specific candidates and warns when another node's fingerprint also matches this screen. By default, does NOT overwrite existing fingerprints — use force=true to replace them. Use save_nav_graph to persist changes to disk.",
         inputSchema: JSONSchema(
             properties: [
                 "node_id": .init(
@@ -35,7 +35,7 @@ func registerTagScreenTool(
                 ),
                 "static_text": .init(
                     type: "string",
-                    description: "Static text that identifies this screen (medium-confidence fallback). Must be visible on the current screen. Defaults to the most frequent static text."
+                    description: "Static text that identifies this screen (medium-confidence fallback). Must be visible on the current screen. Defaults to the first text not seen on other screens tagged this session."
                 ),
                 "udid": .init(
                     type: "string",
@@ -120,17 +120,23 @@ func registerTagScreenTool(
             ))
         }
 
-        // Without an explicit ID, skip IDs other nodes already use: those are
-        // shared UI and would make where_am_i ambiguous.
-        let claimed = await navGraph.fingerprintIdsClaimed(excluding: nodeId)
-        let rootId = requestedId ?? snapshot.accessibilityIds.first { !claimed.contains($0) }
-        let dominantText = requestedText ?? snapshot.dominantStaticText
+        // Without explicit values, skip elements other nodes' fingerprints use
+        // or that other tagged screens showed: those are shared UI and would
+        // make where_am_i ambiguous or wrong.
+        let claimed = await navGraph.fingerprintsClaimed(excluding: nodeId)
+        let elsewhere = await navGraph.elementsObservedOnOtherScreens(excluding: nodeId)
+        let sharedIds = claimed.accessibilityIds.union(elsewhere.accessibilityIds)
+        let sharedTexts = claimed.staticTexts.union(elsewhere.staticTexts)
+        let rootId = requestedId ?? snapshot.accessibilityIds.first { !sharedIds.contains($0) }
+        let dominantText = requestedText ?? snapshot.uniqueStaticTexts.first { !sharedTexts.contains($0) }
 
         guard rootId != nil || dominantText != nil else {
             return .error(ToolError(
                 code: .invalidInput,
                 message: "Could not extract any fingerprint data from the current screen. The screen may lack accessibility identifiers and static text.",
-                details: "Accessibility IDs found: \(snapshot.accessibilityIds.count) (\(claimed.count) already used by other nodes), Static texts found: \(snapshot.staticTexts.count)"
+                details: snapshot.accessibilityIds.isEmpty && snapshot.staticTexts.isEmpty
+                    ? "The accessibility tree has no identifiers or static text."
+                    : "Every accessibility ID (\(snapshot.accessibilityIds.count)) and static text (\(snapshot.uniqueStaticTexts.count)) on this screen is used by another node's fingerprint or was seen on another tagged screen. Pass accessibility_id or static_text explicitly."
             ))
         }
 
@@ -153,6 +159,16 @@ func registerTagScreenTool(
             ))
         }
 
+        await navGraph.recordObservedScreen(
+            nodeId: nodeId,
+            accessibilityIds: snapshot.accessibilityIdSet,
+            staticTexts: Set(snapshot.staticTexts)
+        )
+        let conflicts = await navGraph.fingerprintMatches(
+            accessibilityIds: snapshot.accessibilityIdSet,
+            staticTexts: snapshot.staticTexts
+        ).filter { $0.nodeId != nodeId }
+
         var output = "Fingerprint captured for node '\(nodeId)':\n"
         if let id = rootId {
             output += "  accessibilityId: \(id)\(requestedId == nil ? " (auto-selected)" : "")\n"
@@ -160,11 +176,26 @@ func registerTagScreenTool(
         if let text = dominantText {
             output += "  dominantStaticText: \(text)\(requestedText == nil ? " (auto-selected)" : "")\n"
         }
+        if rootId == nil {
+            output += "  No accessibility ID on this screen is screen-specific, so the fingerprint uses text only (medium confidence).\n"
+        }
         if requestedId == nil {
-            let others = snapshot.accessibilityIds.filter { $0 != rootId }.prefix(20)
-            if !others.isEmpty {
-                output += "\nOther IDs on this screen: \(others.joined(separator: ", "))\n"
-                output += "If the auto-selected ID also appears on other screens, re-run with force=true and accessibility_id set to a screen-specific one.\n"
+            let candidates = snapshot.accessibilityIds.filter { $0 != rootId && !sharedIds.contains($0) }
+            let sharedCount = snapshot.accessibilityIds.filter { sharedIds.contains($0) }.count
+            if !candidates.isEmpty {
+                output += "\nOther screen-specific candidates: \(candidates.prefix(20).joined(separator: ", "))\n"
+            }
+            if sharedCount > 0 {
+                output += "Skipped \(sharedCount) ID(s) used by other fingerprints or seen on other tagged screens.\n"
+            }
+            if elsewhere.accessibilityIds.isEmpty {
+                output += "No other screens have been tagged this session, so shared UI such as tab bars can't be ruled out yet. Check this choice after tagging more screens.\n"
+            }
+        }
+        if !conflicts.isEmpty {
+            output += "\nWarning: these nodes' fingerprints also match this screen, so where_am_i can confuse them with '\(nodeId)':\n"
+            for conflict in conflicts {
+                output += "  - \(conflict.nodeId) (\(conflict.confidence)). Re-tag it on its own screen with force=true and an ID or text this screen doesn't have.\n"
             }
         }
         output += "\nThis fingerprint is in memory only. Use save_nav_graph to persist it to disk."

@@ -256,6 +256,42 @@ struct NavGraphStoreTests {
         #expect(match?.confidence == "medium")
     }
 
+    @Test("An ID match with missing fingerprint text is only medium confidence")
+    func idMatchWithoutTextIsMedium() async throws {
+        let path = try writeTestGraph(nodes: [
+            "league": [
+                "id": "league", "name": "League", "isTabRoot": false,
+                "fingerprint": ["accessibilityId": "BackButton", "dominantStaticText": "Standings"],
+            ],
+        ])
+        let store = NavGraphStore()
+        try await store.load(from: path)
+
+        let both = await store.matchFingerprint(accessibilityIds: ["BackButton"], staticTexts: ["Standings"])
+        #expect(both?.confidence == "high")
+        let idOnly = await store.matchFingerprint(accessibilityIds: ["BackButton"], staticTexts: ["Trending"])
+        #expect(idOnly?.confidence == "medium")
+        // The fingerprint's ID is required: matching text alone isn't enough.
+        let textOnly = await store.matchFingerprint(accessibilityIds: ["SearchRoot"], staticTexts: ["Standings"])
+        #expect(textOnly == nil)
+    }
+
+    @Test("Observed screens are reported for other nodes and cleared on load")
+    func observedScreens() async throws {
+        let path = try writeTestGraph()
+        let store = NavGraphStore()
+        try await store.load(from: path)
+        await store.recordObservedScreen(nodeId: "home", accessibilityIds: ["TabBar", "HomeRoot"], staticTexts: ["Banner"])
+        await store.recordObservedScreen(nodeId: "search", accessibilityIds: ["TabBar", "SearchRoot"], staticTexts: ["Trending"])
+
+        let others = await store.elementsObservedOnOtherScreens(excluding: "search")
+        #expect(others.accessibilityIds == ["TabBar", "HomeRoot"])
+        #expect(others.staticTexts == ["Banner"])
+
+        try await store.load(from: path)
+        #expect(await store.elementsObservedOnOtherScreens(excluding: "search").accessibilityIds.isEmpty)
+    }
+
     @Test("Returns nil when no match")
     func noFingerprintMatch() async throws {
         let path = try writeTestGraph()
@@ -471,7 +507,8 @@ struct NavGraphStoreTests {
         let single = await store.matchFingerprint(accessibilityIds: ["TabBar"], staticTexts: [])
         #expect(single == nil)
 
-        let claimed = await store.fingerprintIdsClaimed(excluding: "league")
-        #expect(claimed == ["TabBar"])
+        let claimed = await store.fingerprintsClaimed(excluding: "league")
+        #expect(claimed.accessibilityIds == ["TabBar"])
+        #expect(claimed.staticTexts == ["Welcome"])
     }
 }

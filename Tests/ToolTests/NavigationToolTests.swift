@@ -269,7 +269,7 @@ struct NavigateToToolTests {
         await session.set(.simulatorUDID, value: "AAAA-1111")
         let capture = ArgCapture()
         let executor = MockCommandExecutor { _, args in
-            await capture.capture(args)
+            if args.contains("openurl") { await capture.capture(args) }
             return CommandResult(stdout: "", stderr: "", exitCode: 0)
         }
         let navGraph = NavGraphStore()
@@ -474,6 +474,25 @@ private let axeAvailable: Bool = {
     return false
 }()
 
+private extension Array where Element == [String] {
+    /// The `simctl openurl` call among recorded commands.
+    var openURLCall: [String]? { first { $0.contains("openurl") } }
+}
+
+/// The accessibility tree a mock `axe describe-ui` returns; tests swap it to change screens.
+private actor TreeBox {
+    private(set) var tree: String
+    init(_ tree: String) { self.tree = tree }
+    func set(_ tree: String) { self.tree = tree }
+}
+
+/// An AXe tree with the given identified groups and static texts.
+private func axeTree(ids: [String], texts: [String]) -> String {
+    let groups = ids.map { #"{"role": "AXGroup", "AXUniqueId": "\#($0)", "children": []}"# }
+    let labels = texts.map { #"{"role": "AXStaticText", "AXLabel": "\#($0)", "children": []}"# }
+    return #"[{"role": "AXApplication", "children": ["# + (groups + labels).joined(separator: ", ") + "]}]"
+}
+
 /// Executor that answers `describe-ui` with `tree` and records every call.
 private func recordingExecutor(tree: String = axeTreeJSON, calls: AllCallCapture) -> MockCommandExecutor {
     MockCommandExecutor { _, args in
@@ -491,16 +510,7 @@ struct ScreenSnapshotTests {
         let snapshot = try #require(ScreenSnapshot.parse(axeTreeJSON))
         #expect(snapshot.accessibilityIds == ["TabBar", "SearchScreenRoot"])
         #expect(snapshot.staticTexts == ["Search", "Trending", "Trending"])
-        #expect(snapshot.dominantStaticText == "Trending")
-    }
-
-    @Test("Dominant text ties go to the first text seen")
-    func dominantTextTieBreak() throws {
-        let json = """
-        [{"role": "AXStaticText", "AXLabel": "B", "children": []},
-         {"role": "AXStaticText", "AXLabel": "A", "children": []}]
-        """
-        #expect(ScreenSnapshot.parse(json)?.dominantStaticText == "B")
+        #expect(snapshot.uniqueStaticTexts == ["Search", "Trending"])
     }
 
     @Test("Rejects non-JSON output")
@@ -544,7 +554,7 @@ struct NavigateToEdgeSelectionTests {
         ], graph: try searchGraph())
 
         guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
-        #expect(calls.last?.contains("app://search/summer%20sale%2Fdeals") == true)
+        #expect(calls.openURLCall?.contains("app://search/summer%20sale%2Fdeals") == true)
         #expect(result.content.contains("Preconditions (not checked): logged_in"))
     }
 
@@ -556,7 +566,7 @@ struct NavigateToEdgeSelectionTests {
         ], graph: try searchGraph())
 
         guard case .success = response else { Issue.record("Expected success: \(response)"); return }
-        #expect(calls.last?.contains("app://search") == true)
+        #expect(calls.openURLCall?.contains("app://search") == true)
     }
 
     @Test("'via' runs an in-tab edge even when already on the target node")
@@ -570,7 +580,7 @@ struct NavigateToEdgeSelectionTests {
             "target": .string("home"), "from": .string("home"), "via": .string("pools"),
         ], graph: graph)
         guard case .success = withVia else { Issue.record("Expected success: \(withVia)"); return }
-        #expect(viaCalls.last?.contains("app://pools") == true)
+        #expect(viaCalls.openURLCall?.contains("app://pools") == true)
 
         let (withoutVia, plainCalls) = try await navigate([
             "target": .string("home"), "from": .string("home"),
@@ -703,8 +713,77 @@ struct FingerprintToolTests {
         guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
         let fingerprint = await navGraph.getNode("search")?.fingerprint
         #expect(fingerprint?.accessibilityId == "SearchScreenRoot")
-        #expect(fingerprint?.dominantStaticText == "Trending")
+        #expect(fingerprint?.dominantStaticText == "Search")
         #expect(result.content.contains("(auto-selected)"))
+    }
+
+    @Test("tag_screen skips IDs and text seen on screens tagged earlier this session")
+    func tagSkipsElementsSeenElsewhere() async throws {
+        let screen = TreeBox(axeTree(ids: ["TabBar", "HomeRoot"], texts: ["Debug banner", "Featured"]))
+        let (registry, navGraph) = try await tagRegistry(screen: screen, nodes: [
+            "home": ["id": "home", "name": "Home", "isTabRoot": true],
+            "search": ["id": "search", "name": "Search", "isTabRoot": false],
+        ])
+
+        _ = try await registry.callTool(name: "tag_screen", arguments: ["node_id": .string("home"), "accessibility_id": .string("HomeRoot")])
+        await screen.set(axeTree(ids: ["TabBar", "SearchRoot"], texts: ["Debug banner", "Trending"]))
+        let response = try await registry.callTool(name: "tag_screen", arguments: ["node_id": .string("search")])
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        let fingerprint = await navGraph.getNode("search")?.fingerprint
+        #expect(fingerprint?.accessibilityId == "SearchRoot")
+        #expect(fingerprint?.dominantStaticText == "Trending")
+        #expect(result.content.contains("Skipped 1 ID(s)"))
+        #expect(!result.content.contains("Warning"))
+    }
+
+    @Test("tag_screen warns when another node's fingerprint matches this screen")
+    func tagWarnsAboutConflicts() async throws {
+        let screen = TreeBox(axeTree(ids: ["BackButton", "SearchRoot"], texts: ["Trending"]))
+        let (registry, _) = try await tagRegistry(screen: screen, nodes: [
+            "league": ["id": "league", "name": "League", "isTabRoot": false, "fingerprint": ["accessibilityId": "BackButton"]],
+            "search": ["id": "search", "name": "Search", "isTabRoot": false],
+        ])
+
+        let response = try await registry.callTool(name: "tag_screen", arguments: ["node_id": .string("search")])
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        #expect(result.content.contains("accessibilityId: SearchRoot (auto-selected)"))
+        #expect(result.content.contains("Warning"))
+        #expect(result.content.contains("- league (high)"))
+    }
+
+    @Test("tag_screen falls back to text when every ID is shared")
+    func tagTextOnlyWhenIdsShared() async throws {
+        let screen = TreeBox(axeTree(ids: ["TabBar"], texts: ["Trending"]))
+        let (registry, navGraph) = try await tagRegistry(screen: screen, nodes: [
+            "home": ["id": "home", "name": "Home", "isTabRoot": true, "fingerprint": ["accessibilityId": "TabBar", "dominantStaticText": "Featured"]],
+            "search": ["id": "search", "name": "Search", "isTabRoot": false],
+        ])
+
+        let response = try await registry.callTool(name: "tag_screen", arguments: ["node_id": .string("search")])
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        let fingerprint = await navGraph.getNode("search")?.fingerprint
+        #expect(fingerprint?.accessibilityId == nil)
+        #expect(fingerprint?.dominantStaticText == "Trending")
+        #expect(result.content.contains("uses text only"))
+        // home's ID is on screen but its text isn't, so it is only a medium conflict.
+        #expect(result.content.contains("- home (medium)"))
+    }
+
+    private func tagRegistry(screen: TreeBox, nodes: [String: [String: Any]]) async throws -> (ToolRegistry, NavGraphStore) {
+        let registry = ToolRegistry()
+        let session = SessionStore()
+        await session.set(.simulatorUDID, value: "AAAA-1111")
+        let navGraph = NavGraphStore()
+        try await navGraph.load(from: try writeTestGraph(nodes: nodes))
+        let executor = MockCommandExecutor { _, args in
+            let stdout = args.contains("describe-ui") ? await screen.tree : ""
+            return CommandResult(stdout: stdout, stderr: "", exitCode: 0)
+        }
+        await registerTagScreenTool(with: registry, session: session, executor: executor, navGraph: navGraph, validator: testValidator())
+        return (registry, navGraph)
     }
 
     @Test("tag_screen uses an explicit accessibility_id")

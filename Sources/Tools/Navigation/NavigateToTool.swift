@@ -14,7 +14,8 @@ func registerNavigateToTool(
     session: SessionStore,
     executor: any CommandExecuting,
     navGraph: NavGraphStore,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    urlOpener: SimulatorURLOpener = SimulatorURLOpener()
 ) async {
     let manifest = ToolManifest(
         name: "navigate_to",
@@ -190,7 +191,8 @@ func registerNavigateToTool(
                     params: params,
                     udid: resolvedUDID,
                     executor: executor,
-                    session: session
+                    session: session,
+                    urlOpener: urlOpener
                 )
 
                 switch result {
@@ -238,11 +240,12 @@ private func executeAction(
     params: [String: String],
     udid: String,
     executor: any CommandExecuting,
-    session: SessionStore
+    session: SessionStore,
+    urlOpener: SimulatorURLOpener
 ) async -> Result<String, ToolError> {
     switch action.type {
     case .deeplink:
-        return await executeDeeplink(action, params: params, udid: udid, executor: executor)
+        return await executeDeeplink(action, params: params, udid: udid, executor: executor, urlOpener: urlOpener)
     case .tap:
         return await executeTap(action, udid: udid, executor: executor)
     case .swipe:
@@ -258,7 +261,8 @@ private func executeDeeplink(
     _ action: NavGraphStore.EdgeAction,
     params: [String: String],
     udid: String,
-    executor: any CommandExecuting
+    executor: any CommandExecuting,
+    urlOpener: SimulatorURLOpener
 ) async -> Result<String, ToolError> {
     guard var url = action.url else {
         return .failure(ToolError(code: .invalidInput, message: "Deeplink action missing 'url' field."))
@@ -280,28 +284,8 @@ private func executeDeeplink(
         ))
     }
 
-    do {
-        let result = try await executor.execute(
-            executable: "/usr/bin/xcrun",
-            arguments: ["simctl", "openurl", udid, url],
-            timeout: 60,
-            environment: nil
-        )
-
-        guard result.succeeded else {
-            return .failure(ToolError(
-                code: .commandFailed,
-                message: "simctl openurl failed: \(result.stderr)"
-            ))
-        }
-
-        return .success("Opened \(url)")
-    } catch {
-        return .failure(ToolError(
-            code: .internalError,
-            message: "Failed to open deeplink: \(error.localizedDescription)"
-        ))
-    }
+    return await urlOpener.open(url, udid: udid, executor: executor)
+        .map { notes in (["Opened \(url)"] + notes).joined(separator: "\n    ") }
 }
 
 private func executeTap(

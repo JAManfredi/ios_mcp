@@ -16,7 +16,7 @@ import Foundation
 struct ScreenSnapshot: Equatable {
     /// Non-empty `AXUniqueId` values in tree order, without duplicates.
     let accessibilityIds: [String]
-    /// Text of static text elements in tree order (duplicates kept for frequency).
+    /// Text of static text elements in tree order, duplicates kept.
     let staticTexts: [String]
 
     var accessibilityIdSet: Set<String> { Set(accessibilityIds) }
@@ -25,19 +25,6 @@ struct ScreenSnapshot: Equatable {
     var uniqueStaticTexts: [String] {
         var seen = Set<String>()
         return staticTexts.filter { seen.insert($0).inserted }
-    }
-
-    /// The most frequent static text; ties go to the text seen first.
-    var dominantStaticText: String? {
-        var counts: [String: Int] = [:]
-        for text in staticTexts { counts[text, default: 0] += 1 }
-        var best: String?
-        var bestCount = 0
-        for text in staticTexts where counts[text, default: 0] > bestCount {
-            best = text
-            bestCount = counts[text, default: 0]
-        }
-        return best
     }
 
     /// Parse `axe describe-ui` JSON output. Returns nil if it isn't a JSON array of elements.

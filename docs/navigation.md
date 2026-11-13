@@ -93,7 +93,7 @@ Fingerprints enable `where_am_i` and auto-detection in `navigate_to`.
 | `hierarchyHash` | string | Reserved for future hierarchy-based matching |
 | `dominantStaticText` | string | Static text that appears on the screen (medium confidence match). Read from the element's `AXLabel`. |
 
-Matching priority: `accessibilityId` (high confidence) > `dominantStaticText` (medium confidence).
+A fingerprint with an `accessibilityId` matches only when that ID is on screen. It is a high-confidence match if its `dominantStaticText` is also on screen (or it has none), and medium if the text is missing. A fingerprint with only `dominantStaticText` matches at medium confidence.
 
 #### SubTab
 
@@ -144,7 +144,7 @@ Each action is a single UI operation. Edges can have multiple actions executed i
 
 | Type | Fields | Description |
 |------|--------|-------------|
-| `deeplink` | `url` | Open a URL via `simctl openurl`. Supports `{parameter}` template substitution. |
+| `deeplink` | `url` | Open a URL via `simctl openurl` (see [Deep link confirmation prompts](#deep-link-confirmation-prompts)). Supports `{parameter}` template substitution. |
 | `tap` | `target` | Tap an element by accessibility ID, label, or coordinates. |
 | `swipe` | `direction`, `target` | Swipe in a direction (up/down/left/right), optionally centered on a target. |
 | `type_text` | `text`, `target` | Type text with `axe type`. If `target` is set, it is tapped first to focus it. Supports `{parameter}` substitution. |
@@ -268,8 +268,12 @@ Use `force=true` only when you intentionally want to replace a fingerprint.
 A fingerprint only helps if it is unique to its screen. Shared UI such as the tab bar or navigation bar appears on many screens and makes matches ambiguous.
 
 - Pass `accessibility_id` (and optionally `static_text`) to `tag_screen` with values specific to the screen, such as the screen's root view identifier. Both must be present on the current screen.
-- Without `accessibility_id`, `tag_screen` picks the first ID on screen that no other node already uses, marks it `(auto-selected)`, and lists the other IDs it found so you can re-tag.
+- Without `accessibility_id`, `tag_screen` picks the first ID on screen that no other node's fingerprint uses and that no other screen tagged in this session showed. Without `static_text`, it picks the first text that passes the same test. Auto-selected values are marked `(auto-selected)`, and the response lists other screen-specific candidates. If every ID is shared, the fingerprint uses text only.
+- Tag several screens in one session (for example, each tab root) before relying on auto-selection. The first screen tagged has nothing to compare against, so its choice may be shared UI; the response says so.
+- `tag_screen` warns when another node's fingerprint also matches the current screen. Re-tag that node on its own screen with `force=true` and an element this screen doesn't have.
 - When several nodes match equally well, `where_am_i` reports them all as ambiguous instead of guessing, and `navigate_to` asks for an explicit `from`.
+
+Which elements each tagged screen showed is kept in memory only, for the session. Loading a graph clears it.
 
 `save_nav_graph` writes the original file contents with fingerprint changes applied, so fields the tools don't model are preserved. To leave the source graph untouched, pass a separate `path` argument.
 
@@ -278,3 +282,15 @@ A fingerprint only helps if it is unique to its screen. Shared UI such as the ta
 ## JSON Schema
 
 A formal JSON Schema for validation is available at [`Sources/Core/nav_graph_schema.json`](../Sources/Core/nav_graph_schema.json).
+
+## Deep link confirmation prompts
+
+The first time `simctl openurl` opens a custom scheme on a simulator, iOS can ask "Open in “App”?" and wait. AXe can't tap that system alert, and each later link queues another prompt behind it. Simulators that have already approved the scheme don't ask, so this shows up on new simulators, such as ones created on a CI host.
+
+To avoid it, `deep_link` and `navigate_to` do this the first time a session opens a custom scheme on a simulator:
+
+1. Find the user-installed app whose `Info.plist` declares the scheme. If exactly one does, record the approval iOS would store when someone taps Open: `simctl spawn <udid> defaults write com.apple.launchservices.schemeapproval "com.apple.CoreSimulator.CoreSimulatorBridge--><scheme>" -string <bundle id>`.
+2. Open the URL.
+3. Check the screen once for the prompt. If it appears, return an error instead of reporting that the link opened. If not, later links with that scheme skip steps 1 and 3.
+
+`http` and `https` links skip all of this. Prompt detection matches the English alert text. If several apps declare the scheme, no approval is recorded and the response says so.

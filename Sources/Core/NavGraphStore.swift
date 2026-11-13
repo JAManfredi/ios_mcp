@@ -173,6 +173,15 @@ public actor NavGraphStore {
     /// The file's original JSON, kept so `save` writes back fields this type
     /// doesn't model (generator metadata, custom keys) instead of dropping them.
     private var rawGraph: [String: Any]?
+    /// What each screen tagged this session showed, keyed by node ID. Lets
+    /// tag_screen tell shared UI (seen on several screens) from screen-specific
+    /// elements. Session-only: cleared when a graph is loaded or unloaded.
+    private var observedScreens: [String: ObservedScreen] = [:]
+
+    private struct ObservedScreen {
+        let accessibilityIds: Set<String>
+        let staticTexts: Set<String>
+    }
 
     public init() {}
 
@@ -186,6 +195,7 @@ public actor NavGraphStore {
         graph = decoded
         graphPath = path
         rawGraph = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        observedScreens = [:]
     }
 
     /// Whether a graph is currently loaded.
@@ -198,6 +208,7 @@ public actor NavGraphStore {
         graph = nil
         graphPath = nil
         rawGraph = nil
+        observedScreens = [:]
     }
 
     // MARK: - Queries
@@ -341,16 +352,19 @@ public actor NavGraphStore {
 
     public struct FingerprintMatch: Sendable, Equatable {
         public let nodeId: String
-        /// "high" for an accessibility ID match, "medium" for a static text match.
+        /// "high" when every fingerprint field matches and one is an
+        /// accessibility ID; "medium" when only static text supports the match.
         public let confidence: String
     }
 
     /// Every node whose fingerprint matches the snapshot, strongest first.
     ///
-    /// High-confidence (accessibility ID) matches come before medium (static
-    /// text) ones; within a level, node IDs are sorted so results are stable.
-    /// More than one match at the top level means the fingerprints don't
-    /// distinguish the screens (often because they captured shared chrome).
+    /// A fingerprint's accessibility ID must be on screen. If its static text
+    /// is on screen too (or it has none), the match is high confidence; if the
+    /// text is missing, medium. A text-only fingerprint matches at medium.
+    /// Within a level, node IDs are sorted so results are stable. More than
+    /// one match at the top level means the fingerprints don't distinguish
+    /// the screens (often because they captured shared chrome).
     public func fingerprintMatches(
         accessibilityIds: Set<String>,
         staticTexts: [String]
@@ -362,9 +376,11 @@ public actor NavGraphStore {
 
         for (nodeId, node) in graph.nodes {
             guard let fingerprint = node.fingerprint else { continue }
-            if let id = fingerprint.accessibilityId, accessibilityIds.contains(id) {
-                high.append(nodeId)
-            } else if let text = fingerprint.dominantStaticText, texts.contains(text) {
+            let textMatches = fingerprint.dominantStaticText.map { texts.contains($0) }
+            if let id = fingerprint.accessibilityId {
+                guard accessibilityIds.contains(id) else { continue }
+                if textMatches == false { medium.append(nodeId) } else { high.append(nodeId) }
+            } else if textMatches == true {
                 medium.append(nodeId)
             }
         }
@@ -386,14 +402,41 @@ public actor NavGraphStore {
         return (first.nodeId, first.confidence)
     }
 
-    /// Accessibility IDs already claimed by fingerprints on nodes other than `nodeId`.
-    public func fingerprintIdsClaimed(excluding nodeId: String) -> Set<String> {
-        guard let graph else { return [] }
+    /// Accessibility IDs and static texts used by fingerprints on nodes other than `nodeId`.
+    public func fingerprintsClaimed(
+        excluding nodeId: String
+    ) -> (accessibilityIds: Set<String>, staticTexts: Set<String>) {
+        guard let graph else { return ([], []) }
         var ids = Set<String>()
+        var texts = Set<String>()
         for (id, node) in graph.nodes where id != nodeId {
             if let fpId = node.fingerprint?.accessibilityId { ids.insert(fpId) }
+            if let text = node.fingerprint?.dominantStaticText { texts.insert(text) }
         }
-        return ids
+        return (ids, texts)
+    }
+
+    /// Record what a tagged screen showed, so later tags can avoid elements it shares.
+    public func recordObservedScreen(
+        nodeId: String,
+        accessibilityIds: Set<String>,
+        staticTexts: Set<String>
+    ) {
+        observedScreens[nodeId] = ObservedScreen(accessibilityIds: accessibilityIds, staticTexts: staticTexts)
+    }
+
+    /// Accessibility IDs and static texts seen this session on screens tagged
+    /// as nodes other than `nodeId`.
+    public func elementsObservedOnOtherScreens(
+        excluding nodeId: String
+    ) -> (accessibilityIds: Set<String>, staticTexts: Set<String>) {
+        var ids = Set<String>()
+        var texts = Set<String>()
+        for (id, screen) in observedScreens where id != nodeId {
+            ids.formUnion(screen.accessibilityIds)
+            texts.formUnion(screen.staticTexts)
+        }
+        return (ids, texts)
     }
 
     // MARK: - Mutation

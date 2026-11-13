@@ -14,11 +14,12 @@ func registerNavigationTools(
     session: SessionStore,
     executor: any CommandExecuting,
     navGraph: NavGraphStore,
-    validator: DefaultsValidator
+    validator: DefaultsValidator,
+    urlOpener: SimulatorURLOpener = SimulatorURLOpener()
 ) async {
     await registerLoadNavGraphTool(with: registry, navGraph: navGraph)
     await registerGetNavGraphTool(with: registry, navGraph: navGraph)
-    await registerNavigateToTool(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
+    await registerNavigateToTool(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator, urlOpener: urlOpener)
     await registerWhereAmITool(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
     await registerTagScreenTool(with: registry, session: session, executor: executor, navGraph: navGraph, validator: validator)
     await registerSaveNavGraphTool(with: registry, navGraph: navGraph)
