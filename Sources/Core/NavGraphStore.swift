@@ -18,8 +18,12 @@ public actor NavGraphStore {
     // MARK: - Graph Model Types
 
     public struct NavGraph: Codable, Sendable {
+        /// The graph author's own format version; ios-mcp shows it but doesn't check it.
         public let version: String
         public let app: String
+        /// The platform this graph describes ("ios" or "android"). ios-mcp
+        /// loads only graphs without a platform or marked "ios".
+        public let platform: String?
         public var nodes: [String: NavNode]
         public let edges: [NavEdge]
         public let commands: [NavCommand]?
@@ -194,9 +198,23 @@ public actor NavGraphStore {
     // MARK: - Loading
 
     /// Load a navigation graph from a JSON file.
+    ///
+    /// Throws `ToolError` (`invalid_input`) for a graph marked for another
+    /// platform. That check runs before the full decode, because other
+    /// platforms' graphs may use fields iOS graphs don't (such as a command
+    /// with no deep link) and would otherwise fail with a decoding error.
     public func load(from path: String) throws {
         let url = URL(fileURLWithPath: path)
         let data = try Data(contentsOf: url)
+        struct PlatformHeader: Decodable { let platform: String? }
+        if let platform = try? JSONDecoder().decode(PlatformHeader.self, from: data).platform,
+           platform.lowercased() != "ios" {
+            throw ToolError(
+                code: .invalidInput,
+                message: "This navigation graph is for \(platform), and ios-mcp drives iOS simulators.",
+                details: "Load a graph whose \"platform\" is \"ios\", or one without a platform field."
+            )
+        }
         let decoded = try JSONDecoder().decode(NavGraph.self, from: data)
         graph = decoded
         graphPath = path

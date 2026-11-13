@@ -89,7 +89,8 @@ func registerLoadNavGraphTool(
             let tabRoots = graph.nodes.values.filter { $0.isTabRoot }.map(\.name)
             let commandCount = graph.commands?.count ?? 0
 
-            var summary = "Navigation graph loaded (v\(graph.version), app: \(graph.app)).\n"
+            let platform = graph.platform.map { ", platform: \($0)" } ?? ""
+            var summary = "Navigation graph loaded (v\(graph.version), app: \(graph.app)\(platform)).\n"
             summary += "  \(nodeCount) nodes, \(edgeCount) edges, \(commandCount) commands\n"
             summary += "  Tab roots: \(tabRoots.joined(separator: ", "))"
 
@@ -117,6 +118,8 @@ func registerLoadNavGraphTool(
                     ),
                 ]
             ))
+        } catch let error as ToolError {
+            return .error(error)
         } catch {
             return .error(ToolError(
                 code: .invalidInput,

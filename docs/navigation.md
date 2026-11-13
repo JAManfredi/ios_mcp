@@ -53,12 +53,23 @@ A navigation graph is a single JSON file with the following top-level structure:
 {
   "version": "1.0",
   "app": "my-app",
+  "platform": "ios",
   "nodes": { ... },
   "edges": [ ... ],
   "commands": [ ... ],
   "references": [ ... ]
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | string | yes | The graph's own format version. Shown by `load_nav_graph` and `get_nav_graph`; ios-mcp doesn't check it. |
+| `app` | string | yes | Name of the app the graph describes |
+| `platform` | string | no | `ios` or `android`. One generator can write a graph per platform; `load_nav_graph` refuses a graph marked for a platform other than `ios`. Omit it for iOS-only graphs. |
+| `nodes` | object | yes | Screens, keyed by node ID |
+| `edges` | [Edge] | yes | Transitions between screens |
+| `commands` | [Command] | no | Utility deep links such as "dismiss" or "pop to root" |
+| `references` | [Reference] | no | Files next to the graph that help fill parameters, such as ID lookup tables. `load_nav_graph` lists their paths. |
 
 ### Nodes
 
