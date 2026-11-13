@@ -79,6 +79,47 @@ struct LoadNavGraphToolTests {
         }
     }
 
+    @Test("Refuses a graph marked for another platform, and names it")
+    func refusesOtherPlatform() async throws {
+        // An Android command has no deep link, so this graph wouldn't decode as an iOS graph.
+        let graph: [String: Any] = [
+            "version": "1.0", "app": "test", "platform": "android",
+            "nodes": ["home": ["id": "home", "name": "Home", "isTabRoot": true]],
+            "edges": [["from": "*", "to": "home", "actions": [["type": "deeplink", "url": "app://home"]]]],
+            "commands": [["id": "back", "description": "Back", "deeplinkTemplate": NSNull(), "behavior": "Back"]],
+        ]
+        let path = NSTemporaryDirectory() + "nav-graph-android-\(UUID().uuidString).json"
+        try JSONSerialization.data(withJSONObject: graph).write(to: URL(fileURLWithPath: path))
+        let registry = ToolRegistry()
+        let navGraph = NavGraphStore()
+        await registerLoadNavGraphTool(with: registry, navGraph: navGraph)
+
+        let response = try await registry.callTool(name: "load_nav_graph", arguments: ["path": .string(path)])
+
+        guard case .error(let error) = response else { Issue.record("Expected error: \(response)"); return }
+        #expect(error.code == .invalidInput)
+        #expect(error.message == "This navigation graph is for android, and ios-mcp drives iOS simulators.")
+        #expect(await navGraph.isLoaded() == false)
+    }
+
+    @Test("Loads a graph marked for iOS and shows the platform")
+    func loadsIOSPlatform() async throws {
+        let graph: [String: Any] = [
+            "version": "3.1", "app": "test", "platform": "ios",
+            "nodes": ["home": ["id": "home", "name": "Home", "isTabRoot": true]],
+            "edges": [["from": "*", "to": "home", "actions": [["type": "deeplink", "url": "app://home"]]]],
+        ]
+        let path = NSTemporaryDirectory() + "nav-graph-ios-\(UUID().uuidString).json"
+        try JSONSerialization.data(withJSONObject: graph).write(to: URL(fileURLWithPath: path))
+        let registry = ToolRegistry()
+        await registerLoadNavGraphTool(with: registry, navGraph: NavGraphStore())
+
+        let response = try await registry.callTool(name: "load_nav_graph", arguments: ["path": .string(path)])
+
+        guard case .success(let result) = response else { Issue.record("Expected success: \(response)"); return }
+        #expect(result.content.contains("(v3.1, app: test, platform: ios)"))
+    }
+
     @Test("Returns guidance when file not found")
     func fileNotFound() async throws {
         let registry = ToolRegistry()
